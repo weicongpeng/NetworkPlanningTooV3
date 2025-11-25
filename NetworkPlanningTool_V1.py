@@ -1064,23 +1064,29 @@ class NeighborPlanningTool:
     支持NR到NR、LTE到LTE、NR到LTE的邻区关系规划
     """
 
-    def __init__(self, neighbor_distance_km: float = 2.0, max_neighbors: int = 16):
+    def __init__(self, max_neighbors: int = 16,
+                 coverage_distance_factor: float = 5/9, coverage_radius_factor: float = 5/9):
         """
-        初始化邻区规划工具
+        初始化邻区规划工具（仅使用覆盖圆算法）
 
         Args:
-            neighbor_distance_km: 邻区关系规划距离（公里）
             max_neighbors: 每个小区的最大邻区数量
+            coverage_distance_factor: 覆盖圆距离系数k（站点到覆盖圆心距离 = k * Co）
+            coverage_radius_factor: 覆盖圆半径系数m（覆盖半径 = m * Co）
         """
-        self.neighbor_distance_km = neighbor_distance_km
         self.max_neighbors = max_neighbors
+        # 始终使用覆盖圆算法
+        self.coverage_distance_factor = coverage_distance_factor  # k系数
+        self.coverage_radius_factor = coverage_radius_factor      # m系数
         self.lte_cells = None
         self.nr_cells = None
         self.distance_cache = {}
         self.params_file = None  # 全量工参文件路径
 
         print(f"初始化邻区规划工具")
-        print(f"邻区关系规划距离: {neighbor_distance_km}km")
+        print(f"使用覆盖圆算法")
+        print(f"覆盖圆距离系数k: {coverage_distance_factor}")
+        print(f"覆盖圆半径系数m: {coverage_radius_factor}")
         print(f"最大邻区数量: {max_neighbors}")
 
     def generate_timestamp_suffix(self) -> str:
@@ -1143,6 +1149,70 @@ class NeighborPlanningTool:
         # 缓存结果
         self.distance_cache[cache_key] = distance
         return distance
+
+    def calculate_coverage_circle_center(self, lat: float, lon: float, azimuth: float, distance_factor: float, coverage_distance: float) -> Tuple[float, float]:
+        """
+        计算覆盖圆心坐标
+
+        Args:
+            lat: 站点纬度
+            lon: 站点经度
+            azimuth: 天线方位角（度）
+            distance_factor: 站点到覆盖圆心距离系数k
+            coverage_distance: 正向覆盖距离Co（米转公里）
+
+        Returns:
+            tuple: (圆心纬度, 圆心经度)
+        """
+        # 转换方位角为弧度
+        azimuth_rad = math.radians(azimuth)
+
+        # 计算站点到覆盖圆心的距离（公里）
+        d_s = distance_factor * coverage_distance / 1000  # 转换为公里
+
+        # 使用简单的平面近似计算（适用于较短距离）
+        # 计算纬度变化（每度约111公里）
+        lat_delta = (d_s * math.cos(azimuth_rad)) / 111.0
+        # 计算经度变化（每度约111公里，但需要考虑纬度影响）
+        lon_delta = (d_s * math.sin(azimuth_rad)) / (111.0 * math.cos(math.radians(lat)))
+
+        center_lat = lat + lat_delta
+        center_lon = lon + lon_delta
+
+        return center_lat, center_lon
+
+    def calculate_coverage_radius(self, coverage_distance: float, radius_factor: float) -> float:
+        """
+        计算覆盖半径
+
+        Args:
+            coverage_distance: 正向覆盖距离Co（米）
+            radius_factor: 覆盖半径系数m
+
+        Returns:
+            float: 覆盖半径（公里）
+        """
+        return radius_factor * coverage_distance / 1000  # 转换为公里
+
+    def are_coverage_circles_intersecting(self, center1_lat: float, center1_lon: float, radius1: float,
+                                          center2_lat: float, center2_lon: float, radius2: float) -> bool:
+        """
+        判断两个覆盖圆是否相交
+
+        Args:
+            center1_lat, center1_lon: 第一个圆心位置
+            radius1: 第一个圆的半径
+            center2_lat, center2_lon: 第二个圆心位置
+            radius2: 第二个圆的半径
+
+        Returns:
+            bool: 如果相交返回True，否则返回False
+        """
+        # 计算两个圆心之间的距离
+        center_distance = self.calculate_distance(center1_lat, center1_lon, center2_lat, center2_lon)
+
+        # 两圆相交的条件：圆心距离 <= 半径之和
+        return center_distance <= (radius1 + radius2)
 
     def preprocess_parameter_cells(self, raw_df: pd.DataFrame, network_type: str) -> pd.DataFrame:
         """
@@ -1493,7 +1563,7 @@ class NeighborPlanningTool:
 
     def plan_neighbors_for_network(self, source_network: str, target_network: str) -> pd.DataFrame:
         """
-        为指定网络类型规划邻区关系
+        为指定网络类型规划邻区关系（使用覆盖圆算法）
 
         Args:
             source_network: 源网络类型 ('LTE' 或 'NR')
@@ -1522,6 +1592,16 @@ class NeighborPlanningTool:
             # 获取源小区基站ID
             source_enodeb_id = self.get_enodeb_id(source_row, source_network)
 
+            # 获取源小区的方向角和覆盖距离
+            source_azimuth = source_info.get('antenna_azimuth', None)
+            try:
+                source_azimuth = float(source_azimuth) if source_azimuth is not None and str(source_azimuth).strip() != '' else None
+            except (ValueError, TypeError):
+                source_azimuth = None
+
+            # 假设默认覆盖距离为1000米
+            source_coverage_distance = 1000.0
+
             # 存储候选邻区
             candidate_neighbors = []
 
@@ -1534,27 +1614,80 @@ class NeighborPlanningTool:
                 # 获取目标小区基站ID
                 target_enodeb_id = self.get_enodeb_id(target_row, target_network)
 
+                # 获取目标小区的方向角和覆盖距离
+                target_azimuth = target_info.get('antenna_azimuth', None)
+                try:
+                    target_azimuth = float(target_azimuth) if target_azimuth is not None and str(target_azimuth).strip() != '' else None
+                except (ValueError, TypeError):
+                    target_azimuth = None
+
+                # 假设默认覆盖距离为1000米
+                target_coverage_distance = 1000.0
+
                 # 跳过相同小区
                 if source_key == target_key:
                     continue
 
-                # 计算距离 - 优先使用经纬度，如果没有则使用基站ID相近性
-                if source_lat is not None and source_lon is not None and target_lat is not None and target_lon is not None:
-                    # 使用实际经纬度计算距离
-                    distance = self.calculate_distance(source_lat, source_lon, target_lat, target_lon)
-                elif source_enodeb_id is not None and target_enodeb_id is not None:
-                    # 使用基站ID估算距离
-                    distance = self.estimate_distance_by_enodeb_id(source_enodeb_id, target_enodeb_id)
-                else:
-                    # 无法计算距离，跳过
-                    continue
+                # 使用覆盖圆算法判断是否为邻区
+                is_neighbor = False
+                distance = self.calculate_distance(source_lat, source_lon, target_lat, target_lon)  # 计算源小区到目标小区的距离
 
-                # 检查是否在规划距离内
-                if distance <= self.neighbor_distance_km:
+                try:
+                    # 计算源小区的覆盖圆心和半径
+                    if source_azimuth is not None:
+                        source_center_lat, source_center_lon = self.calculate_coverage_circle_center(
+                            source_lat, source_lon, source_azimuth,
+                            self.coverage_distance_factor, source_coverage_distance)
+                        source_radius = self.calculate_coverage_radius(
+                            source_coverage_distance, self.coverage_radius_factor)
+                    else:
+                        # 如果没有方位角，则以当前位置为中心
+                        source_center_lat, source_center_lon = source_lat, source_lon
+                        source_radius = self.calculate_coverage_radius(
+                            source_coverage_distance, self.coverage_radius_factor)
+
+                    # 计算目标小区的覆盖圆心和半径
+                    if target_azimuth is not None:
+                        target_center_lat, target_center_lon = self.calculate_coverage_circle_center(
+                            target_lat, target_lon, target_azimuth,
+                            self.coverage_distance_factor, target_coverage_distance)
+                        target_radius = self.calculate_coverage_radius(
+                            target_coverage_distance, self.coverage_radius_factor)
+                    else:
+                        # 如果没有方位角，则以当前位置为中心
+                        target_center_lat, target_center_lon = target_lat, target_lon
+                        target_radius = self.calculate_coverage_radius(
+                            target_coverage_distance, self.coverage_radius_factor)
+
+                    # 判断覆盖圆是否相交
+                    is_neighbor = self.are_coverage_circles_intersecting(
+                        source_center_lat, source_center_lon, source_radius,
+                        target_center_lat, target_center_lon, target_radius)
+                except Exception as e:
+                    print(f"覆盖圆计算错误: {e}")
+                    # 如果覆盖圆计算失败，不添加为邻区
+                    is_neighbor = False
+
+                # 如果满足邻区条件，则添加到候选列表
+                if is_neighbor:
+                    # 计算从源小区到目标小区的方位角
+                    source_to_target_azimuth = self.calculate_azimuth_angle(source_lat, source_lon, target_lat, target_lon)
+
+                    # 计算角度差 - 用于确定方向优先级
+                    angle_diff = None
+                    if source_azimuth is not None and target_azimuth is not None:
+                        # 理想情况下，两个小区应该方向对打（相差约180度）
+                        facing_diff = self.calculate_angle_difference(source_azimuth, (target_azimuth + 180) % 360)
+                        # 或者目标小区方向应该朝向源小区
+                        pointing_diff = self.calculate_angle_difference(target_azimuth, source_to_target_azimuth)
+                        # 采用较小的角度差作为参考
+                        angle_diff = min(facing_diff, pointing_diff)
+
                     candidate_neighbors.append({
                         'source_key': source_key,
                         'target_key': target_key,
                         'distance': distance,
+                        'angle_diff': angle_diff,  # 方向角度差
                         'source_cell_name': source_info['cell_name'],
                         'target_cell_name': target_info['cell_name'],
                         'source_earfcn': source_info['earfcn'],
@@ -1569,15 +1702,22 @@ class NeighborPlanningTool:
                         'target_enodeb_id': target_enodeb_id
                     })
 
-            # 按距离排序，选择最近的max_neighbors个小区
-            candidate_neighbors.sort(key=lambda x: x['distance'])
-            selected_neighbors = candidate_neighbors[:self.max_neighbors]
+            # 使用智能选择算法按扇区分部选择邻区
+            if candidate_neighbors:
+                # 按评分排序，选择评分最高的max_neighbors个邻区
+                for neighbor in candidate_neighbors:
+                    score = self._calculate_neighbor_score(neighbor)
+                    neighbor['score'] = score
 
-            # 添加到结果中
-            neighbor_relations.extend(selected_neighbors)
+                # 按评分排序（评分越高优先级越高）
+                candidate_neighbors.sort(key=lambda x: x['score'], reverse=True)
+                selected_neighbors = candidate_neighbors[:self.max_neighbors]
 
-            if len(selected_neighbors) > 0:
-                print(f"  {source_info['cell_name']}: 规划 {len(selected_neighbors)} 个邻区")
+                # 添加到结果中
+                neighbor_relations.extend(selected_neighbors)
+
+                if len(selected_neighbors) > 0:
+                    print(f"  {source_info['cell_name']}: 规划 {len(selected_neighbors)} 个邻区")
 
         # 转换为DataFrame
         if neighbor_relations:
@@ -1767,12 +1907,25 @@ class NeighborPlanningTool:
             source_info = self.get_cell_info(source_row, source_network)
             source_enodeb_id = self.get_enodeb_id(source_row, source_network)
 
+            # 获取方向角和覆盖距离（如果有的话）
+            source_azimuth = source_info.get('antenna_azimuth', None)
+            try:
+                source_azimuth = float(source_azimuth) if source_azimuth is not None and str(source_azimuth).strip() != '' else None
+            except (ValueError, TypeError):
+                source_azimuth = None
+
+            # 尝试从数据中获取覆盖距离（如果存在相关列）
+            coverage_distance = 1000.0  # 默认1000米，如果无法获取则使用默认值
+            # 这里可以根据实际数据列进行调整
+
             source_cell_info.append({
                 'key': source_key,
                 'lat': source_lat,
                 'lon': source_lon,
                 'info': source_info,
-                'enodeb_id': source_enodeb_id
+                'enodeb_id': source_enodeb_id,
+                'azimuth': source_azimuth,
+                'coverage_distance': coverage_distance
             })
 
         print(f"预处理完成，共 {len(source_cell_info)} 个源小区")
@@ -1789,15 +1942,18 @@ class NeighborPlanningTool:
             # 获取目标小区基站ID
             target_enodeb_id = self.get_enodeb_id(target_row, target_network)
 
-            # 存储候选邻区
-            candidate_neighbors = []
-
-            # 获取目标小区的方向角
+            # 获取目标小区的方向角和覆盖距离
             target_azimuth = target_info.get('antenna_azimuth', None)
             try:
                 target_azimuth = float(target_azimuth) if target_azimuth is not None and str(target_azimuth).strip() != '' else None
             except (ValueError, TypeError):
                 target_azimuth = None
+
+            # 默认覆盖距离，如果数据中有具体值可以进一步获取
+            target_coverage_distance = 1000.0  # 默认1000米
+
+            # 存储候选邻区
+            candidate_neighbors = []
 
             # 遍历预处理的源小区信息
             for source_data in source_cell_info:
@@ -1806,6 +1962,8 @@ class NeighborPlanningTool:
                 source_lon = source_data['lon']
                 source_info = source_data['info']
                 source_enodeb_id = source_data['enodeb_id']
+                source_azimuth = source_data['azimuth']
+                source_coverage_distance = source_data['coverage_distance']
 
                 # 跳过相同小区
                 if target_key == source_key:
@@ -1815,20 +1973,50 @@ class NeighborPlanningTool:
                 if source_lat is None or source_lon is None:
                     continue
 
-                # 计算距离
+                # 使用覆盖圆算法判断
+                is_neighbor = False
                 distance = self.calculate_distance(target_lat, target_lon, source_lat, source_lon)
 
-                # 检查是否在规划距离内
-                if distance <= self.neighbor_distance_km:
+                try:
+                    # 计算目标小区的覆盖圆心和半径
+                    if target_azimuth is not None:
+                        target_center_lat, target_center_lon = self.calculate_coverage_circle_center(
+                            target_lat, target_lon, target_azimuth,
+                            self.coverage_distance_factor, target_coverage_distance)
+                        target_radius = self.calculate_coverage_radius(
+                            target_coverage_distance, self.coverage_radius_factor)
+                    else:
+                        # 如果没有方位角，则以当前位置为中心
+                        target_center_lat, target_center_lon = target_lat, target_lon
+                        target_radius = self.calculate_coverage_radius(
+                            target_coverage_distance, self.coverage_radius_factor)
+
+                    # 计算源小区的覆盖圆心和半径
+                    if source_azimuth is not None:
+                        source_center_lat, source_center_lon = self.calculate_coverage_circle_center(
+                            source_lat, source_lon, source_azimuth,
+                            self.coverage_distance_factor, source_coverage_distance)
+                        source_radius = self.calculate_coverage_radius(
+                            source_coverage_distance, self.coverage_radius_factor)
+                    else:
+                        # 如果没有方位角，则以当前位置为中心
+                        source_center_lat, source_center_lon = source_lat, source_lon
+                        source_radius = self.calculate_coverage_radius(
+                            source_coverage_distance, self.coverage_radius_factor)
+
+                    # 判断覆盖圆是否相交
+                    is_neighbor = self.are_coverage_circles_intersecting(
+                        target_center_lat, target_center_lon, target_radius,
+                        source_center_lat, source_center_lon, source_radius)
+                except Exception as e:
+                    print(f"覆盖圆计算错误: {e}")
+                    # 如果覆盖圆计算失败，不添加为邻区（覆盖圆算法失效时返回False）
+                    is_neighbor = False
+
+                # 如果满足邻区条件，则计算方位角和角度差等信息
+                if is_neighbor:
                     # 计算从目标小区到源小区的方位角
                     target_to_source_azimuth = self.calculate_azimuth_angle(target_lat, target_lon, source_lat, source_lon)
-
-                    # 获取源小区的方向角
-                    source_azimuth = source_info.get('antenna_azimuth', None)
-                    try:
-                        source_azimuth = float(source_azimuth) if source_azimuth is not None and str(source_azimuth).strip() != '' else None
-                    except (ValueError, TypeError):
-                        source_azimuth = None
 
                     # 计算角度差 - 用于确定方向优先级
                     angle_diff = None
@@ -1977,21 +2165,40 @@ class NeighborPlanningTool:
         distance = neighbor['distance']
         angle_diff = neighbor.get('angle_diff', float('inf'))  # 角度差，越小越好
 
-        # 距离评分：距离越近得分越高
-        # 使用负指数函数，使近距离的得分显著高于远距离
-        distance_score = 100 * math.exp(-distance / 5.0)  # 调整参数5.0以控制距离衰减速度
+        # 检查是否为同站小区（经纬度相同或非常接近）
+        # tolerance设为0.0001度（约10米精度）来判断是否为同站
+        tolerance = 0.0001
+        is_same_site = (abs(neighbor['source_lat'] - neighbor['target_lat']) < tolerance and
+                        abs(neighbor['source_lon'] - neighbor['target_lon']) < tolerance)
 
-        # 方向评分：方向对打或朝向目标小区的得分更高
-        # angle_diff = 0 表示完美对打或朝向，angle_diff = 180 表示完全背向
-        if angle_diff is None or angle_diff == float('inf'):
-            # 如果无法计算方向角，则只考虑距离
-            direction_score = 0
+        # 如果是同站小区，给予最高优先级
+        if is_same_site:
+            # 给同站小区一个非常高基础分，确保它们总是优先选择
+            same_site_bonus = 1000  # 大于任何其他评分的值
+            # 同站小区仍然会根据距离和方向进行微调
+            distance_score = 100 * math.exp(-distance / 5.0)  # 调整参数5.0以控制距离衰减速度
+            if angle_diff is None or angle_diff == float('inf'):
+                direction_score = 0
+            else:
+                # 角度差越小得分越高，0度差得满分，180度差得0分
+                direction_score = max(0, (180 - angle_diff) / 180 * 50)  # 最多50分
+            total_score = same_site_bonus + distance_score + direction_score
         else:
-            # 角度差越小得分越高，0度差得满分，180度差得0分
-            direction_score = max(0, (180 - angle_diff) / 180 * 50)  # 最多50分
+            # 距离评分：距离越近得分越高
+            # 使用负指数函数，使近距离的得分显著高于远距离
+            distance_score = 100 * math.exp(-distance / 5.0)  # 调整参数5.0以控制距离衰减速度
 
-        # 综合评分 = 距离评分 + 方向评分
-        total_score = distance_score + direction_score
+            # 方向评分：方向对打或朝向目标小区的得分更高
+            # angle_diff = 0 表示完美对打或朝向，angle_diff = 180 表示完全背向
+            if angle_diff is None or angle_diff == float('inf'):
+                # 如果无法计算方向角，则只考虑距离
+                direction_score = 0
+            else:
+                # 角度差越小得分越高，0度差得满分，180度差得0分
+                direction_score = max(0, (180 - angle_diff) / 180 * 50)  # 最多50分
+
+            # 综合评分 = 距离评分 + 方向评分
+            total_score = distance_score + direction_score
 
         return total_score
 
@@ -4312,33 +4519,73 @@ class Tooltip:
         self.tipwindow = None
         self.id = None
         self.x = self.y = 0
-        
-    def show(self, text, x, y, duration=2000):
+        self.x_offset = 10  # X offset from mouse pointer
+        self.y_offset = 10  # Y offset from mouse pointer
+
+        # Bind mouse events
+        self.widget.bind("<Enter>", self.on_enter)
+        self.widget.bind("<Leave>", self.on_leave)
+        self.widget.bind("<Motion>", self.on_motion)
+
+    def on_enter(self, event=None):
+        """When mouse enters the widget"""
+        self.schedule_show()
+
+    def on_leave(self, event=None):
+        """When mouse leaves the widget"""
+        self.hide()
+
+    def on_motion(self, event=None):
+        """When mouse moves over the widget"""
+        self.x = event.x_root + self.x_offset
+        self.y = event.y_root + self.y_offset
+
+    def schedule_show(self):
+        """Schedule tooltip to show after delay"""
+        self.widget.after_cancel(self.id) if self.id else None
+        self.id = self.widget.after(500, self.show)  # Show after 500ms
+
+    def show(self, text=None, x=None, y=None, duration=None):
         """Show tooltip at specified position for duration (ms)"""
-        self.text = text
-        self.x = x
-        self.y = y
-        
+        if text is not None:
+            self.text = text
+        if x is not None:
+            self.x = x
+        if y is not None:
+            self.y = y
+
         if self.tipwindow or not self.text:
             return
-        
+
+        # Calculate position if not provided
+        if x is None or y is None:
+            try:
+                x = self.x if hasattr(self, 'x') else 0
+                y = self.y if hasattr(self, 'y') else 0
+            except:
+                # Fallback to mouse position if not set
+                x = self.widget.winfo_pointerx() + self.x_offset
+                y = self.widget.winfo_pointery() + self.y_offset
+
         # Create tooltip window
         self.tipwindow = tw = tk.Toplevel(self.widget)
         tw.wm_overrideredirect(1)  # Remove window decorations
         tw.wm_geometry("+%d+%d" % (x, y))
-        
+
         # Create label with styling
         label = tk.Label(tw, text=self.text, justify=tk.LEFT,
-                        background="#ffffe0", foreground="black", 
+                        background="#ffffe0", foreground="black",
                         relief=tk.SOLID, borderwidth=1,
                         font=("TkDefaultFont", 9))
         label.pack(ipadx=1)
-        
-        # Auto-hide after duration
-        self.widget.after(duration, self.hide)
-    
+
+        # Auto-hide after duration if specified
+        if duration is not None:
+            self.widget.after(duration, self.hide)
+
     def hide(self):
         """Hide the tooltip"""
+        self.widget.after_cancel(self.id) if self.id else None
         if self.tipwindow:
             self.tipwindow.destroy()
             self.tipwindow = None
@@ -4374,6 +4621,8 @@ class PCIGUIApp:
         self.online_param_file = tk.StringVar(value=latest_baseline_file or "")
         self.neighbor_cells_file = tk.StringVar(value=latest_cells_file or "")
         self.neighbor_params_file = tk.StringVar(value=latest_params_file or "")
+        self.coverage_distance_factor = tk.DoubleVar(value=5/9)  # k系数
+        self.coverage_radius_factor = tk.DoubleVar(value=5/9)   # m系数
         self.reuse_distance = tk.DoubleVar(value=3.0)
         self.lte_inherit_mod3 = tk.BooleanVar()
         self.nr_inherit_mod30 = tk.BooleanVar()
@@ -4743,26 +4992,44 @@ class PCIGUIApp:
         neighbor_frame = ttk.Frame(self.notebook)
         self.notebook.add(neighbor_frame, text="邻区规划")
 
+        # Planning type
+        type_frame = ttk.Frame(neighbor_frame)
+        type_frame.pack(fill=tk.X, padx=10, pady=5)
+        ttk.Label(type_frame, text="邻区类型:").pack(side=tk.LEFT, padx=5)
+        self.planning_type = tk.StringVar(value="NR到NR")
+        type_combo = ttk.Combobox(type_frame, textvariable=self.planning_type,
+                                 values=["NR到NR", "LTE到LTE", "NR到LTE"], state="readonly")
+        type_combo.pack(side=tk.LEFT, padx=5)
+
         # Planning parameters
         param_frame = ttk.LabelFrame(neighbor_frame, text="规划参数")
         param_frame.pack(fill=tk.X, padx=10, pady=5)
 
-        # Neighbor distance
-        ttk.Label(param_frame, text="邻区距离 (km):").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
-        self.neighbor_distance = tk.DoubleVar(value=2.0)
-        ttk.Entry(param_frame, textvariable=self.neighbor_distance, width=10).grid(row=0, column=1, sticky=tk.W, padx=5, pady=5)
-
         # Max neighbors
-        ttk.Label(param_frame, text="最大邻区数:").grid(row=0, column=2, sticky=tk.W, padx=10, pady=5)
+        ttk.Label(param_frame, text="最大邻区数:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
         self.max_neighbors = tk.IntVar(value=16)
-        ttk.Entry(param_frame, textvariable=self.max_neighbors, width=10).grid(row=0, column=3, sticky=tk.W, padx=5, pady=5)
+        ttk.Entry(param_frame, textvariable=self.max_neighbors, width=10).grid(row=0, column=1, sticky=tk.W, padx=5, pady=5)
 
-        # Planning type
-        ttk.Label(param_frame, text="邻区类型:").grid(row=1, column=0, sticky=tk.W, padx=5, pady=5)
-        self.planning_type = tk.StringVar(value="NR到NR")
-        type_combo = ttk.Combobox(param_frame, textvariable=self.planning_type,
-                                 values=["NR到NR", "LTE到LTE", "NR到LTE"], state="readonly")
-        type_combo.grid(row=1, column=1, sticky=tk.W, padx=5, pady=5)
+        # Coverage circle parameters with help tooltip
+        self.coverage_distance_label = ttk.Label(param_frame, text="覆盖圆距离系数k:")
+        self.coverage_distance_label.grid(row=0, column=2, sticky=tk.W, padx=10, pady=5)
+        self.coverage_distance_factor_entry = ttk.Entry(param_frame, textvariable=self.coverage_distance_factor, width=10)
+        self.coverage_distance_factor_entry.grid(row=0, column=3, sticky=tk.W, padx=5, pady=5)
+
+        # 添加覆盖圆距离系数的说明帮助
+        self.k_help_label = ttk.Label(param_frame, text="?", foreground="blue", cursor="hand2")
+        self.k_help_label.grid(row=0, column=4, sticky=tk.W, padx=(0, 5))
+        self.k_tooltip = Tooltip(self.k_help_label, "覆盖圆距离系数k：站点到覆盖圆心的距离系数\n- 默认值5/9(≈0.556)，覆盖圆心位于主瓣方向距离站点(5/9)*Co处\n- k值越大，覆盖圆心离基站越远，方向性越明显，邻区范围偏向前方\n- k值越小，覆盖圆心越接近基站，覆盖越接近全向，邻区分布更均匀")
+
+        self.coverage_radius_label = ttk.Label(param_frame, text="覆盖圆半径系数m:")
+        self.coverage_radius_label.grid(row=0, column=5, sticky=tk.W, padx=10, pady=5)
+        self.coverage_radius_factor_entry = ttk.Entry(param_frame, textvariable=self.coverage_radius_factor, width=10)
+        self.coverage_radius_factor_entry.grid(row=0, column=6, sticky=tk.W, padx=5, pady=5)
+
+        # 添加覆盖圆半径系数的说明帮助
+        self.m_help_label = ttk.Label(param_frame, text="?", foreground="blue", cursor="hand2")
+        self.m_help_label.grid(row=0, column=7, sticky=tk.W, padx=(0, 5))
+        self.m_tooltip = Tooltip(self.m_help_label, "覆盖圆半径系数m：覆盖半径系数\n- 默认值5/9(≈0.556)，覆盖半径为(5/9)*Co\n- m值越大，覆盖圆半径越大，可获得邻区数量增多\n- m值越小，覆盖圆半径越小，邻区数量减少")
 
         # Buttons frame
         btn_frame = ttk.Frame(neighbor_frame)
@@ -4918,6 +5185,7 @@ class PCIGUIApp:
         )
         if filename:
             self.neighbor_params_file.set(filename)
+
 
     def _get_latest_file(self, file_list):
         """Get the latest file from a list based on timestamp in filename or modification time"""
@@ -5211,10 +5479,11 @@ class PCIGUIApp:
             self.queue.put(("neighbor_info", "开始邻区规划...\n"))
             self.queue.put(("neighbor_progress", 10))  # Start progress
 
-            # Create neighbor planning tool instance
+            # Create neighbor planning tool instance (always uses coverage circle algorithm now)
             tool = NeighborPlanningTool(
-                neighbor_distance_km=self.neighbor_distance.get(),
-                max_neighbors=self.max_neighbors.get()
+                max_neighbors=self.max_neighbors.get(),
+                coverage_distance_factor=self.coverage_distance_factor.get(),
+                coverage_radius_factor=self.coverage_radius_factor.get()
             )
 
             # Determine planning type based on GUI selection

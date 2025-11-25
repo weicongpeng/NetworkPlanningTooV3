@@ -27,6 +27,16 @@ run.bat
 pip install pandas numpy openpyxl tkinter cryptography
 ```
 
+### Testing and Development
+```bash
+python test.py  # Test coverage circle neighbor planning algorithm
+```
+
+**Algorithm Parameters**:
+- k = 5/9: Distance coefficient from site to coverage center
+- m = 5/9: Coverage radius coefficient
+- Default max neighbors: 32 per cell
+
 ## License Management
 
 The application includes a license verification system that must be validated before use:
@@ -34,6 +44,24 @@ The application includes a license verification system that must be validated be
 - Contact information for license issues: weicongpeng1@163.com or 15220958556
 - License validation occurs on application startup
 - Invalid licenses will display an error message and exit
+
+## Input File Requirements
+
+### PCI Planning Input (待规划小区/)
+Expected format: `cell-tree-export-*.xlsx`
+- Must contain columns for cell identification, coordinates, frequency, etc.
+- Supports fuzzy column name matching (e.g., "物理小区识别码" matches variations)
+
+### Network Parameters (全量工参/)
+Expected format: `ProjectParameter_mongoose*.xlsx`
+- **Critical**: First 3 rows (indices 0-2) are headers and MUST NOT be modified
+- Data starts from row 4 (index 3)
+- Timestamp format in filename: YYYYMMDDHHMMSS (14 digits)
+
+### Parameter Update Source
+Expected format: `BaselineLab_*.zip` (compressed archive)
+- Contains LTE_SDR/LTE_ITBBU and NR online parameter files
+- System automatically extracts and selects latest timestamp files
 
 ## Code Architecture
 
@@ -102,6 +130,21 @@ Three types of caches cleared after each PCI assignment:
 - `pci_validity_cache` - PCI validation results
 - `same_site_cache` - Same-site cell lookups
 
+## Advanced Features
+
+### Fuzzy Column Matching
+The tool implements intelligent column name matching to handle variations:
+- Automatically finds columns with similar names
+- Supports different naming conventions (e.g., 'cellName' vs 'CellName')
+- Enables compatibility across different data source formats
+
+### Neighbor Planning Coverage Circle Algorithm
+Uses geometric circle intersection to determine neighbor relationships:
+- Coverage circle center: Located at distance `k*Co` from site in azimuth direction
+- Coverage radius: `m*Co` where Co is forward coverage distance
+- Neighbor condition: Circle intersection OR same-site location
+- Priority sorting: By distance between coverage circle centers
+
 ## File Structure
 
 ```
@@ -121,6 +164,25 @@ Three types of caches cleared after each PCI assignment:
     ├── pci_planning_*.xlsx
     └── neighbor_planning_*.xlsx
 ```
+
+## Output Files
+
+All outputs are saved to `输出文件/` directory with timestamp:
+
+### PCI Planning Output
+- Format: `pci_planning_YYYYMMDD_HHMMSS.xlsx`
+- Contains assigned PCIs with conflict resolution details
+- Includes constraint satisfaction status and fallback information
+
+### Neighbor Planning Output
+- Format: `neighbor_planning_YYYYMMDD_HHMMSS.xlsx`
+- Three planning types: NR-NR, LTE-LTE, NR-LTE
+- Distance-based neighbor relationships with configurable thresholds
+
+### Updated Parameters
+- Format: `ProjectParameter_mongoose_updated_YYYYMMDD_HHMMSS.xlsx`
+- Preserves original header rows (0-2)
+- Shows updated and new cell counts in console log
 
 ## Development Guidelines
 
@@ -142,3 +204,35 @@ Three types of caches cleared after each PCI assignment:
 - Clear caches appropriately to prevent memory leaks
 - Consider threading for GUI responsiveness
 - Optimize DataFrame operations for large datasets
+
+## Debugging and Troubleshooting
+
+### Common Issues
+
+**License Validation Failure**
+- Check license.dat file exists in root directory
+- Verify file has not been tampered with
+- Contact: weicongpeng1@163.com or 15220958556
+
+**Missing Input Files**
+- Verify directory structure: `全量工参/`, `待规划小区/`
+- Check file naming patterns match expected formats
+- Ensure Excel files are not corrupted or password-protected
+
+**PCI Planning Conflicts**
+- Tool uses smart fallback: 3.0km → 2.0km reuse distance
+- Check console output for constraint relaxation messages
+- Verify frequency and mod constraint settings
+- Review same-site cells (< 10 meters) for conflicts
+
+**Parameter Update Issues**
+- Ensure BaselineLab_*.zip contains valid Excel files
+- Check timestamp format in filenames (14-digit YYYYMMDDHHMMSS)
+- Verify header rows (0-2) are intact in ProjectParameter files
+- Confirm fuzzy column matching finds required columns
+
+**GUI Freezing or Unresponsive**
+- Operations run in background threads for responsiveness
+- Check console output for progress messages
+- Large datasets may take several minutes to process
+- Monitor memory usage for very large files (> 100MB)
