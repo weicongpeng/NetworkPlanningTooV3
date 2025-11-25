@@ -7,7 +7,7 @@
 
 # First check license
 try:
-    from license_manager import LicenseManager
+    from license_generator import LicenseManager
     license_mgr = LicenseManager()
     is_valid, message = license_mgr.check_license()
 
@@ -1064,7 +1064,7 @@ class NeighborPlanningTool:
     支持NR到NR、LTE到LTE、NR到LTE的邻区关系规划
     """
 
-    def __init__(self, max_neighbors: int = 16,
+    def __init__(self, max_neighbors: int = 32,
                  coverage_distance_factor: float = 5/9, coverage_radius_factor: float = 5/9):
         """
         初始化邻区规划工具（仅使用覆盖圆算法）
@@ -5007,7 +5007,7 @@ class PCIGUIApp:
 
         # Max neighbors
         ttk.Label(param_frame, text="最大邻区数:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
-        self.max_neighbors = tk.IntVar(value=16)
+        self.max_neighbors = tk.IntVar(value=32)
         ttk.Entry(param_frame, textvariable=self.max_neighbors, width=10).grid(row=0, column=1, sticky=tk.W, padx=5, pady=5)
 
         # Coverage circle parameters with help tooltip
