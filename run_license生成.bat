@@ -1,1 +1,0 @@
-python license_generator.py

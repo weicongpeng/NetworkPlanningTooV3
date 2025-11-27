@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-License Manager and Generator Script
-Combined functionality for NetworkPlanningTool
+License Manager and Generator - CLI Version
+Command-line interface for NetworkPlanningTool license management
 """
 
 import datetime
@@ -12,6 +12,7 @@ import sys
 import hashlib
 import base64
 import hmac
+import argparse
 from cryptography.fernet import Fernet
 
 
@@ -56,7 +57,7 @@ class LicenseManager:
         with open(self.license_path, 'wb') as f:
             f.write(json.dumps(license_package).encode('utf-8'))
 
-        print(f"Encrypted license generated valid until: {expire_date.strftime('%Y-%m-%d')}")
+        return f"Encrypted license generated valid until: {expire_date.strftime('%Y-%m-%d')}"
 
     def check_license(self):
         """Check if license is valid and hasn't expired"""
@@ -124,71 +125,124 @@ def create_key():
     return Fernet.generate_key()
 
 
-def main():
+def print_menu():
+    """打印菜单选项"""
+    print("\n" + "="*50)
     print("Network Planning Tool - License Manager and Generator")
-    print("=" * 50)
+    print("="*50)
+    print("请选择操作:")
+    print("1. 生成新许可证")
+    print("2. 检查现有许可证")
+    print("3. 生成并检查许可证")
+    print("4. 退出")
+    print("="*50)
 
-    # Provide options to user
-    print("Options:")
-    print("1. Generate New License")
-    print("2. Check Existing License")
-    print("3. Both Generate and Check")
 
+def get_user_choice():
+    """获取用户选择"""
     try:
-        choice = input("\nSelect option (1-3, default 1): ").strip()
-        if not choice:
-            choice = "1"
-        else:
-            choice = int(choice)
-    except ValueError:
-        print("Invalid input. Using default option 1 (Generate New License).")
-        choice = 1
+        choice = input("请输入选项编号 (1-4): ").strip()
+        return choice
+    except KeyboardInterrupt:
+        print("\n\n程序已退出。")
+        sys.exit(0)
 
-    # Create license manager
-    lm = LicenseManager("license.dat")  # Standard filename for the app
 
-    if choice in [1, 3]:
-        # Generate license option
+def get_days_input():
+    """获取天数输入"""
+    while True:
         try:
-            days = input("Enter number of days for license (default 30): ").strip()
-            if not days:
-                days = 30
-            else:
-                days = int(days)
+            days_input = input("请输入许可证有效天数 (默认30天): ").strip()
+            if days_input == "":
+                return 30
+            days = int(days_input)
+            if days <= 0:
+                print("天数必须大于0，请重新输入。")
+                continue
+            return days
         except ValueError:
-            print("Invalid input. Using default 30 days.")
-            days = 30
+            print("请输入有效的数字。")
+            continue
 
-        # Generate license
-        try:
-            lm.generate_license(days=days)
-            print(f"\nLicense generated successfully!")
-            print(f"Valid for {days} days")
-            print(f"Current date: {datetime.datetime.now().strftime('%Y-%m-%d')}")
-            expire_date = (datetime.datetime.now() + datetime.timedelta(days=days)).strftime('%Y-%m-%d')
-            print(f"Expires on: {expire_date}")
-            print(f"License file created: license.dat")
-            print(f"File size: {os.path.getsize('license.dat')} bytes")
 
-            if choice == 1:
-                print("\nTo use with NetworkPlanningTool:")
-                print("1. Place 'license.dat' in the same directory as the executable")
-                print("2. Run NetworkPlanningTool")
+def main():
+    print("欢迎使用 Network Planning Tool 许可证管理器！")
 
-        except Exception as e:
-            print(f"Error generating license: {str(e)}")
+    while True:
+        print_menu()
+        choice = get_user_choice()
 
-    if choice in [2, 3]:
-        # Check license option
-        print("\nChecking existing license...")
-        is_valid, message = lm.check_license()
-        if is_valid:
-            print(f"✓ {message}")
+        if choice == "1":
+            # 生成许可证
+            days = get_days_input()
+            license_manager = LicenseManager("license.dat")
+            try:
+                result_msg = license_manager.generate_license(days=days)
+                print(result_msg)
+                print(f"\n许可证生成成功!")
+                print(f"有效天数: {days} 天")
+                print(f"当前日期: {datetime.datetime.now().strftime('%Y-%m-%d')}")
+                expire_date = (datetime.datetime.now() + datetime.timedelta(days=days)).strftime('%Y-%m-%d')
+                print(f"到期日期: {expire_date}")
+                print(f"许可证文件: license.dat")
+                if os.path.exists('license.dat'):
+                    print(f"文件大小: {os.path.getsize('license.dat')} 字节")
+                print(f"\n使用说明:")
+                print(f"1. 将 'license.dat' 放在可执行文件的同一目录下")
+                print(f"2. 运行 NetworkPlanningTool")
+            except Exception as e:
+                print(f"生成许可证时出错: {str(e)}")
+
+        elif choice == "2":
+            # 检查许可证
+            license_manager = LicenseManager("license.dat")
+            print("正在检查现有许可证...")
+            is_valid, message = license_manager.check_license()
+            if is_valid:
+                print(f"[OK] {message}")
+            else:
+                print(f"[ERROR] {message}")
+
+        elif choice == "3":
+            # 生成并检查许可证
+            days = get_days_input()
+            license_manager = LicenseManager("license.dat")
+            try:
+                # 首先生成许可证
+                result_msg = license_manager.generate_license(days=days)
+                print(result_msg)
+                print(f"\n许可证生成成功!")
+                print(f"有效天数: {days} 天")
+                print(f"当前日期: {datetime.datetime.now().strftime('%Y-%m-%d')}")
+                expire_date = (datetime.datetime.now() + datetime.timedelta(days=days)).strftime('%Y-%m-%d')
+                print(f"到期日期: {expire_date}")
+                print(f"许可证文件: license.dat")
+                if os.path.exists('license.dat'):
+                    print(f"文件大小: {os.path.getsize('license.dat')} 字节")
+
+                # 然后检查生成的许可证
+                print(f"\n正在验证生成的许可证...")
+                is_valid, message = license_manager.check_license()
+                if is_valid:
+                    print(f"[OK] {message}")
+                else:
+                    print(f"[ERROR] {message}")
+            except Exception as e:
+                print(f"生成或检查许可证时出错: {str(e)}")
+
+        elif choice == "4":
+            # 退出
+            print("感谢使用！再见！")
+            sys.exit(0)
+
         else:
-            print(f"✗ {message}")
+            print("无效的选择，请输入 1-4 之间的数字。")
 
-    if choice not in [1, 2, 3]:
-        print("Invalid choice. Please select 1, 2, or 3.")
+        # 询问是否继续
+        continue_choice = input("\n按 Enter 键继续，输入 'q' 退出: ").strip().lower()
+        if continue_choice == 'q':
+            print("感谢使用！再见！")
+            sys.exit(0)
 
 
 if __name__ == "__main__":
