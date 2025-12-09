@@ -15,21 +15,20 @@ python NetworkPlanningTool_V1.py
 run_gui.bat
 ```
 
-### CLI Version (Legacy)
+### License Generator
 ```bash
-python planning_lte_nr_enhanced.py
+python license_generator.py
 # or on Windows
-run.bat
+run_license.bat
 ```
 
 ### Dependencies
 ```bash
-pip install pandas numpy openpyxl tkinter cryptography
-```
+# Core dependencies
+pip install pandas numpy openpyxl cryptography
 
-### Testing and Development
-```bash
-python test.py  # Test coverage circle neighbor planning algorithm
+# GUI framework (usually included with Python)
+# tkinter
 ```
 
 **Algorithm Parameters**:
@@ -37,13 +36,50 @@ python test.py  # Test coverage circle neighbor planning algorithm
 - m = 5/9: Coverage radius coefficient
 - Default max neighbors: 32 per cell
 
+### Testing and Development
+**Note**: No automated test suite currently exists in the repository.
+
+**Manual Testing Approaches**:
+1. **Small Dataset Testing**: Use datasets with <100 cells for quick validation
+2. **Core Algorithm Verification**:
+   - Test PCI assignment with known constraints
+   - Verify distance calculations using known coordinate pairs
+   - Check same-site detection (<0.01km threshold)
+3. **Integration Testing**:
+   - Test license validation flow
+   - Verify file I/O operations
+   - Test GUI responsiveness during processing
+
+**Code Quality Tools** (not currently configured):
+- **Formatting**: No code formatter configured
+- **Linting**: No linter configured
+- **Type Checking**: Optional (no mypy configuration)
+- **Documentation**: Docstrings recommended for all classes/methods
+
+**Development Setup**:
+```bash
+# Clone repository
+git clone <repository-url>
+cd NetworkPlanningTool
+
+# Install dependencies
+# Core dependencies
+pip install pandas numpy openpyxl cryptography
+
+# Run application
+python NetworkPlanningTool_V1.py
+```
+
 ## License Management
 
 The application includes a license verification system that must be validated before use:
-- License file: `license.dat`
-- Contact information for license issues: weicongpeng1@163.com or 15220958556
-- License validation occurs on application startup
-- Invalid licenses will display an error message and exit
+- **License file**: `license.dat`
+- **Contact information**: weicongpeng1@163.com or 15220958556
+- **Validation**: Automatic license check on application startup
+- **Invalid licenses**: Display error message and exit gracefully
+- **Generator tool**: `license_generator.py` for creating and validating licenses
+- **Encryption**: Uses Fernet encryption with HMAC signature verification
+- **Tamper detection**: Validates license integrity and expiration date
 
 ## Input File Requirements
 
@@ -67,27 +103,25 @@ Expected format: `BaselineLab_*.zip` (compressed archive)
 
 ### Main Components
 
-#### 1. NetworkPlanningTool_V1.py (GUI Version)
-**Primary application with tkinter-based GUI**
-- License verification on startup
-- Three main functional modules:
+#### 1. NetworkPlanningTool_V1.py (Main Application)
+**Primary application with tkinter-based GUI and integrated license verification**
+- **License verification**: Embedded license check at startup (first 100 lines)
+- **Three main functional modules**:
   - PCI Planning
   - Network Parameter Updates
   - Neighbor Planning
-- Threaded execution for responsive UI
-- Real-time progress reporting
+- **Threaded execution**: Background processing for responsive UI
+- **Real-time progress reporting**: Console output and GUI progress bars
+- **Size**: ~5300 lines
 
-#### 2. planning_lte_nr_enhanced.py (CLI Version)
-**Legacy command-line interface**
-- Same core functionality as GUI version
-- Interactive menu system
-- Batch processing capabilities
-
-#### 3. License Management System
-- `license_manager.py`: Handles license validation and encryption
-- Uses Fernet encryption with HMAC signature verification
-- License expiration checking
-- Tamper detection
+#### 2. License Management System
+**Integrated license validation and generation tools**
+- **Integrated validation**: License check embedded in main program
+- `license_generator.py`: Interactive license generation and validation tool
+  - Generate new licenses with customizable expiration dates
+  - Check existing license validity
+  - Uses Fernet encryption + HMAC signature verification
+  - Provides clear error messages for invalid/tampered licenses
 
 ### Core Functional Classes
 
@@ -149,20 +183,22 @@ Uses geometric circle intersection to determine neighbor relationships:
 
 ```
 /
-├── NetworkPlanningTool_V1.py          # Main GUI application
-├── planning_lte_nr_enhanced.py        # Legacy CLI application
-├── license_manager.py                 # License validation system
+├── NetworkPlanningTool_V1.py          # Main GUI application (~5300 lines)
 ├── license_generator.py               # License generation utility
 ├── license.dat                        # License file
 ├── run_gui.bat                        # Windows GUI launcher
-├── run.bat                            # Windows CLI launcher
+├── run_license.bat                    # Windows license generator launcher
+├── README.md                          # User documentation
+├── CLAUDE.md                          # Developer guide (this file)
+├── IFLOW.md                           # iFlow CLI context
 ├── 全量工参/                          # Full network parameter files
 │   └── ProjectParameter_mongoose*.xlsx
 ├── 待规划小区/                        # Cells to be planned
 │   └── cell-tree-export-*.xlsx
 └── 输出文件/                          # Output files
     ├── pci_planning_*.xlsx
-    └── neighbor_planning_*.xlsx
+    ├── neighbor_planning_*.xlsx
+    └── ProjectParameter_mongoose_updated_*.xlsx
 ```
 
 ## Output Files
@@ -187,32 +223,38 @@ All outputs are saved to `输出文件/` directory with timestamp:
 ## Development Guidelines
 
 ### When Modifying Code
-- Never modify header rows (indices 0-2)
-- Always use `df.loc[3:, ...]` for data operations
-- Maintain timestamp format consistency
-- Test with both LTE and NR data
-- Verify license management functionality
+- **Data Protection**: Never modify header rows (indices 0-2), always use `df.loc[3:, ...]`
+- **Timestamp Format**: Maintain `YYYYMMDD_HHMMSS` format consistency for all output files
+- **Testing**: Test with both LTE and NR data sets
+- **License Management**: Verify license validation functionality after changes
 
 ### Error Handling
-- Check for license validation errors first
-- Handle missing files with clear error messages
-- Validate input data formats before processing
-- Implement graceful fallback for constraint violations
+- **License Validation**: Check for license errors first (embedded in main program startup)
+- **File Operations**: Handle missing files with clear, actionable error messages
+- **Data Validation**: Validate input Excel formats before processing
+- **Constraint Violations**: Implement graceful fallback for PCI planning conflicts
 
 ### Performance Considerations
-- Use caching for distance calculations
-- Clear caches appropriately to prevent memory leaks
-- Consider threading for GUI responsiveness
-- Optimize DataFrame operations for large datasets
+- **Caching**: Use and properly clear caches for distance calculations (`distance_cache`, `pci_validity_cache`, `same_site_cache`)
+- **Memory Management**: Clear caches after each PCI assignment to prevent memory leaks
+- **Threading**: Use background threads for GUI responsiveness during heavy processing
+- **DataFrame Optimization**: Use vectorized operations for large datasets (>100MB files)
 
 ## Debugging and Troubleshooting
 
 ### Common Issues
 
 **License Validation Failure**
-- Check license.dat file exists in root directory
-- Verify file has not been tampered with
+- Check `license.dat` file exists in root directory
+- Verify file has not been tampered with (HMAC signature validation)
+- Use `license_generator.py` to generate a new license
 - Contact: weicongpeng1@163.com or 15220958556
+
+**License Generator Issues**
+- Run with `python license_generator.py` or `run_license.bat`
+- Check license expiration date format (YYYY-MM-DD)
+- Ensure generated license has correct permissions (readable by main application)
+- Test generated license immediately with option 2 or 3 in the generator
 
 **Missing Input Files**
 - Verify directory structure: `全量工参/`, `待规划小区/`

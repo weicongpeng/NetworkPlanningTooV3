@@ -327,7 +327,7 @@ class NetworkParameterUpdater:
         # 加载LTE_SDR文件
         for file in lte_sdr_files:
             try:
-                df = pd.read_csv(file, encoding='utf-8')
+                df = pd.read_csv(file, encoding='utf-8-sig')
                 print(f"加载LTE_SDR文件: {os.path.basename(file)}, 记录数: {len(df)}")
                 lte_dfs.append(df)
                 # 清理临时文件
@@ -338,7 +338,7 @@ class NetworkParameterUpdater:
         # 加载LTE_ITBBU文件
         for file in lte_itbbu_files:
             try:
-                df = pd.read_csv(file, encoding='utf-8')
+                df = pd.read_csv(file, encoding='utf-8-sig')
                 # 处理LTE_ITBBU文件的列名大小写问题 - 只标准化cellName相关列
                 for col in df.columns:
                     if 'cellname' in col.lower():
@@ -388,7 +388,7 @@ class NetworkParameterUpdater:
                                 print(f"重新提取NR文件: {filename}")
 
                 if os.path.exists(file):
-                    df = pd.read_csv(file, encoding='utf-8')
+                    df = pd.read_csv(file, encoding='utf-8-sig')
                     print(f"加载NR文件: {os.path.basename(file)}, 记录数: {len(df)}")
                     nr_dfs.append(df)
 
@@ -4584,6 +4584,7 @@ class PlaceholderEntry(ttk.Entry):
         return content
 
 
+
 class Tooltip:
     """Simple tooltip class for showing bubble notifications"""
     def __init__(self, widget, text=''):
@@ -4706,7 +4707,7 @@ class PCIGUIApp:
         # Store clicked column index for copy functionality
         self.nr_clicked_column = None
         self.lte_clicked_column = None
-        
+
         # Initialize tooltip for copy notifications
         self.tooltip = Tooltip(self.root, '')
 
@@ -4868,8 +4869,6 @@ class PCIGUIApp:
         """Create the Parameter Update tab"""
         param_frame = ttk.Frame(self.notebook)
         self.notebook.add(param_frame, text="规划数据导入及工参更新")
-
-        # Configure param_frame to be responsive
         param_frame.columnconfigure(0, weight=1)
         param_frame.rowconfigure(1, weight=1)
 
@@ -5219,6 +5218,8 @@ class PCIGUIApp:
         if filename:
             self.online_param_file.set(filename)
 
+    
+
     def select_neighbor_cells_file(self):
         """Select the cells file for neighbor planning"""
         import glob
@@ -5438,22 +5439,36 @@ class PCIGUIApp:
 
                 self.queue.put(("info", f"{network_type}规划完成，结果保存至: {output_file}\n"))
 
-            # Set progress to 100% when completely done
+        except Exception as e:
+            # Log error
+            error_msg = f"PCI规划过程中发生错误: {str(e)}\n"
+            self.queue.put(("error", error_msg))
+            self.queue.put(("info", f"\n❌ PCI规划失败\n"))
+            print(error_msg)
+            import traceback
+            traceback.print_exc()
+        finally:
+            # Re-enable the button
             self.queue.put(("progress", 100))
-
-            # Mark planning as successful only if we reach this point
+            self.queue.put(("enable_button", "plan_btn"))
             planning_successful = True
 
-        except Exception as e:
-            self.queue.put(("error", f"规划过程中发生错误: {str(e)}\n"))
-            import traceback
-            self.queue.put(("error", traceback.format_exc()))
-        finally:
-            self.queue.put(("done", None))
+            # Calculate and log execution time
+            end_time = time.time()
+            execution_time = end_time - start_time
+            completion_msg = f"PCI规划完成，总用时: {execution_time:.2f}秒\n"
+            self.queue.put(("info", completion_msg))
 
-            # Only open output folder if planning completed successfully
+            # Add success indicator
+            self.queue.put(("info", f"\n✅ PCI规划完成\n"))
+
+            # Prepare output directory info (but don't show popup)
+            output_dir = os.path.abspath("输出文件")
+
+            # Open output folder after planning completion
             if planning_successful:
                 self.root.after(1000, self.open_output_folder)  # Delay to let GUI update
+
 
     def start_param_update(self):
         """Start the parameter update process in a separate thread"""
@@ -6008,15 +6023,28 @@ class PCIGUIApp:
                 msg_type, content = self.queue.get_nowait()
 
                 if msg_type == "info":
-                    self.result_text.insert(tk.END, content)
-                    self.result_text.see(tk.END)
+                    # For sector layer generation, show in the appropriate result area based on active tab
+                    if hasattr(self, 'neighbor_result_text') and self.notebook.select() == self.notebook.tabs()[1]:
+                        # If neighbor planning tab is active
+                        self.neighbor_result_text.insert(tk.END, content)
+                        self.neighbor_result_text.see(tk.END)
+                    elif hasattr(self, 'result_text'):
+                        # Otherwise use PCI planning result text
+                        self.result_text.insert(tk.END, content)
+                        self.result_text.see(tk.END)
                 elif msg_type == "progress":
                     self.plan_progress['value'] = content
                     self.plan_progress_label.config(text=f"{content}%")
                 elif msg_type == "error":
                     # Insert error text in red
-                    self.result_text.insert(tk.END, content, "error")
-                    self.result_text.see(tk.END)
+                    if hasattr(self, 'neighbor_result_text') and self.notebook.select() == self.notebook.tabs()[1]:
+                        # If neighbor planning tab is active
+                        self.neighbor_result_text.insert(tk.END, content, "error")
+                        self.neighbor_result_text.see(tk.END)
+                    elif hasattr(self, 'result_text'):
+                        # Otherwise use PCI planning result text
+                        self.result_text.insert(tk.END, content, "error")
+                        self.result_text.see(tk.END)
                     self.status_var.set("错误")
                 elif msg_type == "done":
                     self.plan_btn.config(state=tk.NORMAL)
@@ -6032,7 +6060,15 @@ class PCIGUIApp:
                     self.status_var.set("错误")
                 elif msg_type == "update_done":
                     self.update_btn.config(state=tk.NORMAL)
-                    self.status_var.set("就绪")
+
+                # Handle button enabling for PCI planning
+                elif msg_type == "enable_button":
+                    if content == "plan_btn":
+                        self.plan_btn.config(state=tk.NORMAL)
+                        self.status_var.set("就绪")
+                    elif content == "update_btn":
+                        self.update_btn.config(state=tk.NORMAL)
+
 
                 # Update neighbor planning results
                 elif msg_type == "neighbor_info":
