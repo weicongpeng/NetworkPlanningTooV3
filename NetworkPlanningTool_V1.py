@@ -15,6 +15,7 @@ except ImportError:
 
 import math
 import ssl
+import requests
 try:
     _create_unverified_https_context = ssl._create_unverified_context
 except AttributeError:
@@ -5505,6 +5506,27 @@ class PCIGUIApp:
         selection_frame.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
         selection_frame.columnconfigure(1, weight=1)  # Entry column
 
+        #待规划小区文件选择
+        ttk.Label(selection_frame, text="待规划小区文件:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
+        ttk.Entry(selection_frame, textvariable=self.neighbor_cells_file, width=50).grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+        ttk.Button(selection_frame, text="浏览", command=self.select_neighbor_cells_file).grid(row=0, column=2, padx=5, pady=5)
+        ttk.Button(selection_frame, text="模板下载", command=self.download_template).grid(row=0, column=3, padx=5, pady=5)
+
+        # Parameters file selection
+        ttk.Label(selection_frame, text="全量工参文件:").grid(row=1, column=0, sticky=tk.W, padx=5, pady=5)
+        ttk.Entry(selection_frame, textvariable=self.param_update_file, width=50).grid(row=1, column=1, padx=5, pady=5, sticky="ew")
+        ttk.Button(selection_frame, text="浏览", command=self.select_param_update_file).grid(row=1, column=2, padx=5, pady=5)
+        # No template needed for full parameter file
+
+        # Online parameters file selection
+        ttk.Label(selection_frame, text="现网工参:").grid(row=2, column=0, sticky=tk.W, padx=5, pady=5)
+        ttk.Entry(selection_frame, textvariable=self.online_param_file, width=50).grid(row=2, column=1, padx=5, pady=5, sticky="ew")
+        ttk.Button(selection_frame, text="浏览", command=self.select_online_param_file).grid(row=2, column=2, padx=5, pady=5)
+
+        # Add the "更新工参" button next to the "现网工参" browse button
+        self.update_btn = ttk.Button(selection_frame, text="更新工参", command=self.start_param_update)
+        self.update_btn.grid(row=2, column=3, padx=5, pady=5)
+
         # Create right frame for instructions
         instruction_frame = ttk.LabelFrame(file_frame, text='文件导入说明')
         instruction_frame.pack(side=tk.RIGHT, fill=tk.Y)
@@ -5515,9 +5537,11 @@ class PCIGUIApp:
         instruction_text.config(state=tk.DISABLED)  # Make it read-only
         instruction_text.pack(padx=5, pady=5)
 
-        # 地图框架
+        # 在线地图框架 - 最大化显示
         self.update_map_frame = ttk.LabelFrame(param_frame, text="在线地图")
         self.update_map_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        # 设置地图框架权重以最大化显示
+        param_frame.rowconfigure(2, weight=1)  # 地图框架行索引
         self.update_map_widget = TiandituMapPanel(self.update_map_frame, app_instance=self)
         self.update_map_widget.pack(fill=tk.BOTH, expand=True)
 
@@ -5648,7 +5672,119 @@ class PCIGUIApp:
         if filename:
             self.online_param_file.set(filename)
 
-    
+    def start_param_update(self):
+        """Start the parameter update process in a separate thread"""
+        if not self.param_update_file.get() or not self.online_param_file.get():
+            messagebox.showerror("错误", "请先选择全量工参文件和现网工参文件")
+            return
+
+        # Disable the button during processing
+        self.update_btn.config(state=tk.DISABLED)
+
+        # Start the update in a separate thread
+        update_thread = threading.Thread(target=self.run_param_update)
+        update_thread.daemon = True
+        update_thread.start()
+
+    def run_param_update(self):
+        """Run the actual parameter update process"""
+        import sys
+        import io
+        from contextlib import redirect_stdout, redirect_stderr
+
+        update_successful = False  # Flag to track if update completed successfully
+        output_text = ""  # Store output for popup
+
+        try:
+            output_text += "开始现网工参更新...\n"
+
+            # Create updater instance and set file paths
+            updater = NetworkParameterUpdater()
+
+            # Override the default file paths with user selections
+            if self.param_update_file.get():
+                updater.full_param_dir = os.path.dirname(self.param_update_file.get())
+
+            if self.online_param_file.get():
+                # Since we're using the NetworkParameterUpdater class as is,
+                # we need to extract the zip path from the selected file
+                updater.baseline_zip_pattern = os.path.basename(self.online_param_file.get())
+
+            # Redirect print output to capture it in the GUI
+            result_string = io.StringIO()
+            with redirect_stdout(result_string), redirect_stderr(result_string):
+                success = updater.update_network_parameters()
+
+            # Get and display the captured output
+            captured_output = result_string.getvalue()
+            output_text += captured_output
+
+            if success:
+                output_text += "\n✅ 现网工参更新完成\n"
+                update_successful = True  # Mark as successful
+            else:
+                output_text += "\n❌ 现网工参更新失败\n"
+
+        except Exception as e:
+            output_text += f"更新过程中发生错误: {str(e)}\n"
+            import traceback
+            output_text += traceback.format_exc()
+
+        finally:
+            # Show results in popup
+            self.root.after(0, lambda: self.show_update_results(output_text, update_successful))
+            # Re-enable the button
+            self.root.after(0, lambda: self.update_btn.config(state=tk.NORMAL))
+
+    def show_update_results(self, output_text, successful):
+        """Show the update results in a popup window"""
+        # Create a new window to show results
+        result_window = tk.Toplevel(self.root)
+        result_window.title("工参更新结果")
+        result_window.geometry("600x400")
+        result_window.transient(self.root)  # Make it a child window
+        result_window.grab_set()  # Modal window
+
+        # Create scrolled text widget
+        text_frame = ttk.Frame(result_window)
+        text_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        text_widget = scrolledtext.ScrolledText(text_frame, wrap=tk.WORD, width=70, height=20)
+        text_widget.pack(fill=tk.BOTH, expand=True)
+        text_widget.insert(tk.END, output_text)
+        text_widget.config(state=tk.DISABLED)  # Make it read-only
+
+        # Color the first line based on success
+        if successful:
+            text_widget.tag_config("success", foreground="green")
+            text_widget.tag_add("success", "1.0", "1.end")
+        else:
+            text_widget.tag_config("error", foreground="red")
+            text_widget.tag_add("error", "1.0", "1.end")
+
+        # Button frame
+        button_frame = ttk.Frame(result_window)
+        button_frame.pack(fill=tk.X, padx=10, pady=5)
+
+        # Close button
+        close_btn = ttk.Button(button_frame, text="关闭", command=result_window.destroy)
+        close_btn.pack(side=tk.RIGHT, padx=5)
+
+        # Copy button
+        copy_btn = ttk.Button(button_frame, text="复制结果",
+                             command=lambda: self.copy_to_clipboard(output_text))
+        copy_btn.pack(side=tk.RIGHT, padx=5)
+
+    def copy_to_clipboard(self, text):
+        """Copy text to clipboard"""
+        self.root.clipboard_clear()
+        self.root.clipboard_append(text)
+        messagebox.showinfo("复制成功", "结果已复制到剪贴板")
+
+
+
+
+
 
     def select_neighbor_cells_file(self):
         """Select the cells file for neighbor planning"""
