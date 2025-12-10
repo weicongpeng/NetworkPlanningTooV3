@@ -4716,10 +4716,12 @@ class InfoPopup(tk.Frame):
         display_text = ""
         for k, v in data.items():
             if k not in ['points', 'type', 'lat', 'lon']:  # 过滤掉坐标等底层数据
-                display_text += f"{k}: {v}\n"
+                display_text += f"{k}: {v}
+"
 
         if not display_text:
-            display_text = f"Name: {data.get('name', '未命名')}\nType: {data.get('type')}"
+            display_text = f"Name: {data.get('name', '未命名')}
+Type: {data.get('type')}"
 
         self.text_area.insert(tk.END, display_text)
         self.text_area.config(state=tk.DISABLED)  # 设为只读但可复制
@@ -5354,6 +5356,10 @@ class PCIGUIApp:
         # Create a queue for thread communication
         self.queue = queue.Queue()
 
+        # Create main frames
+        self.create_main_frame()
+        self.create_status_bar()
+
         # Bind the queue processing to the main thread
         self.process_queue()
 
@@ -5520,74 +5526,6 @@ class PCIGUIApp:
         self.update_map_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
         self.update_map_widget = TiandituMapPanel(self.update_map_frame, app_instance=self)
         self.update_map_widget.pack(fill=tk.BOTH, expand=True)
-
-    def create_neighbor_planning_tab(self):
-        """Create the Neighbor Planning tab"""
-        neighbor_frame = ttk.Frame(self.notebook)
-        self.notebook.add(neighbor_frame, text="邻区规划")
-
-        # Planning type
-        type_frame = ttk.Frame(neighbor_frame)
-        type_frame.pack(fill=tk.X, padx=10, pady=5)
-        ttk.Label(type_frame, text="邻区类型:").pack(side=tk.LEFT, padx=5)
-        self.planning_type = tk.StringVar(value="NR到NR")
-        type_combo = ttk.Combobox(type_frame, textvariable=self.planning_type,
-                                 values=["NR到NR", "LTE到LTE", "NR到LTE"], state="readonly")
-        type_combo.pack(side=tk.LEFT, padx=5)
-
-        # Planning parameters
-        param_frame = ttk.LabelFrame(neighbor_frame, text="规划参数")
-        param_frame.pack(fill=tk.X, padx=10, pady=5)
-
-        # Max neighbors
-        ttk.Label(param_frame, text="最大邻区数:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
-        self.max_neighbors = tk.IntVar(value=32)
-        ttk.Entry(param_frame, textvariable=self.max_neighbors, width=10).grid(row=0, column=1, sticky=tk.W, padx=5, pady=5)
-
-        # Coverage circle parameters with help tooltip
-        self.coverage_distance_label = ttk.Label(param_frame, text="覆盖圆距离系数k:")
-        self.coverage_distance_label.grid(row=0, column=2, sticky=tk.W, padx=10, pady=5)
-        self.coverage_distance_factor_entry = ttk.Entry(param_frame, textvariable=self.coverage_distance_factor, width=10)
-        self.coverage_distance_factor_entry.grid(row=0, column=3, sticky=tk.W, padx=5, pady=5)
-
-        # 添加覆盖圆距离系数的说明帮助
-        self.k_help_label = ttk.Label(param_frame, text="?", foreground="blue", cursor="hand2")
-        self.k_help_label.grid(row=0, column=4, sticky=tk.W, padx=(0, 5))
-        self.k_tooltip = Tooltip(self.k_help_label, "覆盖圆距离系数k：站点到覆盖圆心的距离系数\n- 默认值5/9(≈0.556)，覆盖圆心位于主瓣方向距离站点(5/9)*Co处\n- k值越大，覆盖圆心离基站越远，方向性越明显，邻区范围偏向前方\n- k值越小，覆盖圆心越接近基站，覆盖越接近全向，邻区分布更均匀")
-
-        self.coverage_radius_label = ttk.Label(param_frame, text="覆盖圆半径系数m:")
-        self.coverage_radius_label.grid(row=0, column=5, sticky=tk.W, padx=10, pady=5)
-        self.coverage_radius_factor_entry = ttk.Entry(param_frame, textvariable=self.coverage_radius_factor, width=10)
-        self.coverage_radius_factor_entry.grid(row=0, column=6, sticky=tk.W, padx=5, pady=5)
-
-        # 添加覆盖圆半径系数的说明帮助
-        self.m_help_label = ttk.Label(param_frame, text="?", foreground="blue", cursor="hand2")
-        self.m_help_label.grid(row=0, column=7, sticky=tk.W, padx=(0, 5))
-        self.m_tooltip = Tooltip(self.m_help_label, "覆盖圆半径系数m：覆盖半径系数\n- 默认值5/9(≈0.556)，覆盖半径为(5/9)*Co\n- m值越大，覆盖圆半径越大，可获得邻区数量增多\n- m值越小，覆盖圆半径越小，邻区数量减少")
-
-        # Buttons frame
-        btn_frame = ttk.Frame(neighbor_frame)
-        btn_frame.pack(fill=tk.X, padx=10, pady=5)
-
-        self.neighbor_plan_btn = ttk.Button(btn_frame, text="开始规划", command=self.start_neighbor_planning)
-        self.neighbor_plan_btn.pack(side=tk.LEFT, padx=5)
-
-        # Progress bar frame with percentage label
-        progress_frame = ttk.Frame(btn_frame)
-        progress_frame.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
-
-        self.neighbor_progress = ttk.Progressbar(progress_frame, mode='determinate')
-        self.neighbor_progress.pack(side=tk.LEFT, fill=tk.X, expand=True)
-
-        self.neighbor_progress_label = ttk.Label(progress_frame, text="0%")
-        self.neighbor_progress_label.pack(side=tk.RIGHT, padx=(5,0))
-
-        # 地图框架
-        self.neighbor_map_frame = ttk.LabelFrame(neighbor_frame, text="在线地图")
-        self.neighbor_map_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-        self.neighbor_map_widget = TiandituMapPanel(self.neighbor_map_frame, app_instance=self)
-        self.neighbor_map_widget.pack(fill=tk.BOTH, expand=True)
-
     def select_params_file(self):
         """Select the parameters file"""
         import glob

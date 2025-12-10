@@ -4682,71 +4682,6 @@ class Tooltip:
             self.tipwindow = None
 
 
-
-class InfoPopup(tk.Frame):
-    """显示图形信息的悬浮窗"""
-    def __init__(self, master, close_callback=None):
-        super().__init__(master, bg="white", highlightbackground="gray", highlightthickness=1)
-        self.close_callback = close_callback
-        self.place_forget()
-
-        # 顶部标题栏
-        header = tk.Frame(self, bg="#f0f0f0", height=25)
-        header.pack(fill=tk.X)
-        tk.Label(header, text="属性信息", bg="#f0f0f0", font=("Arial", 9, "bold")).pack(side=tk.LEFT, padx=5)
-
-        # 关闭按钮
-        close_btn = tk.Label(header, text="×", bg="#f0f0f0", cursor="hand2", font=("Arial", 12))
-        close_btn.pack(side=tk.RIGHT, padx=5)
-        close_btn.bind("<Button-1>", lambda e: self.hide())
-
-        # 内容区域 (Text控件以支持复制)
-        self.text_area = tk.Text(self, width=30, height=8, font=("Arial", 9), relief=tk.FLAT)
-        self.text_area.pack(padx=5, pady=5)
-
-        # 阻止事件冒泡，防止点击弹窗内容时触发地图点击
-        self.bind("<Button-1>", lambda e: "break")
-        self.text_area.bind("<Button-1>", lambda e: self.focus_set())  # 允许获取焦点
-
-    def show(self, data, x, y):
-        self.text_area.config(state=tk.NORMAL)
-        self.text_area.delete(1.0, tk.END)
-
-        # 格式化显示数据
-        display_text = ""
-        for k, v in data.items():
-            if k not in ['points', 'type', 'lat', 'lon']:  # 过滤掉坐标等底层数据
-                display_text += f"{k}: {v}\n"
-
-        if not display_text:
-            display_text = f"Name: {data.get('name', '未命名')}\nType: {data.get('type')}"
-
-        self.text_area.insert(tk.END, display_text)
-        self.text_area.config(state=tk.DISABLED)  # 设为只读但可复制
-
-        # 调整位置，避免超出屏幕
-        req_w = 250
-        req_h = 180
-
-        # 简单的边界检查
-        parent_w = self.master.winfo_width()
-        parent_h = self.master.winfo_height()
-
-        if x + req_w > parent_w:
-            x = parent_w - req_w - 10
-        if y + req_h > parent_h:
-            y = parent_h - req_h - 10
-
-        self.place(x=x, y=y, width=req_w, height=req_h)
-        self.lift()  # 确保在最上层
-
-    def hide(self):
-        self.place_forget()
-        if self.close_callback:
-            self.close_callback()
-
-
-
 class TiandituMapPanel(ttk.Frame):
     TIANDITU_API_KEY = "47d74466e95676315a6f5d135edbfbd3" 
     AMAP_API_KEY = "5299af602f4ee3cd7351c1bc7f32b1cb"
@@ -5354,6 +5289,10 @@ class PCIGUIApp:
         # Create a queue for thread communication
         self.queue = queue.Queue()
 
+        # Create main frames
+        self.create_main_frame()
+        self.create_status_bar()
+
         # Bind the queue processing to the main thread
         self.process_queue()
 
@@ -5501,12 +5440,33 @@ class PCIGUIApp:
         file_frame.columnconfigure(0, weight=1)
 
         # Create left frame for file selection
-        selection_frame = ttk.LabelFrame(file_frame, text='文件选择')
+        selection_frame = ttk.LabelFrame(file_frame, text="文件选择")
         selection_frame.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
         selection_frame.columnconfigure(1, weight=1)  # Entry column
 
+        #待规划小区文件选择
+        ttk.Label(selection_frame, text="待规划小区文件:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
+        ttk.Entry(selection_frame, textvariable=self.neighbor_cells_file, width=50).grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+        ttk.Button(selection_frame, text="浏览", command=self.select_neighbor_cells_file).grid(row=0, column=2, padx=5, pady=5)
+        ttk.Button(selection_frame, text="模板下载", command=self.download_template).grid(row=0, column=3, padx=5, pady=5)
+
+        # Parameters file selection
+        ttk.Label(selection_frame, text="全量工参文件:").grid(row=1, column=0, sticky=tk.W, padx=5, pady=5)
+        ttk.Entry(selection_frame, textvariable=self.param_update_file, width=50).grid(row=1, column=1, padx=5, pady=5, sticky="ew")
+        ttk.Button(selection_frame, text="浏览", command=self.select_param_update_file).grid(row=1, column=2, padx=5, pady=5)
+        # No template needed for full parameter file
+
+        # Online parameters file selection
+        ttk.Label(selection_frame, text="现网工参:").grid(row=2, column=0, sticky=tk.W, padx=5, pady=5)
+        ttk.Entry(selection_frame, textvariable=self.online_param_file, width=50).grid(row=2, column=1, padx=5, pady=5, sticky="ew")
+        ttk.Button(selection_frame, text="浏览", command=self.select_online_param_file).grid(row=2, column=2, padx=5, pady=5)
+
+        # Add the "更新工参" button next to the "现网工参" browse button
+        self.update_btn = ttk.Button(selection_frame, text="更新工参", command=self.start_param_update)
+        self.update_btn.grid(row=2, column=3, padx=5, pady=5)
+
         # Create right frame for instructions
-        instruction_frame = ttk.LabelFrame(file_frame, text='文件导入说明')
+        instruction_frame = ttk.LabelFrame(file_frame, text="文件导入说明")
         instruction_frame.pack(side=tk.RIGHT, fill=tk.Y)
 
         # Add instructions
@@ -5515,28 +5475,22 @@ class PCIGUIApp:
         instruction_text.config(state=tk.DISABLED)  # Make it read-only
         instruction_text.pack(padx=5, pady=5)
 
-        # 地图框架
-        self.update_map_frame = ttk.LabelFrame(param_frame, text="在线地图")
-        self.update_map_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-        self.update_map_widget = TiandituMapPanel(self.update_map_frame, app_instance=self)
-        self.update_map_widget.pack(fill=tk.BOTH, expand=True)
+        # Cell search frame
+        search_frame = ttk.LabelFrame(param_frame, text="小区搜索")
+        search_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        search_frame.columnconfigure(0, weight=1)
+        search_frame.rowconfigure(0, weight=1)
 
-    def create_neighbor_planning_tab(self):
-        """Create the Neighbor Planning tab"""
-        neighbor_frame = ttk.Frame(self.notebook)
-        self.notebook.add(neighbor_frame, text="邻区规划")
+        # Create notebook for NR and LTE search
+        self.search_notebook = ttk.Notebook(search_frame)
+        self.search_notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
 
-        # Planning type
-        type_frame = ttk.Frame(neighbor_frame)
-        type_frame.pack(fill=tk.X, padx=10, pady=5)
-        ttk.Label(type_frame, text="邻区类型:").pack(side=tk.LEFT, padx=5)
-        self.planning_type = tk.StringVar(value="NR到NR")
-        type_combo = ttk.Combobox(type_frame, textvariable=self.planning_type,
-                                 values=["NR到NR", "LTE到LTE", "NR到LTE"], state="readonly")
-        type_combo.pack(side=tk.LEFT, padx=5)
-
-        # Planning parameters
-        param_frame = ttk.LabelFrame(neighbor_frame, text="规划参数")
+        # NR Cell Search tab
+        nr_search_frame = ttk.Frame(self.search_notebook)
+        self.search_notebook.add(nr_search_frame, text="NR小区查询")
+        # Configure NR search frame to be responsive
+        nr_search_frame.columnconfigure(0, weight=1)
+        nr_search_frame.rowconfigure(1, weight=1)  # Row 1 is the result frame
         param_frame.pack(fill=tk.X, padx=10, pady=5)
 
         # Max neighbors
@@ -5582,11 +5536,24 @@ class PCIGUIApp:
         self.neighbor_progress_label = ttk.Label(progress_frame, text="0%")
         self.neighbor_progress_label.pack(side=tk.RIGHT, padx=(5,0))
 
-        # 地图框架
-        self.neighbor_map_frame = ttk.LabelFrame(neighbor_frame, text="在线地图")
-        self.neighbor_map_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-        self.neighbor_map_widget = TiandituMapPanel(self.neighbor_map_frame, app_instance=self)
-        self.neighbor_map_widget.pack(fill=tk.BOTH, expand=True)
+        """Select the cells file"""
+        import glob
+        # First try to find the latest cell file automatically
+        cell_files = glob.glob("待规划小区/*.xlsx")
+        latest_file = self._get_latest_file(cell_files)
+
+        # Extract directory for initialdir
+        initial_dir = "待规划小区" if cell_files else "."
+        initial_file = os.path.basename(latest_file) if latest_file else ""
+
+        filename = filedialog.askopenfilename(
+            title="选择待规划小区文件",
+            initialdir=initial_dir,
+            initialfile=initial_file,
+            filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")]
+        )
+        if filename:
+            self.cells_file.set(filename)
 
     def select_params_file(self):
         """Select the parameters file"""
@@ -6117,7 +6084,6 @@ class PCIGUIApp:
 
     def process_queue(self):
         """Process messages from the thread queue"""
-        """Process messages from the thread queue"""
         while True:
             try:
                 msg_type, content = self.queue.get_nowait()
@@ -6141,7 +6107,6 @@ class PCIGUIApp:
                     pass  # No longer used
                 elif msg_type == "update_error":
                     # No longer insert to text area
-                    pass
                 elif msg_type == "update_done":
                     self.update_btn.config(state=tk.NORMAL)
 
@@ -6152,15 +6117,14 @@ class PCIGUIApp:
                     elif content == "update_btn":
                         self.update_btn.config(state=tk.NORMAL)
 
+
                 # Update neighbor planning results
                 elif msg_type == "neighbor_info":
-                    pass  # No longer insert to text area
                 elif msg_type == "neighbor_progress":
                     self.neighbor_progress['value'] = content
                     self.neighbor_progress_label.config(text=f"{content}%")
                 elif msg_type == "neighbor_error":
                     # Insert error text in red
-                    pass
                 elif msg_type == "neighbor_done":
                     self.neighbor_plan_btn.config(state=tk.NORMAL)
 
@@ -6169,6 +6133,9 @@ class PCIGUIApp:
 
         # Schedule the next check
         self.root.after(100, self.process_queue)
+
+
+    
     def update_status(self, text):
         """Update status bar text"""
         pass
