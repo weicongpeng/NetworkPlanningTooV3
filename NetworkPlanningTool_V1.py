@@ -5077,7 +5077,7 @@ class TiandituMapPanel(ttk.Frame):
 
     def on_map_interaction(self, event=None):
         if not self.map_widget or not self.tab_layer_data: return
-        self.map_widget.after(200, self.refresh_layer)
+        self.refresh_layer_optimized()
 
     def on_map_zoom(self, event=None):
         if not self.map_widget: return
@@ -5088,16 +5088,16 @@ class TiandituMapPanel(ttk.Frame):
                 new_z = min(curr + 1, 19) if event.delta > 0 else max(curr - 1, 3)
             elif event.num == 4: new_z = min(curr + 1, 19)
             elif event.num == 5: new_z = max(curr - 1, 3)
-            
+
             if new_z != curr:
                 self.map_widget.set_zoom(new_z)
-        
+
         if self.tab_layer_data:
-            self.map_widget.after(200, self.refresh_layer)
+            self.refresh_layer_optimized()
 
     def on_map_resize(self, event=None):
         if self.tab_layer_data:
-            self.map_widget.after(300, self.refresh_layer)
+            self.refresh_layer_optimized()
 
     def handle_map_background_click(self, coords):
         """点击地图空白处"""
@@ -5147,10 +5147,19 @@ class TiandituMapPanel(ttk.Frame):
         if self.popup: self.popup.hide()
         self.app_instance.update_status("图层已清空")
 
-    def refresh_layer(self):
-        """刷新图层显示 (已优化边界和交互)"""
+    def refresh_layer_optimized(self):
+        """优化的刷新图层方法 - 使用防抖和增量更新"""
+        # 实现防抖机制，避免频繁更新
+        if hasattr(self, '_refresh_timer'):
+            self.map_widget.after_cancel(self._refresh_timer)
+
+        # 延迟执行以提高响应性
+        self._refresh_timer = self.map_widget.after(50, self._perform_refresh_layer)
+
+    def _perform_refresh_layer(self):
+        """执行实际的图层刷新"""
         if not self.tab_layer_data or not self.map_widget: return
-        
+
         # 清除现有显示
         for obj in self.tab_layer_objects:
             self.map_widget.delete(obj)
@@ -5168,50 +5177,69 @@ class TiandituMapPanel(ttk.Frame):
         if zoom < self.cluster_threshold_zoom and len(points) > 50:
              display_points = self.cluster_points(points, zoom)
 
+        # 限制显示要素数量以提高性能
+        max_display_elements = 500  # 性能优化：限制最大显示元素数量
+        if len(display_points) > max_display_elements:
+            display_points = display_points[:max_display_elements]
+        if len(others) > max_display_elements:
+            others = others[:max_display_elements]
+
         # 绘制点
         for p in display_points:
             d_lon, d_lat = self.apply_coordinate_correction(p['lon'], p['lat'])
-            
+
             if self.is_point_visible(d_lat, d_lon, bounds):
                 is_cluster = p.get('type') == 'cluster'
                 col = "orange" if is_cluster else "red"
                 txt = p.get('name', '')
-                
+
                 # 【新增】绑定 command 回调
-                m = self.map_widget.set_marker(
-                    d_lat, d_lon, text=txt,
-                    marker_color_circle=col, marker_color_outside="white",
-                    text_color="black",
-                    command=self.on_object_click # 绑定点击事件
-                )
-                # 【技巧】将数据源绑定到对象上，以便回调时获取
-                m.data_source = p 
-                self.tab_layer_objects.append(m)
+                try:
+                    m = self.map_widget.set_marker(
+                        d_lat, d_lon, text=txt,
+                        marker_color_circle=col, marker_color_outside="white",
+                        text_color="black",
+                        command=self.on_object_click # 绑定点击事件
+                    )
+                    # 【技巧】将数据源绑定到对象上，以便回调时获取
+                    m.data_source = p
+                    self.tab_layer_objects.append(m)
+                except:
+                    # 如果创建marker失败，跳过这个点
+                    continue
 
         # 绘制线/面
         for item in others:
             raw_pts = item['points']
             if not self.is_path_visible(raw_pts, bounds):
                 continue
-                
+
             disp_pts = [self.apply_coordinate_correction(ln, lt)[::-1] for lt, ln in raw_pts]
-            
-            if item['type'] == 'path':
-                obj = self.map_widget.set_path(
-                    disp_pts, width=width, color="blue",
-                    command=self.on_object_click # 绑定点击事件
-                )
-            else:
-                obj = self.map_widget.set_polygon(
-                    disp_pts, border_width=width, outline_color="green", fill_color=None,
-                    command=self.on_object_click # 绑定点击事件
-                )
-            
-            # 【技巧】绑定数据源
-            obj.data_source = item
-            self.tab_layer_objects.append(obj)
-            
+
+            try:
+                if item['type'] == 'path':
+                    obj = self.map_widget.set_path(
+                        disp_pts, width=width, color="blue",
+                        command=self.on_object_click # 绑定点击事件
+                    )
+                else:
+                    obj = self.map_widget.set_polygon(
+                        disp_pts, border_width=width, outline_color="green", fill_color=None,
+                        command=self.on_object_click # 绑定点击事件
+                    )
+
+                # 【技巧】绑定数据源
+                obj.data_source = item
+                self.tab_layer_objects.append(obj)
+            except:
+                # 如果创建路径或区域失败，跳过这个要素
+                continue
+
         self.app_instance.update_status(f"当前视口显示要素: {len(self.tab_layer_objects)}")
+
+    def refresh_layer(self):
+        """刷新图层显示 (已废弃，使用优化版本)"""
+        self.refresh_layer_optimized()
 
     def load_tab_layer(self):
         path = self.tab_file_path.get()
@@ -5356,11 +5384,18 @@ class PCIGUIApp:
         self.nr_clicked_column = None
         self.lte_clicked_column = None
 
-        # Layer creation variables
+        # Layer creation variables (for Layer Maker Tab - still needed)
         self.layer_data = None
         self.layer_field_mapping = {}
         self.layer_created_data = None
         self.layer_export_path = tk.StringVar()
+        self.layer_data_file = tk.StringVar()
+        self.layer_type = tk.StringVar(value="扇区图层")
+        self.sector_color = tk.StringVar(value="blue")
+        self.point_color = tk.StringVar(value="red")
+        self.sector_angle = tk.IntVar(value=40)
+        self.sector_radius = tk.IntVar(value=60)
+        self.layer_status = tk.StringVar()
         self.selected_sheet = tk.StringVar(value="")
         self.available_sheets = []
 
@@ -5556,85 +5591,6 @@ class PCIGUIApp:
         instruction_text.config(state=tk.DISABLED)  # Make it read-only
         instruction_text.pack(padx=5, pady=5)
 
-        # 图层制作功能区
-        layer_frame = ttk.Frame(param_frame)
-        layer_frame.pack(fill=tk.X, padx=10, pady=5)
-
-        # 图层类型选择
-        layer_type_frame = ttk.Frame(layer_frame)
-        layer_type_frame.pack(fill=tk.X, pady=5)
-
-        ttk.Label(layer_type_frame, text="图层类型:").pack(side=tk.LEFT, padx=5)
-        self.layer_type = tk.StringVar(value="扇区图层")
-        layer_type_combo = ttk.Combobox(layer_type_frame, textvariable=self.layer_type,
-                                       values=["扇区图层", "点状图层"], state="readonly", width=15)
-        layer_type_combo.pack(side=tk.LEFT, padx=5)
-        layer_type_combo.bind("<<ComboboxSelected>>", self.on_layer_type_change)
-
-        # 数据文件选择
-        layer_file_frame = ttk.Frame(layer_frame)
-        layer_file_frame.pack(fill=tk.X, pady=5)
-
-        ttk.Label(layer_file_frame, text="数据文件:").pack(side=tk.LEFT, padx=5)
-        self.layer_data_file = tk.StringVar()
-        ttk.Entry(layer_file_frame, textvariable=self.layer_data_file, width=50).pack(side=tk.LEFT, padx=5)
-        ttk.Button(layer_file_frame, text="浏览", command=self.select_layer_data_file).pack(side=tk.LEFT, padx=5)
-
-        # Sheet selection (for Excel files)
-        self.sheet_frame = ttk.Frame(layer_file_frame)
-        self.sheet_label = ttk.Label(self.sheet_frame, text="工作表:")
-        self.sheet_label.pack(side=tk.LEFT, padx=5)
-        self.selected_sheet = tk.StringVar()
-        self.sheet_combo = ttk.Combobox(self.sheet_frame, textvariable=self.selected_sheet, state="readonly", width=20)
-        self.sheet_combo.pack(side=tk.LEFT, padx=5)
-        self.sheet_combo.bind("<<ComboboxSelected>>", self.on_sheet_selected)
-
-        ttk.Button(layer_file_frame, text="字段映射", command=self.open_field_mapping_dialog).pack(side=tk.LEFT, padx=5)
-
-        # 图层参数设置
-        self.layer_params_frame = ttk.Frame(layer_frame)
-        self.layer_params_frame.pack(fill=tk.X, pady=5)
-
-        # 扇区图层参数
-        self.sector_params_frame = ttk.Frame(self.layer_params_frame)
-        self.sector_params_frame.pack(fill=tk.X)
-
-        ttk.Label(self.sector_params_frame, text="颜色:").grid(row=0, column=0, padx=5, pady=2)
-        self.sector_color = tk.StringVar(value="blue")
-        color_combo = ttk.Combobox(self.sector_params_frame, textvariable=self.sector_color,
-                                  values=["red", "blue", "green", "orange", "purple"], width=10)
-        color_combo.grid(row=0, column=1, padx=5, pady=2)
-
-        ttk.Label(self.sector_params_frame, text="扇区夹角:").grid(row=0, column=2, padx=5, pady=2)
-        self.sector_angle = tk.IntVar(value=40)
-        ttk.Entry(self.sector_params_frame, textvariable=self.sector_angle, width=8).grid(row=0, column=3, padx=5, pady=2)
-
-        ttk.Label(self.sector_params_frame, text="扇区半径(米):").grid(row=0, column=4, padx=5, pady=2)
-        self.sector_radius = tk.IntVar(value=60)
-        ttk.Entry(self.sector_params_frame, textvariable=self.sector_radius, width=8).grid(row=0, column=5, padx=5, pady=2)
-
-        # 点状图层参数
-        self.point_params_frame = ttk.Frame(self.layer_params_frame)
-
-        ttk.Label(self.point_params_frame, text="颜色:").grid(row=0, column=0, padx=5, pady=2)
-        self.point_color = tk.StringVar(value="red")
-        point_color_combo = ttk.Combobox(self.point_params_frame, textvariable=self.point_color,
-                                        values=["red", "blue", "green", "orange", "purple"], width=10)
-        point_color_combo.grid(row=0, column=1, padx=5, pady=2)
-
-        # 默认显示扇区参数
-        self.point_params_frame.pack_forget()
-
-        # 制作和导出按钮
-        button_frame = ttk.Frame(layer_frame)
-        button_frame.pack(fill=tk.X, pady=10)
-
-        ttk.Button(button_frame, text="制作图层", command=self.create_layer).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="导出图层", command=self.export_layer).pack(side=tk.LEFT, padx=5)
-
-        # 状态标签
-        self.layer_status = tk.StringVar()
-        ttk.Label(button_frame, textvariable=self.layer_status).pack(side=tk.LEFT, padx=20)
 
         # 在线地图框架 - 最大化显示
         self.update_map_frame = ttk.Frame(param_frame)
@@ -6510,14 +6466,6 @@ class PCIGUIApp:
         if self.selected_sheet.get() and self.layer_data_file.get().endswith('.xlsx'):
             self.layer_status.set(f"已选择工作表: {self.selected_sheet.get()}")
 
-    def on_layer_type_change(self, event=None):
-        """Handle layer type selection change"""
-        if self.layer_type.get() == "扇区图层":
-            self.sector_params_frame.pack(fill=tk.X)
-            self.point_params_frame.pack_forget()
-        else:
-            self.sector_params_frame.pack_forget()
-            self.point_params_frame.pack(fill=tk.X)
 
     def select_layer_data_file(self):
         """Select the data file for layer creation"""
@@ -6534,29 +6482,15 @@ class PCIGUIApp:
         if self.selected_sheet.get() and self.layer_data_file.get().endswith('.xlsx'):
             self.layer_status.set(f"已选择工作表: {self.selected_sheet.get()}")
 
-    def get_layer_data(self, nrows=None):
-        """Get layer data with sheet selection support"""
-        if not self.layer_data_file.get():
-            return None
 
-        try:
-            import pandas as pd
 
-            if self.layer_data_file.get().endswith('.csv'):
-                if nrows:
-                    return pd.read_csv(self.layer_data_file.get(), nrows=nrows)
-                else:
-                    return pd.read_csv(self.layer_data_file.get())
-            else:  # Excel
-                sheet_name = self.selected_sheet.get() if self.selected_sheet.get() else 0
-                if nrows:
-                    return pd.read_excel(self.layer_data_file.get(), sheet_name=sheet_name, nrows=nrows)
-                else:
-                    return pd.read_excel(self.layer_data_file.get(), sheet_name=sheet_name)
 
-        except Exception as e:
-            messagebox.showerror("错误", f"读取文件失败: {str(e)}")
-            return None
+
+
+
+
+
+
 
     def select_layer_data_file(self):
         """Select the data file for layer creation"""
@@ -6587,6 +6521,30 @@ class PCIGUIApp:
                 self.sheet_frame.pack_forget()
                 self.selected_sheet.set("")
                 self.available_sheets = []
+
+    def get_layer_data(self, nrows=None):
+        """Get layer data with sheet selection support"""
+        if not self.layer_data_file.get():
+            return None
+
+        try:
+            import pandas as pd
+
+            if self.layer_data_file.get().endswith('.csv'):
+                if nrows:
+                    return pd.read_csv(self.layer_data_file.get(), nrows=nrows)
+                else:
+                    return pd.read_csv(self.layer_data_file.get())
+            else:  # Excel
+                sheet_name = self.selected_sheet.get() if self.selected_sheet.get() else 0
+                if nrows:
+                    return pd.read_excel(self.layer_data_file.get(), sheet_name=sheet_name, nrows=nrows)
+                else:
+                    return pd.read_excel(self.layer_data_file.get(), sheet_name=sheet_name)
+
+        except Exception as e:
+            messagebox.showerror("错误", f"读取文件失败: {str(e)}")
+            return None
 
     def open_field_mapping_dialog(self):
         """Open dialog for field mapping"""
@@ -6902,7 +6860,7 @@ class PCIGUIApp:
 
             for sector in self.layer_created_data:
                 # Create polygon from sector points
-                polygon_coords = sector['polygon']
+                polygon_coords = sector['points']  # 使用 'points' 而不是 'polygon'
                 # Ensure the polygon is closed (first point = last point)
                 if polygon_coords[0] != polygon_coords[-1]:
                     polygon_coords.append(polygon_coords[0])
@@ -7110,9 +7068,9 @@ class PCIGUIApp:
                     # Write number of polygons (1)
                     f.write(struct.pack('<I', 1))
                     # Write number of points in polygon
-                    f.write(struct.pack('<I', len(sector['polygon'])))
+                    f.write(struct.pack('<I', len(sector['points'])))  # Fixed: use 'points' instead of 'polygon'
                     # Write points
-                    for lon, lat in sector['polygon']:
+                    for lon, lat in sector['points']:  # Fixed: use 'points' instead of 'polygon'
                         f.write(struct.pack('<d', lon))
                         f.write(struct.pack('<d', lat))
             else:
@@ -7125,6 +7083,15 @@ class PCIGUIApp:
                     # Write point coordinates
                     f.write(struct.pack('<d', point['longitude']))
                     f.write(struct.pack('<d', point['latitude']))
+
+    def on_layer_type_change(self, event=None):
+        """Handle layer type selection change"""
+        if self.layer_type.get() == "扇区图层":
+            self.sector_params_frame.pack(fill=tk.X)
+            self.point_params_frame.pack_forget()
+        else:
+            self.sector_params_frame.pack_forget()
+            self.point_params_frame.pack(fill=tk.X)
 
     def _find_column_by_fuzzy_match(self, df, search_term):
         """Find column by fuzzy matching"""
