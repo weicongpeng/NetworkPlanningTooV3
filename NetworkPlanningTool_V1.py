@@ -5505,7 +5505,7 @@ class PCIGUIApp:
     def create_param_update_tab(self):
         """Create the Parameter Update tab"""
         param_frame = ttk.Frame(self.notebook)
-        self.notebook.add(param_frame, text="规划数据导入及工参更新")
+        self.notebook.add(param_frame, text="工参更新")
         param_frame.columnconfigure(0, weight=1)
         param_frame.rowconfigure(1, weight=1)
 
@@ -5606,11 +5606,11 @@ class PCIGUIApp:
         color_combo.grid(row=0, column=1, padx=5, pady=2)
 
         ttk.Label(self.sector_params_frame, text="扇区夹角:").grid(row=0, column=2, padx=5, pady=2)
-        self.sector_angle = tk.IntVar(value=60)
+        self.sector_angle = tk.IntVar(value=40)
         ttk.Entry(self.sector_params_frame, textvariable=self.sector_angle, width=8).grid(row=0, column=3, padx=5, pady=2)
 
         ttk.Label(self.sector_params_frame, text="扇区半径(米):").grid(row=0, column=4, padx=5, pady=2)
-        self.sector_radius = tk.IntVar(value=500)
+        self.sector_radius = tk.IntVar(value=60)
         ttk.Entry(self.sector_params_frame, textvariable=self.sector_radius, width=8).grid(row=0, column=5, padx=5, pady=2)
 
         # 点状图层参数
@@ -5688,7 +5688,7 @@ class PCIGUIApp:
         layer_type_combo.pack(fill=tk.X, padx=5, pady=5)
         layer_type_combo.bind("<<ComboboxSelected>>", self.on_layer_type_change)
 
-        ttk.Button(type_group, text="设置字段映射 (经纬度/方位角)", command=self.open_field_mapping_dialog).pack(fill=tk.X, padx=5, pady=5)
+        ttk.Button(type_group, text="执行字段映射", command=self.open_field_mapping_dialog).pack(fill=tk.X, padx=5, pady=5)
 
         # 3. 样式参数
         style_group = ttk.LabelFrame(left_frame, text="3. 样式参数")
@@ -5730,7 +5730,7 @@ class PCIGUIApp:
         action_group.pack(fill=tk.X, padx=5, pady=5)
 
         ttk.Button(action_group, text="生成图层 (预览)", command=self.create_layer).pack(fill=tk.X, padx=5, pady=5)
-        ttk.Button(action_group, text="导出图层 (MapInfo TAB)", command=self.export_layer).pack(fill=tk.X, padx=5, pady=5)
+        ttk.Button(action_group, text="导出图层", command=self.export_layer).pack(fill=tk.X, padx=5, pady=5)
 
         # 状态显示
         ttk.Label(action_group, text="状态:").pack(anchor=tk.W, padx=5)
@@ -6748,7 +6748,7 @@ class PCIGUIApp:
                             'longitude': lon,
                             'latitude': lat,
                             'azimuth': azimuth,
-                            'polygon': sector_data,
+                            'points': sector_data,
                             'color': self.sector_color.get(),
                             'type': 'polygon'
                         })
