@@ -1,0 +1,24 @@
+!table
+!version 300
+!charset WindowsSimpChinese
+
+Definition Table
+  File "sectors_20251210_143142.dat"
+  Type "Native"
+  Charset "WindowsSimpChinese"
+
+Fields
+  1 name Char(100) ;
+  2 longitude Float ;
+  3 latitude Float ;
+  4 azimuth Float ;
+  5 color Char(20) ;
+
+CoordSys Earth Projection 1, 104
+Columns 5
+  name Char(100)
+  longitude Float
+  latitude Float
+  azimuth Float
+  color Char(20)
+Data

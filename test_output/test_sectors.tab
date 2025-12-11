@@ -1,0 +1,12 @@
+!table
+!version 300
+!charset Neutral
+
+Definition Table
+  Type NATIVE Charset "Neutral"
+  Fields 5
+    name Char (254) ;
+    longitude Float ;
+    latitude Float ;
+    azimuth LargeInt ;
+    color Char (254) ;

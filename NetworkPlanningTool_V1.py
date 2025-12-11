@@ -7,6 +7,16 @@ except ImportError:
     MAP_AVAILABLE = False
     print("Warning: tkintermapview not found.")
 
+# Check for GeoPandas availability for MapInfo export
+GEOPANDAS_AVAILABLE = False
+try:
+    import geopandas
+    from shapely.geometry import Point, Polygon
+    GEOPANDAS_AVAILABLE = True
+    print("GeoPandas is available - MapInfo export will use standard format")
+except ImportError:
+    print("GeoPandas not found - MapInfo export will use compatibility mode")
+
 try:
     from osgeo import ogr
     OGR_AVAILABLE = True
@@ -5346,6 +5356,14 @@ class PCIGUIApp:
         self.nr_clicked_column = None
         self.lte_clicked_column = None
 
+        # Layer creation variables
+        self.layer_data = None
+        self.layer_field_mapping = {}
+        self.layer_created_data = None
+        self.layer_export_path = tk.StringVar()
+        self.selected_sheet = tk.StringVar(value="")
+        self.available_sheets = []
+
         # Initialize tooltip for copy notifications
         self.tooltip = Tooltip(self.root, '')
 
@@ -5401,10 +5419,11 @@ class PCIGUIApp:
         # Configure the notebook to be responsive
         self.root.bind('<Configure>', self.on_window_resize)
 
-        # Create tabs in requested order: 全量工参更新 -> 邻区规划 -> PCI规划
-        self.create_param_update_tab()      # 全量工参更新 (was 现网工参更新)
-        self.create_neighbor_planning_tab() # 邻区规划
-        self.create_pci_planning_tab()      # PCI规划 (was PCI Planning)
+        # Create tabs in requested order: 全量工参更新 -> 图层制作 -> 邻区规划 -> PCI规划
+        self.create_param_update_tab()      # 1. 规划数据导入及工参更新
+        self.create_layer_maker_tab()       # 2. 图层制作 (新增独立模块) [修复3]
+        self.create_neighbor_planning_tab() # 3. 邻区规划
+        self.create_pci_planning_tab()      # 4. PCI规划
 
     def create_pci_planning_tab(self):
         """Create the PCI Planning tab"""
@@ -5502,7 +5521,7 @@ class PCIGUIApp:
         file_frame.columnconfigure(0, weight=1)
 
         # Create left frame for file selection
-        selection_frame = ttk.LabelFrame(file_frame, text='文件选择')
+        selection_frame = ttk.Frame(file_frame)
         selection_frame.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
         selection_frame.columnconfigure(1, weight=1)  # Entry column
 
@@ -5537,13 +5556,193 @@ class PCIGUIApp:
         instruction_text.config(state=tk.DISABLED)  # Make it read-only
         instruction_text.pack(padx=5, pady=5)
 
+        # 图层制作功能区
+        layer_frame = ttk.Frame(param_frame)
+        layer_frame.pack(fill=tk.X, padx=10, pady=5)
+
+        # 图层类型选择
+        layer_type_frame = ttk.Frame(layer_frame)
+        layer_type_frame.pack(fill=tk.X, pady=5)
+
+        ttk.Label(layer_type_frame, text="图层类型:").pack(side=tk.LEFT, padx=5)
+        self.layer_type = tk.StringVar(value="扇区图层")
+        layer_type_combo = ttk.Combobox(layer_type_frame, textvariable=self.layer_type,
+                                       values=["扇区图层", "点状图层"], state="readonly", width=15)
+        layer_type_combo.pack(side=tk.LEFT, padx=5)
+        layer_type_combo.bind("<<ComboboxSelected>>", self.on_layer_type_change)
+
+        # 数据文件选择
+        layer_file_frame = ttk.Frame(layer_frame)
+        layer_file_frame.pack(fill=tk.X, pady=5)
+
+        ttk.Label(layer_file_frame, text="数据文件:").pack(side=tk.LEFT, padx=5)
+        self.layer_data_file = tk.StringVar()
+        ttk.Entry(layer_file_frame, textvariable=self.layer_data_file, width=50).pack(side=tk.LEFT, padx=5)
+        ttk.Button(layer_file_frame, text="浏览", command=self.select_layer_data_file).pack(side=tk.LEFT, padx=5)
+
+        # Sheet selection (for Excel files)
+        self.sheet_frame = ttk.Frame(layer_file_frame)
+        self.sheet_label = ttk.Label(self.sheet_frame, text="工作表:")
+        self.sheet_label.pack(side=tk.LEFT, padx=5)
+        self.selected_sheet = tk.StringVar()
+        self.sheet_combo = ttk.Combobox(self.sheet_frame, textvariable=self.selected_sheet, state="readonly", width=20)
+        self.sheet_combo.pack(side=tk.LEFT, padx=5)
+        self.sheet_combo.bind("<<ComboboxSelected>>", self.on_sheet_selected)
+
+        ttk.Button(layer_file_frame, text="字段映射", command=self.open_field_mapping_dialog).pack(side=tk.LEFT, padx=5)
+
+        # 图层参数设置
+        self.layer_params_frame = ttk.Frame(layer_frame)
+        self.layer_params_frame.pack(fill=tk.X, pady=5)
+
+        # 扇区图层参数
+        self.sector_params_frame = ttk.Frame(self.layer_params_frame)
+        self.sector_params_frame.pack(fill=tk.X)
+
+        ttk.Label(self.sector_params_frame, text="颜色:").grid(row=0, column=0, padx=5, pady=2)
+        self.sector_color = tk.StringVar(value="blue")
+        color_combo = ttk.Combobox(self.sector_params_frame, textvariable=self.sector_color,
+                                  values=["red", "blue", "green", "orange", "purple"], width=10)
+        color_combo.grid(row=0, column=1, padx=5, pady=2)
+
+        ttk.Label(self.sector_params_frame, text="扇区夹角:").grid(row=0, column=2, padx=5, pady=2)
+        self.sector_angle = tk.IntVar(value=60)
+        ttk.Entry(self.sector_params_frame, textvariable=self.sector_angle, width=8).grid(row=0, column=3, padx=5, pady=2)
+
+        ttk.Label(self.sector_params_frame, text="扇区半径(米):").grid(row=0, column=4, padx=5, pady=2)
+        self.sector_radius = tk.IntVar(value=500)
+        ttk.Entry(self.sector_params_frame, textvariable=self.sector_radius, width=8).grid(row=0, column=5, padx=5, pady=2)
+
+        # 点状图层参数
+        self.point_params_frame = ttk.Frame(self.layer_params_frame)
+
+        ttk.Label(self.point_params_frame, text="颜色:").grid(row=0, column=0, padx=5, pady=2)
+        self.point_color = tk.StringVar(value="red")
+        point_color_combo = ttk.Combobox(self.point_params_frame, textvariable=self.point_color,
+                                        values=["red", "blue", "green", "orange", "purple"], width=10)
+        point_color_combo.grid(row=0, column=1, padx=5, pady=2)
+
+        # 默认显示扇区参数
+        self.point_params_frame.pack_forget()
+
+        # 制作和导出按钮
+        button_frame = ttk.Frame(layer_frame)
+        button_frame.pack(fill=tk.X, pady=10)
+
+        ttk.Button(button_frame, text="制作图层", command=self.create_layer).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="导出图层", command=self.export_layer).pack(side=tk.LEFT, padx=5)
+
+        # 状态标签
+        self.layer_status = tk.StringVar()
+        ttk.Label(button_frame, textvariable=self.layer_status).pack(side=tk.LEFT, padx=20)
+
         # 在线地图框架 - 最大化显示
-        self.update_map_frame = ttk.LabelFrame(param_frame, text="在线地图")
+        self.update_map_frame = ttk.Frame(param_frame)
         self.update_map_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
         # 设置地图框架权重以最大化显示
         param_frame.rowconfigure(2, weight=1)  # 地图框架行索引
         self.update_map_widget = TiandituMapPanel(self.update_map_frame, app_instance=self)
         self.update_map_widget.pack(fill=tk.BOTH, expand=True)
+
+    def create_layer_maker_tab(self):
+        """[新增] 创建独立的图层制作Tab"""
+        layer_tab = ttk.Frame(self.notebook)
+        self.notebook.add(layer_tab, text="图层制作")
+
+        # 左右分栏布局
+        paned = ttk.PanedWindow(layer_tab, orient=tk.HORIZONTAL)
+        paned.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        left_frame = ttk.Frame(paned, width=400)
+        right_frame = ttk.Frame(paned)
+        paned.add(left_frame, weight=0) # 左侧固定宽度
+        paned.add(right_frame, weight=1) # 右侧地图自适应
+
+        # --- 左侧控制面板 ---
+
+        # 1. 数据源设置
+        source_group = ttk.LabelFrame(left_frame, text="1. 数据源设置")
+        source_group.pack(fill=tk.X, padx=5, pady=5)
+
+        ttk.Label(source_group, text="数据文件:").pack(anchor=tk.W, padx=5, pady=2)
+
+        file_box = ttk.Frame(source_group)
+        file_box.pack(fill=tk.X, padx=5)
+        ttk.Entry(file_box, textvariable=self.layer_data_file).pack(side=tk.LEFT, fill=tk.X, expand=True)
+        ttk.Button(file_box, text="浏览", width=6, command=self.select_layer_data_file).pack(side=tk.LEFT, padx=2)
+
+        self.sheet_frame = ttk.Frame(source_group)
+        self.sheet_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(self.sheet_frame, text="工作表:").pack(side=tk.LEFT)
+        self.sheet_combo = ttk.Combobox(self.sheet_frame, textvariable=self.selected_sheet, state="readonly")
+        self.sheet_combo.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        self.sheet_combo.bind("<<ComboboxSelected>>", self.on_sheet_selected)
+
+        # 2. 图层类型与映射
+        type_group = ttk.LabelFrame(left_frame, text="2. 类型与字段映射")
+        type_group.pack(fill=tk.X, padx=5, pady=5)
+
+        ttk.Label(type_group, text="图层类型:").pack(anchor=tk.W, padx=5)
+        layer_type_combo = ttk.Combobox(type_group, textvariable=self.layer_type,
+                                       values=["扇区图层", "点状图层"], state="readonly")
+        layer_type_combo.pack(fill=tk.X, padx=5, pady=5)
+        layer_type_combo.bind("<<ComboboxSelected>>", self.on_layer_type_change)
+
+        ttk.Button(type_group, text="设置字段映射 (经纬度/方位角)", command=self.open_field_mapping_dialog).pack(fill=tk.X, padx=5, pady=5)
+
+        # 3. 样式参数
+        style_group = ttk.LabelFrame(left_frame, text="3. 样式参数")
+        style_group.pack(fill=tk.X, padx=5, pady=5)
+
+        # 扇区参数容器
+        self.sector_params_frame = ttk.Frame(style_group)
+        self.sector_params_frame.pack(fill=tk.X, padx=5)
+
+        f1 = ttk.Frame(self.sector_params_frame)
+        f1.pack(fill=tk.X, pady=2)
+        ttk.Label(f1, text="颜色:").pack(side=tk.LEFT)
+        ttk.Combobox(f1, textvariable=self.sector_color, values=["red", "blue", "green", "orange", "purple"], width=10).pack(side=tk.RIGHT)
+
+        f2 = ttk.Frame(self.sector_params_frame)
+        f2.pack(fill=tk.X, pady=2)
+        ttk.Label(f2, text="扇区夹角(度):").pack(side=tk.LEFT)
+        ttk.Entry(f2, textvariable=self.sector_angle, width=10).pack(side=tk.RIGHT)
+
+        f3 = ttk.Frame(self.sector_params_frame)
+        f3.pack(fill=tk.X, pady=2)
+        ttk.Label(f3, text="扇区半径(米):").pack(side=tk.LEFT)
+        ttk.Entry(f3, textvariable=self.sector_radius, width=10).pack(side=tk.RIGHT)
+
+        # 点状参数容器
+        self.point_params_frame = ttk.Frame(style_group)
+        f4 = ttk.Frame(self.point_params_frame)
+        f4.pack(fill=tk.X, pady=2)
+        ttk.Label(f4, text="颜色:").pack(side=tk.LEFT)
+        ttk.Combobox(f4, textvariable=self.point_color, values=["red", "blue", "green", "orange", "purple"], width=10).pack(side=tk.RIGHT)
+
+        # 初始显示状态
+        if self.layer_type.get() == "点状图层":
+            self.sector_params_frame.pack_forget()
+            self.point_params_frame.pack(fill=tk.X, padx=5)
+
+        # 4. 操作
+        action_group = ttk.LabelFrame(left_frame, text="4. 执行操作")
+        action_group.pack(fill=tk.X, padx=5, pady=5)
+
+        ttk.Button(action_group, text="生成图层 (预览)", command=self.create_layer).pack(fill=tk.X, padx=5, pady=5)
+        ttk.Button(action_group, text="导出图层 (MapInfo TAB)", command=self.export_layer).pack(fill=tk.X, padx=5, pady=5)
+
+        # 状态显示
+        ttk.Label(action_group, text="状态:").pack(anchor=tk.W, padx=5)
+        lbl_status = ttk.Label(action_group, textvariable=self.layer_status, foreground="blue", wraplength=350)
+        lbl_status.pack(fill=tk.X, padx=5, pady=5)
+
+        # --- 右侧地图 ---
+        # 复用已有的地图类，但在本Tab实例化一个新的
+        self.layer_map_widget = TiandituMapPanel(right_frame, app_instance=self)
+        self.layer_map_widget.pack(fill=tk.BOTH, expand=True)
+        # 将图层制作结果关联到这个地图
+        self.layer_target_map = self.layer_map_widget
 
     def create_neighbor_planning_tab(self):
         """Create the Neighbor Planning tab"""
@@ -6305,6 +6504,635 @@ class PCIGUIApp:
 
         # Schedule the next check
         self.root.after(100, self.process_queue)
+
+    def on_sheet_selected(self, event=None):
+        """Handle sheet selection change"""
+        if self.selected_sheet.get() and self.layer_data_file.get().endswith('.xlsx'):
+            self.layer_status.set(f"已选择工作表: {self.selected_sheet.get()}")
+
+    def on_layer_type_change(self, event=None):
+        """Handle layer type selection change"""
+        if self.layer_type.get() == "扇区图层":
+            self.sector_params_frame.pack(fill=tk.X)
+            self.point_params_frame.pack_forget()
+        else:
+            self.sector_params_frame.pack_forget()
+            self.point_params_frame.pack(fill=tk.X)
+
+    def select_layer_data_file(self):
+        """Select the data file for layer creation"""
+        filename = filedialog.askopenfilename(
+            title="选择数据文件",
+            filetypes=[("Excel files", "*.xlsx"), ("CSV files", "*.csv"), ("All files", "*.*")]
+        )
+        if filename:
+            self.layer_data_file.set(filename)
+            self.layer_status.set("已选择数据文件")
+
+    def on_sheet_selected(self, event=None):
+        """Handle sheet selection change"""
+        if self.selected_sheet.get() and self.layer_data_file.get().endswith('.xlsx'):
+            self.layer_status.set(f"已选择工作表: {self.selected_sheet.get()}")
+
+    def get_layer_data(self, nrows=None):
+        """Get layer data with sheet selection support"""
+        if not self.layer_data_file.get():
+            return None
+
+        try:
+            import pandas as pd
+
+            if self.layer_data_file.get().endswith('.csv'):
+                if nrows:
+                    return pd.read_csv(self.layer_data_file.get(), nrows=nrows)
+                else:
+                    return pd.read_csv(self.layer_data_file.get())
+            else:  # Excel
+                sheet_name = self.selected_sheet.get() if self.selected_sheet.get() else 0
+                if nrows:
+                    return pd.read_excel(self.layer_data_file.get(), sheet_name=sheet_name, nrows=nrows)
+                else:
+                    return pd.read_excel(self.layer_data_file.get(), sheet_name=sheet_name)
+
+        except Exception as e:
+            messagebox.showerror("错误", f"读取文件失败: {str(e)}")
+            return None
+
+    def select_layer_data_file(self):
+        """Select the data file for layer creation"""
+        filename = filedialog.askopenfilename(
+            title="选择数据文件",
+            filetypes=[("Excel files", "*.xlsx"), ("CSV files", "*.csv"), ("All files", "*.*")]
+        )
+        if filename:
+            self.layer_data_file.set(filename)
+            self.layer_status.set("已选择数据文件")
+
+            # Update sheet selection if it's an Excel file
+            if filename.endswith('.xlsx'):
+                try:
+                    import pandas as pd
+                    xl_file = pd.ExcelFile(filename)
+                    self.available_sheets = xl_file.sheet_names
+                    self.sheet_combo['values'] = self.available_sheets
+                    if self.available_sheets:
+                        self.selected_sheet.set(self.available_sheets[0])
+                    # Show sheet selection
+                    self.sheet_frame.pack(side=tk.LEFT, padx=10)
+                except Exception as e:
+                    messagebox.showerror("错误", f"读取Excel文件失败: {str(e)}")
+                    self.sheet_frame.pack_forget()
+            else:
+                # Hide sheet selection for CSV files
+                self.sheet_frame.pack_forget()
+                self.selected_sheet.set("")
+                self.available_sheets = []
+
+    def open_field_mapping_dialog(self):
+        """Open dialog for field mapping"""
+        if not self.layer_data_file.get():
+            messagebox.showwarning("警告", "请先选择数据文件")
+            return
+
+        try:
+            # Read the file to get column names
+            data = self.get_layer_data(nrows=1)
+            if data is None:
+                return
+
+            columns = list(data.columns)
+
+            # Create field mapping dialog
+            dialog = tk.Toplevel(self.root)
+            dialog.title("字段映射")
+            dialog.geometry("500x400")
+            dialog.transient(self.root)
+            dialog.grab_set()
+
+            # Required fields based on layer type
+            if self.layer_type.get() == "扇区图层":
+                required_fields = {
+                    "经度": "lon_col",
+                    "纬度": "lat_col",
+                    "小区名称": "name_col",
+                    "方位角": "azimuth_col"
+                }
+            else:
+                required_fields = {
+                    "经度": "lon_col",
+                    "纬度": "lat_col",
+                    "站点名称": "name_col"
+                }
+
+            # Create mapping UI
+            mapping_vars = {}
+            row = 0
+            for field_name, var_name in required_fields.items():
+                ttk.Label(dialog, text=f"{field_name}:").grid(row=row, column=0, sticky=tk.W, padx=10, pady=5)
+                var = tk.StringVar()
+                if columns:
+                    var.set(columns[0] if var_name not in self.layer_field_mapping else self.layer_field_mapping.get(var_name, ""))
+                combo = ttk.Combobox(dialog, textvariable=var, values=columns, state="readonly", width=30)
+                combo.grid(row=row, column=1, padx=10, pady=5)
+                mapping_vars[var_name] = var
+                row += 1
+
+            def save_mapping():
+                """Save the field mapping"""
+                self.layer_field_mapping = {k: v.get() for k, v in mapping_vars.items() if v.get()}
+                if len(self.layer_field_mapping) != len(required_fields):
+                    messagebox.showwarning("警告", "请映射所有必需字段")
+                    return
+                dialog.destroy()
+                self.layer_status.set("字段映射已完成")
+
+            def cancel_mapping():
+                """Cancel field mapping"""
+                dialog.destroy()
+
+            # Buttons
+            button_frame = ttk.Frame(dialog)
+            button_frame.grid(row=row, column=0, columnspan=2, pady=20)
+
+            ttk.Button(button_frame, text="确定", command=save_mapping).pack(side=tk.LEFT, padx=10)
+            ttk.Button(button_frame, text="取消", command=cancel_mapping).pack(side=tk.LEFT, padx=10)
+
+        except Exception as e:
+            messagebox.showerror("错误", f"读取文件失败: {str(e)}")
+
+    def create_layer(self):
+        """Create the layer based on selected parameters (With Data Cleaning)"""
+        if not self.layer_data_file.get():
+            messagebox.showwarning("警告", "请先选择数据文件")
+            return
+
+        if not self.layer_field_mapping:
+            messagebox.showwarning("警告", "请先进行字段映射")
+            return
+
+        try:
+            import pandas as pd
+            import numpy as np
+
+            # Read the data file
+            data = self.get_layer_data()
+            if data is None: return
+
+            layer_type = self.layer_type.get()
+
+            # --- [修复2] 数据清洗逻辑开始 ---
+            original_count = len(data)
+
+            # 获取映射的列名
+            lon_col = self.layer_field_mapping.get("lon_col")
+            lat_col = self.layer_field_mapping.get("lat_col")
+            name_col = self.layer_field_mapping.get("name_col")
+
+            cols_to_check = [lon_col, lat_col, name_col]
+
+            if layer_type == "扇区图层":
+                azimuth_col = self.layer_field_mapping.get("azimuth_col")
+                if not azimuth_col:
+                    messagebox.showerror("错误", "扇区图层必须映射方位角字段")
+                    return
+                cols_to_check.append(azimuth_col)
+
+            # 1. 强制转换数值列 (非数值变NaN)
+            data[lon_col] = pd.to_numeric(data[lon_col], errors='coerce')
+            data[lat_col] = pd.to_numeric(data[lat_col], errors='coerce')
+            if layer_type == "扇区图层":
+                data[azimuth_col] = pd.to_numeric(data[azimuth_col], errors='coerce')
+
+            # 2. 剔除数值列为空的行
+            if layer_type == "扇区图层":
+                data.dropna(subset=[lon_col, lat_col, azimuth_col], inplace=True)
+            else:
+                data.dropna(subset=[lon_col, lat_col], inplace=True)
+
+            # 3. 剔除名称为空的行
+            data.dropna(subset=[name_col], inplace=True)
+            # 剔除名称为空白字符的行
+            data = data[data[name_col].astype(str).str.strip() != '']
+
+            cleaned_count = len(data)
+            dropped_count = original_count - cleaned_count
+
+            if cleaned_count == 0:
+                messagebox.showerror("错误", "没有有效数据！请检查经纬度是否为数值，关键列是否为空。")
+                return
+
+            if dropped_count > 0:
+                self.layer_status.set(f"数据清洗: 总{original_count}行, 剔除{dropped_count}无效行, 剩余{cleaned_count}行")
+            # --- 数据清洗逻辑结束 ---
+
+            self.layer_data = data # 更新为清洗后的数据
+
+            if layer_type == "扇区图层":
+                sectors = []
+                for idx, row in data.iterrows():
+                    try:
+                        lon = float(row[lon_col])
+                        lat = float(row[lat_col])
+                        name = str(row[name_col])
+                        azimuth = float(row[azimuth_col])
+
+                        # Calculate sector polygon
+                        sector_data = self.calculate_sector_polygon(
+                            lon, lat, azimuth,
+                            self.sector_angle.get(),
+                            self.sector_radius.get()
+                        )
+
+                        sectors.append({
+                            'name': name,
+                            'longitude': lon,
+                            'latitude': lat,
+                            'azimuth': azimuth,
+                            'polygon': sector_data,
+                            'color': self.sector_color.get(),
+                            'type': 'polygon'
+                        })
+
+                    except Exception as e:
+                        print(f"跳过行 {idx}: {e}")
+                        continue
+
+                self.layer_created_data = sectors
+
+                # 自动显示到右侧地图
+                if hasattr(self, 'layer_target_map'):
+                    self.layer_target_map.tab_layer_data = sectors
+                    self.layer_target_map.refresh_layer()
+                    # 定位到第一个点
+                    if sectors:
+                        # 修正坐标偏移用于显示
+                        d_lon, d_lat = self.layer_target_map.apply_coordinate_correction(sectors[0]['longitude'], sectors[0]['latitude'])
+                        self.layer_target_map.map_widget.set_position(d_lat, d_lon)
+
+                self.layer_status.set(f"扇区图层生成成功: {len(sectors)}个 (已剔除无效数据{dropped_count}条)")
+
+            else:  # 点状图层
+                points = []
+                for idx, row in data.iterrows():
+                    try:
+                        lon = float(row[lon_col])
+                        lat = float(row[lat_col])
+                        name = str(row[name_col])
+
+                        points.append({
+                            'name': name,
+                            'longitude': lon,
+                            'latitude': lat,
+                            'color': self.point_color.get(),
+                            'type': 'point'
+                        })
+
+                    except Exception as e:
+                        continue
+
+                self.layer_created_data = points
+
+                # 自动显示到右侧地图
+                if hasattr(self, 'layer_target_map'):
+                    self.layer_target_map.tab_layer_data = points
+                    self.layer_target_map.refresh_layer()
+                    if points:
+                        d_lon, d_lat = self.layer_target_map.apply_coordinate_correction(points[0]['longitude'], points[0]['latitude'])
+                        self.layer_target_map.map_widget.set_position(d_lat, d_lon)
+
+                self.layer_status.set(f"点状图层生成成功: {len(points)}个 (已剔除无效数据{dropped_count}条)")
+
+            messagebox.showinfo("成功", f"{layer_type}制作完成！\n有效数据: {cleaned_count}\n无效剔除: {dropped_count}")
+
+        except Exception as e:
+            messagebox.showerror("错误", f"图层制作失败: {str(e)}")
+            import traceback
+            traceback.print_exc()
+
+    def calculate_sector_polygon(self, lon, lat, azimuth, angle_deg, radius_m):
+        """
+        Calculate sector polygon coordinates
+        [修复1] 修正方位角方向问题 (通信方位角0度朝北 -> 数学坐标转换)
+        [修复1] 修正位置纠偏算法 (加入纬度对经度跨度的校正)
+        """
+        import math
+
+        # 1. 基础转换系数 (WGS84椭球近似)
+        # 1度纬度 ≈ 111320米
+        # 1度经度 ≈ 111320米 * cos(lat)
+        meters_per_deg_lat = 111320.0
+        meters_per_deg_lon = 111320.0 * math.cos(math.radians(lat))
+
+        # 将半径转换为经纬度跨度
+        radius_deg_lat = radius_m / meters_per_deg_lat
+        radius_deg_lon = radius_m / meters_per_deg_lon
+
+        # 2. 角度范围计算
+        # 通信方位角: 0=北, 90=东, 180=南, 270=西
+        half_angle = angle_deg / 2
+        start_azimuth = azimuth - half_angle
+        end_azimuth = azimuth + half_angle
+
+        # 3. 生成多边形点
+        points = []
+
+        # 中心点
+        points.append((lon, lat))
+
+        # 弧线点 (生成20个插值点使弧线平滑)
+        num_points = 20
+        for i in range(num_points + 1):
+            # 当前通信方位角
+            curr_azimuth = start_azimuth + (end_azimuth - start_azimuth) * i / num_points
+
+            # [核心修复] 坐标系转换
+            # 数学三角函数: 0=东(X轴), 90=北(Y轴)
+            # 转换公式: math_angle = 90 - telecom_azimuth
+            math_angle_rad = math.radians(90 - curr_azimuth)
+
+            # 计算偏移 (注意: cos是X/经度方向, sin是Y/纬度方向)
+            dx = radius_deg_lon * math.cos(math_angle_rad)
+            dy = radius_deg_lat * math.sin(math_angle_rad)
+
+            points.append((lon + dx, lat + dy))
+
+        # 闭合多边形
+        points.append((lon, lat))
+
+        return points
+
+    def export_layer(self):
+        """Export the created layer to TAB format"""
+        if not self.layer_created_data:
+            messagebox.showwarning("警告", "请先制作图层")
+            return
+
+        # Ask for export directory
+        export_dir = filedialog.askdirectory(title="选择导出目录")
+        if not export_dir:
+            return
+
+        try:
+            layer_type = self.layer_type.get()
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+
+            if layer_type == "扇区图层":
+                filename = f"sectors_{timestamp}"
+                self.export_sector_layer(export_dir, filename)
+            else:
+                filename = f"points_{timestamp}"
+                self.export_point_layer(export_dir, filename)
+
+            self.layer_export_path.set(os.path.join(export_dir, filename))
+            messagebox.showinfo("成功", f"图层已导出到: {export_dir}")
+
+        except Exception as e:
+            messagebox.showerror("错误", f"导出失败: {str(e)}")
+
+    def export_sector_layer(self, export_dir, filename):
+        """Export sector layer to TAB format using GeoPandas for standard MapInfo compatibility"""
+        if GEOPANDAS_AVAILABLE:
+            # Use GeoPandas for standard MapInfo format
+            import geopandas as gpd
+            from shapely.geometry import Polygon
+            import pandas as pd
+
+            # Create a list to store data for GeoDataFrame
+            data_list = []
+
+            for sector in self.layer_created_data:
+                # Create polygon from sector points
+                polygon_coords = sector['polygon']
+                # Ensure the polygon is closed (first point = last point)
+                if polygon_coords[0] != polygon_coords[-1]:
+                    polygon_coords.append(polygon_coords[0])
+
+                # Create Shapely Polygon
+                polygon = Polygon(polygon_coords)
+
+                # Add data to list
+                data_list.append({
+                    'name': sector['name'],
+                    'longitude': sector['longitude'],
+                    'latitude': sector['latitude'],
+                    'azimuth': sector['azimuth'],
+                    'color': sector['color'],
+                    'geometry': polygon
+                })
+
+            # Create GeoDataFrame
+            gdf = gpd.GeoDataFrame(data_list, crs='EPSG:4326')
+
+            # Export to MapInfo TAB format
+            tab_file = os.path.join(export_dir, f"{filename}.tab")
+            gdf.to_file(tab_file, driver='MapInfo File', encoding='utf-8')
+        else:
+            # Fallback to manual creation if geopandas not available
+            messagebox.showwarning("警告", "GeoPandas未安装，使用兼容性模式导出。\n建议安装GeoPandas以获得更好的MapInfo兼容性：\npip install geopandas")
+            self.export_sector_layer_manual(export_dir, filename)
+
+    def export_point_layer(self, export_dir, filename):
+        """Export point layer to TAB format using GeoPandas for standard MapInfo compatibility"""
+        if GEOPANDAS_AVAILABLE:
+            # Use GeoPandas for standard MapInfo format
+            import geopandas as gpd
+            from shapely.geometry import Point
+            import pandas as pd
+
+            # Create a list to store data for GeoDataFrame
+            data_list = []
+
+            for point in self.layer_created_data:
+                # Create Shapely Point
+                point_geom = Point(point['longitude'], point['latitude'])
+
+                # Add data to list
+                data_list.append({
+                    'name': point['name'],
+                    'longitude': point['longitude'],
+                    'latitude': point['latitude'],
+                    'color': point['color'],
+                    'geometry': point_geom
+                })
+
+            # Create GeoDataFrame
+            gdf = gpd.GeoDataFrame(data_list, crs='EPSG:4326')
+
+            # Export to MapInfo TAB format
+            tab_file = os.path.join(export_dir, f"{filename}.tab")
+            gdf.to_file(tab_file, driver='MapInfo File', encoding='utf-8')
+        else:
+            # Fallback to manual creation if geopandas not available
+            messagebox.showwarning("警告", "GeoPandas未安装，使用兼容性模式导出。\n建议安装GeoPandas以获得更好的MapInfo兼容性：\npip install geopandas")
+            self.export_point_layer_manual(export_dir, filename)
+
+    def export_sector_layer_manual(self, export_dir, filename):
+        """Manual export method for sector layer (fallback when GeoPandas not available)"""
+        # Create TAB file
+        tab_file = os.path.join(export_dir, f"{filename}.tab")
+
+        with open(tab_file, 'w', encoding='utf-8') as f:
+            # Write header
+            f.write("!table\n")
+            f.write("!version 300\n")
+            f.write("!charset WindowsSimpChinese\n\n")
+            f.write("Definition Table\n")
+            f.write("  File \"{}.dat\"\n".format(filename))
+            f.write("  Type \"Native\"\n")
+            f.write("  Charset \"WindowsSimpChinese\"\n\n")
+            f.write("Fields\n")
+            f.write("  1 name Char(100) ;\n")
+            f.write("  2 longitude Float ;\n")
+            f.write("  3 latitude Float ;\n")
+            f.write("  4 azimuth Float ;\n")
+            f.write("  5 color Char(20) ;\n")
+            f.write("\n")
+            f.write("CoordSys Earth Projection 1, 104\n")  # WGS84 for China
+            f.write("Columns 5\n")
+            f.write("  name Char(100)\n")
+            f.write("  longitude Float\n")
+            f.write("  latitude Float\n")
+            f.write("  azimuth Float\n")
+            f.write("  color Char(20)\n")
+            f.write("Data\n")
+
+        # Create DAT file with proper format
+        dat_file = os.path.join(export_dir, f"{filename}.dat")
+
+        with open(dat_file, 'w', encoding='utf-8') as f:
+            for i, sector in enumerate(self.layer_created_data):
+                # Format: RowID\tField1\tField2\t...
+                f.write(f"{i+1}\t")  # Row ID
+                f.write(f"\"{sector['name']}\"\t")
+                f.write(f"{sector['longitude']:.6f}\t")
+                f.write(f"{sector['latitude']:.6f}\t")
+                f.write(f"{sector['azimuth']:.1f}\t")
+                f.write(f"\"{sector['color']}\"\n")
+
+        # Create proper MAP file (simplified but functional)
+        map_file = os.path.join(export_dir, f"{filename}.map")
+        self.create_map_file(map_file, self.layer_created_data, is_polygon=True)
+
+        # Create ID file
+        id_file = os.path.join(export_dir, f"{filename}.id")
+        with open(id_file, 'wb') as f:
+            # Write MapInfo ID file header and data
+            # This is a simplified binary format
+            import struct
+            # Write header (simplified)
+            f.write(struct.pack('<I', len(self.layer_created_data)))  # Number of records
+            for i in range(len(self.layer_created_data)):
+                f.write(struct.pack('<I', i + 1))  # Record ID
+
+    def export_point_layer_manual(self, export_dir, filename):
+        """Manual export method for point layer (fallback when GeoPandas not available)"""
+        # Create TAB file
+        tab_file = os.path.join(export_dir, f"{filename}.tab")
+
+        with open(tab_file, 'w', encoding='utf-8') as f:
+            # Write header
+            f.write("!table\n")
+            f.write("!version 300\n")
+            f.write("!charset WindowsSimpChinese\n\n")
+            f.write("Definition Table\n")
+            f.write("  File \"{}.dat\"\n".format(filename))
+            f.write("  Type \"Native\"\n")
+            f.write("  Charset \"WindowsSimpChinese\"\n\n")
+            f.write("Fields\n")
+            f.write("  1 name Char(100) ;\n")
+            f.write("  2 longitude Float ;\n")
+            f.write("  3 latitude Float ;\n")
+            f.write("  4 color Char(20) ;\n")
+            f.write("\n")
+            f.write("CoordSys Earth Projection 1, 104\n")  # WGS84 for China
+            f.write("Columns 4\n")
+            f.write("  name Char(100)\n")
+            f.write("  longitude Float\n")
+            f.write("  latitude Float\n")
+            f.write("  color Char(20)\n")
+            f.write("Data\n")
+
+        # Create DAT file with proper format
+        dat_file = os.path.join(export_dir, f"{filename}.dat")
+
+        with open(dat_file, 'w', encoding='utf-8') as f:
+            for i, point in enumerate(self.layer_created_data):
+                # Format: RowID\tField1\tField2\t...
+                f.write(f"{i+1}\t")  # Row ID
+                f.write(f"\"{point['name']}\"\t")
+                f.write(f"{point['longitude']:.6f}\t")
+                f.write(f"{point['latitude']:.6f}\t")
+                f.write(f"\"{point['color']}\"\n")
+
+        # Create proper MAP file
+        map_file = os.path.join(export_dir, f"{filename}.map")
+        self.create_map_file(map_file, self.layer_created_data, is_polygon=False)
+
+        # Create ID file
+        id_file = os.path.join(export_dir, f"{filename}.id")
+        with open(id_file, 'wb') as f:
+            # Write MapInfo ID file header and data
+            import struct
+            # Write header (simplified)
+            f.write(struct.pack('<I', len(self.layer_created_data)))  # Number of records
+            for i in range(len(self.layer_created_data)):
+                f.write(struct.pack('<I', i + 1))  # Record ID
+
+    def create_map_file(self, map_file, data, is_polygon=False):
+        """Create a simplified but valid MapInfo MAP file"""
+        import struct
+
+        with open(map_file, 'wb') as f:
+            # Write MapInfo MAP file header
+            # Version 300 header
+            f.write(struct.pack('<H', 0x0459))  # Version 300 (1113)
+
+            # Write coordinate bounds (simplified - using approximate bounds)
+            min_x = min(item['longitude'] for item in data) - 0.01
+            max_x = max(item['longitude'] for item in data) + 0.01
+            min_y = min(item['latitude'] for item in data) - 0.01
+            max_y = max(item['latitude'] for item in data) + 0.01
+
+            f.write(struct.pack('<d', min_x))  # Min X
+            f.write(struct.pack('<d', min_y))  # Min Y
+            f.write(struct.pack('<d', max_x))  # Max X
+            f.write(struct.pack('<d', max_y))  # Max Y
+
+            # For sectors, we need to store polygon data
+            # For points, we store point data
+            if is_polygon:
+                # Simplified polygon storage
+                for i, sector in enumerate(data):
+                    # Write object type (3 = region/polyline)
+                    f.write(struct.pack('<H', 3))
+                    # Write object info (simplified)
+                    f.write(struct.pack('<I', i + 1))  # Object ID
+                    # Write number of polygons (1)
+                    f.write(struct.pack('<I', 1))
+                    # Write number of points in polygon
+                    f.write(struct.pack('<I', len(sector['polygon'])))
+                    # Write points
+                    for lon, lat in sector['polygon']:
+                        f.write(struct.pack('<d', lon))
+                        f.write(struct.pack('<d', lat))
+            else:
+                # Point storage
+                for i, point in enumerate(data):
+                    # Write object type (1 = point)
+                    f.write(struct.pack('<H', 1))
+                    # Write object info (simplified)
+                    f.write(struct.pack('<I', i + 1))  # Object ID
+                    # Write point coordinates
+                    f.write(struct.pack('<d', point['longitude']))
+                    f.write(struct.pack('<d', point['latitude']))
+
+    def _find_column_by_fuzzy_match(self, df, search_term):
+        """Find column by fuzzy matching"""
+        for col in df.columns:
+            if search_term in col:
+                return col
+        return None
+
     def update_status(self, text):
         """Update status bar text"""
         pass
