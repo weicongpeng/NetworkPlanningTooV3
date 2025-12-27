@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(timeout 3 python:*)"
-    ],
-    "deny": [],
-    "ask": []
-  }
-}

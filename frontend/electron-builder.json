@@ -1,0 +1,46 @@
+{
+  "appId": "com.networkplanning.tool",
+  "productName": "网络规划工具",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "dist-renderer/**/*",
+    "dist-electron/**/*",
+    "package.json"
+  ],
+  "mac": {
+    "category": "public.app-category.productivity",
+    "target": [
+      "dmg",
+      "zip"
+    ]
+  },
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": [
+          "x64"
+        ]
+      }
+    ]
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true
+  },
+  "linux": {
+    "target": [
+      "AppImage",
+      "deb"
+    ],
+    "category": "Utility"
+  },
+  "publish": {
+    "provider": "generic",
+    "url": "https://example.com/releases"
+  }
+}
