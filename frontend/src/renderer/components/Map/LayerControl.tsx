@@ -329,47 +329,42 @@ function TreeNodeComponent({
         style={{
           display: 'flex',
           alignItems: 'center',
-          padding: node.type === 'root' ? '8px 10px' : '6px 8px',
+          padding: '8px 10px',
           cursor: isExpandable ? 'pointer' : 'default',
           userSelect: 'none',
-          borderBottom: node.type === 'root' ? '1px solid rgba(0, 0, 0, 0.1)' : 'none',
-          backgroundColor: node.type === 'root' ? 'linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(240,240,240,0.9) 100%)' : 'transparent',
-          borderRadius: node.type === 'root' ? '6px' : '0',
-          border: node.type === 'root' ? '1px solid rgba(0, 0, 0, 0.1)' : 'none',
-          boxShadow: node.type === 'root' ? '0 2px 4px rgba(0, 0, 0, 0.1)' : 'none',
+          borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
+          backgroundColor: 'transparent',
+          borderRadius: '0',
+          border: 'none',
+          boxShadow: 'none',
+          gap: '6px',
           ...getIndent()
         }}
         onClick={handleClick}
         onMouseEnter={(e) => {
           if (isExpandable) {
-            e.currentTarget.style.backgroundColor = node.type === 'root' 
-              ? 'linear-gradient(180deg, rgba(250,250,250,0.98) 0%, rgba(235,235,235,0.95) 100%)' 
-              : 'rgba(0, 0, 0, 0.05)'
+            e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)'
           }
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = node.type === 'root'
-            ? 'linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(240,240,240,0.9) 100%)'
-            : 'transparent'
+          e.currentTarget.style.backgroundColor = 'transparent'
         }}
       >
         {/* 展开/折叠图标 */}
         {isExpandable ? (
-          <span style={{ marginRight: '4px', display: 'flex', alignItems: 'center' }}>
+          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '16px' }}>
             {isExpanded ? (
               <ChevronDown size={12} color="#999" />
             ) : (
               <ChevronRight size={12} color="#999" />
             )}
           </span>
-        ) : node.type === 'map-type' ? (
-          <span style={{ width: '16px', marginRight: '4px' }} />
         ) : (
-          <span style={{ width: '16px', marginRight: '4px' }} />
+          <span style={{ width: '16px' }} />
         )}
 
         {/* 节点图标 */}
-        <span style={{ marginRight: '6px', display: 'flex', alignItems: 'center' }}>
+        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '16px' }}>
           {getNodeIcon()}
         </span>
 
@@ -377,7 +372,8 @@ function TreeNodeComponent({
         <span style={{
           flex: 1,
           color: node.type === 'root' ? '#333' : '#666',
-          fontWeight: node.type === 'root' ? 500 : 400
+          fontWeight: node.type === 'root' ? 500 : 400,
+          textAlign: 'left'
         }}>
           {node.label}
         </span>
@@ -414,7 +410,6 @@ function TreeNodeComponent({
             style={{
               width: '20px',
               height: '20px',
-              marginLeft: '8px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',

@@ -245,41 +245,7 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
       console.log('[OnlineMap] setMapType called with type:', type)
       setMapLayerType(type)
       mapStateService.setState({ mapLayerType: type })
-      
-      // 直接更新瓦片图层，不依赖useEffect钩子
-      if (mapInstanceRef.current && window.L) {
-        console.log('[OnlineMap] Updating tile layer:', type)
-        const map = mapInstanceRef.current
-        const L = window.L
-        
-        // 移除旧的瓦片图层
-        if (tileLayerRef.current) {
-          console.log('[OnlineMap] Removing old tile layer')
-          map.removeLayer(tileLayerRef.current)
-        }
-        
-        // 添加新的瓦片图层
-        const getTileUrl = (mapType: MapLayerType) => {
-          if (mapType === 'satellite') {
-            // 使用谷歌地图卫星瓦片
-            return `https://mt0.google.com/vt/lyrs=s&x={x}&y={y}&z={z}`
-          } else {
-            // 使用OpenStreetMap作为默认道路地图
-            return `https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png`
-          }
-        }
-        
-        const newTileLayer = L.tileLayer(getTileUrl(type), {
-          attribution: type === 'satellite' ? '&copy; Google Maps' : '&copy; OpenStreetMap contributors',
-          maxZoom: 18,
-          minZoom: 3
-        }).addTo(map)
-        
-        tileLayerRef.current = newTileLayer
-        console.log('[OnlineMap] New tile layer added:', type)
-      } else {
-        console.log('[OnlineMap] mapInstanceRef.current or window.L not available')
-      }
+      // 图层更新由useEffect钩子统一处理，不直接操作图层
     },
 
     toggleMapType: () => {
