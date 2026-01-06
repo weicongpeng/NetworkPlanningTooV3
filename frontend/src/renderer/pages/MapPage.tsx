@@ -171,7 +171,7 @@ export function MapPage() {
   }, [items, loadLayerFiles])
 
   // 搜索模式
-  const [searchMode, setSearchMode] = useState<SearchMode>('map')
+  const [searchMode, setSearchMode] = useState<SearchMode>('parameter')
 
   // 搜索状态
   const [searchKeyword, setSearchKeyword] = useState('')
@@ -671,14 +671,15 @@ export function MapPage() {
 
             {/* 工具下拉菜单 */}
             {showToolMenu && (
-              <div className="absolute top-full right-0 mt-1 z-[3000] bg-card border border-border rounded-lg shadow-lg w-24">
+              <div className="absolute top-full right-0 mt-1 z-[3000] bg-card border border-border rounded-lg shadow-lg w-28">
                 <button
                   onClick={() => {
                     setShowToolMenu(false);
                     setShowLocationModal(true);
                   }}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors"
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors flex items-center gap-2"
                 >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-map-pin"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
                   定位
                 </button>
                 <button
@@ -686,8 +687,9 @@ export function MapPage() {
                     setShowToolMenu(false);
                     setMeasureMode(true);
                   }}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors"
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors flex items-center gap-2"
                 >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-ruler"><path d="M12 2v20"></path><path d="m17 5-5 5"></path><path d="m9 5 5 5"></path><path d="m17 19-5-5"></path><path d="m9 19 5-5"></path></svg>
                   测距
                 </button>
               </div>

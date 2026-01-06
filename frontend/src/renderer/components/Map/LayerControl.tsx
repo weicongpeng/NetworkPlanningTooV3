@@ -234,7 +234,7 @@ export function LayerControl({
         onClick={() => setIsVisible(!isVisible)}
         style={{
           position: 'absolute',
-          top: '10px',
+          top: '60px',
           right: isVisible ? '210px' : '10px',
           zIndex: 1001,
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
@@ -262,7 +262,7 @@ export function LayerControl({
         className="layer-control"
         style={{
           position: 'absolute',
-          top: '10px',
+          top: '60px',
           right: isVisible ? '10px' : '-220px',
           zIndex: 1000,
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
