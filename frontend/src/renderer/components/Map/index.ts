@@ -4,7 +4,7 @@
 export { OnlineMap } from './OnlineMap'
 export { OfflineMap } from './OfflineMap'
 export { LayerControl, createDefaultLayers } from './LayerControl'
-export type { LayerOption } from './LayerControl'
+export type { LayerOption, SectorLayerOption } from './LayerControl'
 export { MapToolbar } from './MapToolbar'
 export { SectorInfoPanel, useSectorInfoPanel } from './SectorInfoPanel'
 export type { SectorInfoPanelProps } from './SectorInfoPanel'
