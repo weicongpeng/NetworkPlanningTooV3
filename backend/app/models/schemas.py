@@ -57,6 +57,12 @@ class LicenseResponse(BaseModel):
     message: Optional[str] = None
 
 
+class UpdateParametersRequest(BaseModel):
+    """工参更新请求"""
+    fullParamId: str
+    currentParamId: str
+
+
 # ============== 数据管理相关 ==============
 class UploadResponse(BaseModel):
     """上传响应"""
@@ -71,6 +77,7 @@ class DataItem(BaseModel):
     name: str
     type: DataType
     fileType: Optional[str] = None  # 添加fileType字段
+    originalPath: Optional[str] = None # 原始文件路径
     size: int
     uploadDate: str
     status: DataStatus
@@ -90,6 +97,8 @@ class SectorData(BaseModel):
     pci: Optional[int] = None
     earfcn: Optional[int] = None
     arfcn: Optional[int] = None
+    cell_cover_type: Optional[int] = Field(default=1, description="小区覆盖类型: 1=室外小区, 4=室内小区")
+    is_shared: Optional[str] = None
 
 
 class SiteData(BaseModel):

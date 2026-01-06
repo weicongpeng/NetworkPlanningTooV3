@@ -1,54 +1,706 @@
 /**
- * 图层控制组件
+ * 图层控制组件 - 树形结构版本
+ *
+ * 功能:
+ * - 树形层级结构展示图层
+ * - 支持展开/折叠节点
+ * - 在线地图子项：平面地图/卫星地图切换
+ * - 工参扇区图: LTE/NR子图层
+ * - 图层文件: 外部导入的MapInfo文件
  */
-import { useState } from 'react'
-import { Layers, Eye, EyeOff } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { ChevronDown, ChevronRight, Map, Folder, File, Globe } from 'lucide-react'
+import { NetworkType } from '../../config/sector-config'
 
-interface Layer {
+/**
+ * 树节点类型
+ */
+type TreeNodeType = 'root' | 'online-map' | 'sector-group' | 'layer-files' | 'sector-layer' | 'sector-label' | 'layer-file' | 'map-type'
+
+/**
+ * 扇区图层选项
+ */
+export interface SectorLayerOption {
+  id: string
+  label: string
+  type: NetworkType
+  visible: boolean
+  icon: string
+  color: string
+}
+
+/**
+ * 图层文件选项
+ */
+export interface LayerFileOption {
   id: string
   name: string
-  type: 'sites' | 'sectors' | 'coverage' | 'neighbors' | 'conflicts'
+  type: 'point' | 'line' | 'polygon'
   visible: boolean
-  color?: string
+  dataId: string
 }
 
-interface LayerControlProps {
-  layers: Layer[]
-  onToggleLayer: (layerId: string) => void
+/**
+ * 地图类型选项
+ */
+export interface MapTypeOption {
+  id: 'roadmap' | 'satellite'
+  label: string
+  visible: boolean
 }
 
-export function LayerControl({ layers, onToggleLayer }: LayerControlProps) {
+/**
+ * 树节点接口
+ */
+export interface TreeNode {
+  id: string
+  type: TreeNodeType
+  label: string
+  expanded?: boolean
+  children?: TreeNode[]
+  // 扇区图层专用
+  sectorLayer?: SectorLayerOption
+  // 扇区标签专用
+  sectorLabel?: {
+    layerId: string
+    visible: boolean
+  }
+  // 图层文件专用
+  layerFile?: LayerFileOption
+  // 地图类型专用
+  mapType?: MapTypeOption
+  // 单选
+  radio?: boolean
+}
+
+/**
+ * 图层控制组件属性
+ */
+export interface LayerControlProps {
+  /** 扇区图层选项 */
+  sectors?: SectorLayerOption[]
+  /** 外部图层文件 */
+  layerFiles?: LayerFileOption[]
+  /** 图层可见性变化回调 */
+  onSectorToggle?: (layerId: string, visible: boolean) => void
+  /** 扇区标签可见性变化回调 */
+  onSectorLabelToggle?: (layerId: string, visible: boolean) => void
+  /** 图层文件可见性变化回调 */
+  onLayerFileToggle?: (fileId: string, visible: boolean) => void
+  /** 地图类型变化回调 */
+  onMapTypeChange?: (type: 'roadmap' | 'satellite') => void
+  /** 当前地图类型 */
+  mapType?: 'roadmap' | 'satellite'
+  /** 当前扇区标签可见性 */
+  sectorLabelVisibility?: Record<string, boolean>
+}
+
+/**
+ * 图层控制组件 - 树形结构
+ */
+export function LayerControl({
+  sectors = [],
+  layerFiles = [],
+  onSectorToggle,
+  onSectorLabelToggle,
+  onLayerFileToggle,
+  onMapTypeChange,
+  mapType = 'roadmap',
+  sectorLabelVisibility = {}
+}: LayerControlProps) {
+  // 构建树形结构
+  const buildTree = (): TreeNode[] => {
+    return [
+      {
+        id: 'root',
+        type: 'root',
+        label: '图层控制',
+        expanded: true,
+        children: [
+          // 在线地图分组
+          {
+            id: 'online-map-group',
+            type: 'online-map',
+            label: '在线地图',
+            expanded: true,
+            children: [
+              {
+                id: 'roadmap',
+                type: 'map-type',
+                label: '平面地图',
+                mapType: { id: 'roadmap', label: '平面地图', visible: mapType === 'roadmap' },
+                radio: true
+              },
+              {
+                id: 'satellite',
+                type: 'map-type',
+                label: '卫星地图',
+                mapType: { id: 'satellite', label: '卫星地图', visible: mapType === 'satellite' },
+                radio: true
+              }
+            ]
+          },
+          // 工参扇区图分组
+          {
+            id: 'sector-group',
+            type: 'sector-group',
+            label: '工参扇区图',
+            expanded: true,
+            children: sectors.map(sector => ({
+              id: sector.id,
+              type: 'sector-layer' as TreeNodeType,
+              label: sector.label,
+              sectorLayer: sector,
+              sectorLabel: {
+                layerId: sector.id,
+                visible: sectorLabelVisibility[sector.id] || false
+              }
+            }))
+          },
+          // 图层文件分组
+          ...(layerFiles.length > 0 ? [
+            {
+              id: 'layer-files',
+              type: 'layer-files' as TreeNodeType,
+              label: '图层文件',
+              expanded: true, // 默认展开图层文件分组
+              children: layerFiles.map(file => ({
+                id: file.id,
+                type: 'layer-file' as TreeNodeType,
+                label: file.name,
+                layerFile: file
+              }))
+            }
+          ] : [])
+        ]
+      }
+    ]
+  }
+
+  const [tree, setTree] = useState<TreeNode[]>(buildTree())
+
+  // 当外部数据变化时更新树
+  useEffect(() => {
+    setTree(buildTree())
+  }, [sectors, layerFiles, mapType, sectorLabelVisibility])
+
+  /**
+   * 切换节点展开状态
+   */
+  const toggleNode = (nodeId: string) => {
+    const updateNode = (nodes: TreeNode[]): TreeNode[] => {
+      return nodes.map(node => {
+        if (node.id === nodeId) {
+          return { ...node, expanded: !node.expanded }
+        }
+        if (node.children) {
+          return { ...node, children: updateNode(node.children) }
+        }
+        return node
+      })
+    }
+    setTree(updateNode(tree))
+  }
+
+  /**
+   * 处理扇区图层切换
+   */
+  const handleSectorToggle = (layerId: string, visible: boolean) => {
+    onSectorToggle?.(layerId, visible)
+  }
+
+  /**
+   * 处理图层文件切换
+   */
+  const handleLayerFileToggle = (fileId: string, visible: boolean) => {
+    onLayerFileToggle?.(fileId, visible)
+  }
+
+  /**
+   * 处理地图类型切换
+   */// 地图类型变化事件
+  const handleMapTypeChange = (type: 'roadmap' | 'satellite') => {
+    console.log('[LayerControl] Map type change:', type)
+    onMapTypeChange?.(type)
+  }
+
   return (
-    <div className="absolute top-4 left-4 z-[1000] w-64 bg-card border border-border rounded-lg shadow-lg">
-      <div className="flex items-center gap-2 p-3 border-b border-border">
-        <Layers size={18} />
-        <h3 className="font-semibold text-sm">图层控制</h3>
-      </div>
-
-      <div className="p-2 space-y-1 max-h-96 overflow-y-auto">
-        {layers.map(layer => (
-          <button
-            key={layer.id}
-            onClick={() => onToggleLayer(layer.id)}
-            className="w-full flex items-center justify-between px-3 py-2 rounded-md hover:bg-muted transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              {layer.color && (
-                <div
-                  className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: layer.color }}
-                />
-              )}
-              <span className="text-sm">{layer.name}</span>
-            </div>
-            {layer.visible ? (
-              <Eye size={16} className="text-primary" />
-            ) : (
-              <EyeOff size={16} className="text-muted-foreground" />
-            )}
-          </button>
-        ))}
-      </div>
+    <div
+      className="layer-control"
+      style={{
+        position: 'absolute',
+        top: '10px',
+        right: '10px',
+        zIndex: 1000,
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        backdropFilter: 'blur(8px)',
+        borderRadius: '8px',
+        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.8)',
+        minWidth: '180px',
+        maxWidth: '220px',
+        overflow: 'hidden',
+        fontSize: '13px',
+        border: '1px solid rgba(0, 0, 0, 0.1)',
+        padding: '4px',
+        background: 'linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(245,245,245,0.95) 100%)'
+      }}
+    >
+      {/* 渲染树 */}
+      {tree.map(rootNode => (
+        <TreeNodeComponent
+          key={rootNode.id}
+          node={rootNode}
+          level={0}
+          onToggle={toggleNode}
+          onSectorToggle={handleSectorToggle}
+          onSectorLabelToggle={onSectorLabelToggle}
+          onLayerFileToggle={handleLayerFileToggle}
+          onMapTypeChange={handleMapTypeChange}
+          mapType={mapType}
+        />
+      ))}
     </div>
   )
+}
+
+/**
+ * 树节点组件
+ */
+interface TreeNodeComponentProps {
+  node: TreeNode
+  level: number
+  onToggle: (nodeId: string) => void
+  onSectorToggle: (layerId: string, visible: boolean) => void
+  onSectorLabelToggle?: (layerId: string, visible: boolean) => void
+  onLayerFileToggle: (fileId: string, visible: boolean) => void
+  onMapTypeChange: (type: 'roadmap' | 'satellite') => void
+  mapType: 'roadmap' | 'satellite'
+}
+
+function TreeNodeComponent({
+  node,
+  level,
+  onToggle,
+  onSectorToggle,
+  onSectorLabelToggle,
+  onLayerFileToggle,
+  onMapTypeChange,
+  mapType
+}: TreeNodeComponentProps) {
+  const getIndent = () => ({
+    paddingLeft: `${8 + level * 16}px`
+  })
+
+  const getNodeIcon = () => {
+    // 根据需求，删除特定节点类型的图标，只保留文字
+    switch (node.type) {
+      case 'root':
+      case 'map-type':
+      case 'sector-layer':
+        return null
+      case 'online-map':
+        return <Globe size={14} color="#666" />
+      case 'sector-group':
+        return <Map size={14} color="#666" />
+      case 'layer-files':
+        return <Folder size={14} color="#999" />
+      case 'sector-label':
+        return <span style={{ fontSize: '14px' }}>📝</span>
+      case 'layer-file':
+        return <File size={12} color="#999" />
+      default:
+        return null
+    }
+  }
+
+  const isExpandable = node.children && node.children.length > 0
+  const isExpanded = node.expanded
+
+  const handleClick = () => {
+    if (isExpandable) {
+      onToggle(node.id)
+    }
+  }
+
+  return (
+    <div>
+      {/* 节点行 */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          padding: node.type === 'root' ? '8px 10px' : '6px 8px',
+          cursor: isExpandable ? 'pointer' : 'default',
+          userSelect: 'none',
+          borderBottom: node.type === 'root' ? '1px solid rgba(0, 0, 0, 0.1)' : 'none',
+          backgroundColor: node.type === 'root' ? 'linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(240,240,240,0.9) 100%)' : 'transparent',
+          borderRadius: node.type === 'root' ? '6px' : '0',
+          border: node.type === 'root' ? '1px solid rgba(0, 0, 0, 0.1)' : 'none',
+          boxShadow: node.type === 'root' ? '0 2px 4px rgba(0, 0, 0, 0.1)' : 'none',
+          ...getIndent()
+        }}
+        onClick={handleClick}
+        onMouseEnter={(e) => {
+          if (isExpandable) {
+            e.currentTarget.style.backgroundColor = node.type === 'root' 
+              ? 'linear-gradient(180deg, rgba(250,250,250,0.98) 0%, rgba(235,235,235,0.95) 100%)' 
+              : 'rgba(0, 0, 0, 0.05)'
+          }
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = node.type === 'root'
+            ? 'linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(240,240,240,0.9) 100%)'
+            : 'transparent'
+        }}
+      >
+        {/* 展开/折叠图标 */}
+        {isExpandable ? (
+          <span style={{ marginRight: '4px', display: 'flex', alignItems: 'center' }}>
+            {isExpanded ? (
+              <ChevronDown size={12} color="#999" />
+            ) : (
+              <ChevronRight size={12} color="#999" />
+            )}
+          </span>
+        ) : node.type === 'map-type' ? (
+          <span style={{ width: '16px', marginRight: '4px' }} />
+        ) : (
+          <span style={{ width: '16px', marginRight: '4px' }} />
+        )}
+
+        {/* 节点图标 */}
+        <span style={{ marginRight: '6px', display: 'flex', alignItems: 'center' }}>
+          {getNodeIcon()}
+        </span>
+
+        {/* 节点标签 */}
+        <span style={{
+          flex: 1,
+          color: node.type === 'root' ? '#333' : '#666',
+          fontWeight: node.type === 'root' ? 500 : 400
+        }}>
+          {node.label}
+        </span>
+
+        {/* 地图类型 - 单选按钮 */}
+        {node.type === 'map-type' && node.mapType && (
+          <MapTypeRadio
+            option={node.mapType}
+            onToggle={() => onMapTypeChange(node.mapType!.id)}
+          />
+        )}
+
+        {/* 扇区图层 - 复选框 */}
+        {node.type === 'sector-layer' && node.sectorLayer && (
+          <SectorLayerCheckbox
+            layer={node.sectorLayer}
+            onToggle={(visible) => onSectorToggle(node.sectorLayer!.id, visible)}
+            isChecked={node.sectorLayer.visible}
+          />
+        )}
+
+        {/* 扇区标签 - 标签图标样式控件（如果是扇区图层节点且有标签配置） */}
+        {node.type === 'sector-layer' && node.sectorLayer && node.sectorLabel && (
+          <div
+            onClick={(e) => {
+              e.stopPropagation()
+              // 使用可选链和空值合并操作符确保类型安全
+              const currentVisible = node.sectorLabel?.visible ?? false
+              const newVisible = !currentVisible
+              const layerId = node.sectorLabel?.layerId ?? ''
+              console.log('[LayerControl] Sector label toggle:', layerId, newVisible)
+              onSectorLabelToggle?.(layerId, newVisible)
+            }}
+            style={{
+              width: '20px',
+              height: '20px',
+              marginLeft: '8px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            {/* 标签图标 - 显示为图1样式，不显示为图2样式 */}
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 20 20"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              {/* 标签形状 */}
+              <path
+                d="M10 3L17 5V15L10 17L3 15V5L10 3Z"
+                fill={node.sectorLabel.visible ? '#3b82f6' : '#e0e0e0'}
+                stroke={node.sectorLabel.visible ? '#2563eb' : '#bdbdbd'}
+                strokeWidth="1.5"
+              />
+              {/* 标签孔 */}
+              <circle
+                cx="10"
+                cy="4.5"
+                r="1.5"
+                fill={node.sectorLabel.visible ? '#ffffff' : '#f5f5f5'}
+                stroke={node.sectorLabel.visible ? '#2563eb' : '#bdbdbd'}
+                strokeWidth="1.5"
+              />
+              {/* 标签上的线条 */}
+              <line
+                x1="7"
+                y1="9"
+                x2="13"
+                y2="9"
+                stroke={node.sectorLabel.visible ? '#ffffff' : '#bdbdbd'}
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+              <line
+                x1="7"
+                y1="12"
+                x2="13"
+                y2="12"
+                stroke={node.sectorLabel.visible ? '#ffffff' : '#bdbdbd'}
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
+        )}
+
+        {/* 图层文件 - 复选框 */}
+        {node.type === 'layer-file' && node.layerFile && (
+          <LayerFileCheckbox
+            file={node.layerFile}
+            onToggle={(visible) => onLayerFileToggle(node.layerFile!.id, visible)}
+          />
+        )}
+      </div>
+
+      {/* 子节点 */}
+      {isExpandable && isExpanded && node.children && (
+        <div>
+          {node.children.map(child => (
+            <TreeNodeComponent
+              key={child.id}
+              node={child}
+              level={level + 1}
+              onToggle={onToggle}
+              onSectorToggle={onSectorToggle}
+              onSectorLabelToggle={onSectorLabelToggle}
+              onLayerFileToggle={onLayerFileToggle}
+              onMapTypeChange={onMapTypeChange}
+              mapType={mapType}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * 地图类型单选按钮组件
+ */
+interface MapTypeRadioProps {
+  option: MapTypeOption
+  onToggle: () => void
+}
+
+function MapTypeRadio({ option, onToggle }: MapTypeRadioProps) {
+  return (
+    <div
+      onClick={onToggle}
+      style={{
+        width: '16px',
+        height: '16px',
+        border: option.visible ? '#3b82f6 solid 2px' : 'rgba(0, 0, 0, 0.2) solid 2px',
+        borderRadius: '50%',
+        backgroundColor: option.visible ? '#3b82f6' : 'transparent',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        transition: 'all 0.2s ease'
+      }}
+    >
+      {option.visible && (
+        <div
+          style={{
+            width: '6px',
+            height: '6px',
+            borderRadius: '50%',
+            backgroundColor: 'white'
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+/**
+ * 扇区图层复选框组件
+ */
+interface SectorLayerCheckboxProps {
+  layer: SectorLayerOption
+  onToggle: (visible: boolean) => void
+  isChecked?: boolean
+}
+
+function SectorLayerCheckbox({ layer, onToggle, isChecked: externalChecked }: SectorLayerCheckboxProps) {
+  const [isChecked, setIsChecked] = useState(externalChecked ?? layer.visible)
+
+  useEffect(() => {
+    setIsChecked(externalChecked ?? layer.visible)
+  }, [layer.visible, externalChecked])
+
+  const handleToggle = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    const newValue = !isChecked
+    setIsChecked(newValue)
+    onToggle(newValue)
+  }
+
+  return (
+    <div
+      onClick={handleToggle}
+      style={{
+        width: '16px',
+        height: '16px',
+        marginLeft: '8px',
+        border: isChecked ? `${layer.color} solid 2px` : 'rgba(0, 0, 0, 0.2) solid 2px',
+        borderRadius: '3px',
+        backgroundColor: isChecked ? layer.color : 'transparent',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        transition: 'all 0.2s ease'
+      }}
+    >
+      {isChecked && (
+        <svg
+          width="10"
+          height="10"
+          viewBox="0 0 10 10"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M1 4L3.5 6.5L9 1"
+            stroke="white"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      )}
+    </div>
+  )
+}
+
+/**
+ * 图层文件复选框组件
+ */
+interface LayerFileCheckboxProps {
+  file: LayerFileOption
+  onToggle: (visible: boolean) => void
+}
+
+function LayerFileCheckbox({ file, onToggle }: LayerFileCheckboxProps) {
+  const [isChecked, setIsChecked] = useState(file.visible)
+
+  useEffect(() => {
+    setIsChecked(file.visible)
+  }, [file.visible])
+
+  const handleToggle = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    const newValue = !isChecked
+    setIsChecked(newValue)
+    onToggle(newValue)
+  }
+
+  const getFileColor = () => {
+    switch (file.type) {
+      case 'point': return '#f59e0b'
+      case 'line': return '#8b5cf6'
+      case 'polygon': return '#10b981'
+      default: return '#6b7280'
+    }
+  }
+
+  const color = getFileColor()
+
+  return (
+    <div
+      onClick={handleToggle}
+      style={{
+        width: '16px',
+        height: '16px',
+        border: isChecked ? `${color} solid 2px` : 'rgba(0, 0, 0, 0.2) solid 2px',
+        borderRadius: '3px',
+        backgroundColor: isChecked ? color : 'transparent',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        transition: 'all 0.2s ease'
+      }}
+    >
+      {isChecked && (
+        <svg
+          width="10"
+          height="10"
+          viewBox="0 0 10 10"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M1 4L3.5 6.5L9 1"
+            stroke="white"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      )}
+    </div>
+  )
+}
+
+/**
+ * 旧的图层选项接口（向后兼容）
+ */
+export interface LayerOption {
+  id: string
+  label: string
+  type: NetworkType
+  visible: boolean
+  icon: string
+  color: string
+}
+
+/**
+ * 默认图层配置（向后兼容）
+ */
+export function createDefaultLayers(): LayerOption[] {
+  return [
+    {
+      id: 'lte-sectors',
+      label: 'LTE扇区',
+      type: 'LTE',
+      visible: true,
+      icon: '📡',
+      color: '#3b82f6'
+    },
+    {
+      id: 'nr-sectors',
+      label: 'NR扇区',
+      type: 'NR',
+      visible: true,
+      icon: '📶',
+      color: '#10b981'
+    }
+  ]
 }

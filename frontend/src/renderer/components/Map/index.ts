@@ -3,5 +3,11 @@
  */
 export { OnlineMap } from './OnlineMap'
 export { OfflineMap } from './OfflineMap'
-export { LayerControl } from './LayerControl'
+export { LayerControl, createDefaultLayers } from './LayerControl'
+export type { LayerOption } from './LayerControl'
 export { MapToolbar } from './MapToolbar'
+export { SectorInfoPanel, useSectorInfoPanel } from './SectorInfoPanel'
+export type { SectorInfoPanelProps } from './SectorInfoPanel'
+// 渲染器导出
+export { createSectorLayer } from './SectorRendererSVG'
+export type { SectorLayerOptions } from './SectorRendererSVG'

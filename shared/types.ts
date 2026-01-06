@@ -32,6 +32,8 @@ export interface DataItem {
   uploadDate: string
   status: 'processing' | 'ready' | 'error'
   metadata?: Record<string, any>
+  originalPath?: string
+  fileType?: 'full_params' | 'current_params'
 }
 
 export interface UploadResponse {
@@ -64,6 +66,7 @@ export interface SectorData {
   pci?: number
   earfcn?: number
   arfcn?: number
+  cell_cover_type?: number  // 小区覆盖类型: 1=室外小区, 4=室内小区
 }
 
 // PCI规划相关类型

@@ -41,11 +41,30 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     """创建FastAPI应用实例"""
 
+    # 配置JSON响应使用UTF-8编码
+    from fastapi.responses import JSONResponse
+    from fastapi.encoders import jsonable_encoder
+    from typing import Any
+    import json
+
+    # 自定义JSON响应类，确保使用UTF-8编码
+    class UTF8JSONResponse(JSONResponse):
+        def render(self, content: Any) -> bytes:
+            # 使用UTF-8编码序列化JSON
+            return json.dumps(
+                content,
+                ensure_ascii=False,
+                allow_nan=False,
+                indent=None,
+                separators=(",", ":")
+            ).encode("utf-8")
+
     app = FastAPI(
         title=settings.PROJECT_NAME,
         version=settings.VERSION,
         description="网络规划工具API",
-        lifespan=lifespan
+        lifespan=lifespan,
+        default_response_class=UTF8JSONResponse  # 设置默认响应类为UTF-8 JSON响应
     )
 
     # 配置CORS

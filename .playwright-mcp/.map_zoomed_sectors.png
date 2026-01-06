@@ -1,0 +1,98 @@
+### Page state
+- Page URL: http://localhost:5173/map
+- Page Title: 网络规划工具 v2.0
+- Page Snapshot:
+```yaml
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - heading "网络规划工具" [level=1] [ref=e6]
+      - button [ref=e7] [cursor=pointer]:
+        - img [ref=e8]
+    - navigation [ref=e11]:
+      - link "首页" [ref=e12] [cursor=pointer]:
+        - /url: /
+        - img [ref=e13]
+        - generic [ref=e16]: 首页
+      - link "数据管理" [ref=e17] [cursor=pointer]:
+        - /url: /data
+        - img [ref=e18]
+        - generic [ref=e22]: 数据管理
+      - link "PCI规划" [ref=e23] [cursor=pointer]:
+        - /url: /pci
+        - img [ref=e24]
+        - generic [ref=e27]: PCI规划
+      - link "邻区规划" [ref=e28] [cursor=pointer]:
+        - /url: /neighbor
+        - img [ref=e29]
+        - generic [ref=e34]: 邻区规划
+      - link "地图浏览" [active] [ref=e35] [cursor=pointer]:
+        - /url: /map
+        - img [ref=e36]
+        - generic [ref=e38]: 地图浏览
+      - link "许可证管理" [ref=e39] [cursor=pointer]:
+        - /url: /license
+        - img [ref=e40]
+        - generic [ref=e42]: 许可证管理
+    - paragraph [ref=e44]: "版本: 2.0.0"
+  - main [ref=e45]:
+    - generic [ref=e81]:
+      - generic [ref=e82]:
+        - generic [ref=e83]:
+          - heading "地图浏览" [level=1] [ref=e84]
+          - generic [ref=e85]:
+            - img [ref=e86]
+            - generic [ref=e90]: "工参: ProjectParameter_mongoose河源电联20251230151658.xlsx"
+        - generic [ref=e91]:
+          - generic [ref=e92]:
+            - button "地名搜索" [ref=e93] [cursor=pointer]
+            - button "工参搜索" [ref=e94] [cursor=pointer]
+          - generic [ref=e95]:
+            - img [ref=e96]
+            - textbox "搜索地名，按回车搜索..." [ref=e99]
+      - generic [ref=e100]:
+        - generic [ref=e102]:
+          - generic:
+            - generic:
+              - img
+          - generic [ref=e1196]:
+            - link "Leaflet" [ref=e1197] [cursor=pointer]:
+              - /url: https://leafletjs.com
+              - img [ref=e1198]
+              - text: Leaflet
+            - text: "| ©"
+            - link "高德地图" [ref=e1202] [cursor=pointer]:
+              - /url: https://www.amap.com/
+        - generic [ref=e1204]:
+          - generic [ref=e1205] [cursor=pointer]:
+            - img [ref=e1207]
+            - img [ref=e1210]
+            - generic [ref=e1214]: 图层控制
+          - generic [ref=e1215]:
+            - generic [ref=e1216]:
+              - generic [ref=e1217] [cursor=pointer]:
+                - img [ref=e1219]
+                - img [ref=e1222]
+                - generic [ref=e1225]: 在线地图
+              - generic [ref=e1226]:
+                - generic [ref=e1228]:
+                  - img [ref=e1230]
+                  - generic [ref=e1232]: 平面地图
+                - generic [ref=e1236]:
+                  - img [ref=e1238]
+                  - generic [ref=e1240]: 卫星地图
+            - generic [ref=e1242]:
+              - generic [ref=e1243] [cursor=pointer]:
+                - img [ref=e1245]
+                - img [ref=e1248]
+                - generic [ref=e1250]: 工参扇区图
+              - generic [ref=e1251]:
+                - generic [ref=e1253]:
+                  - generic [ref=e1255]: 📡
+                  - generic [ref=e1256]: LTE扇区
+                  - img [ref=e1258] [cursor=pointer]
+                - generic [ref=e1261]:
+                  - generic [ref=e1263]: 📶
+                  - generic [ref=e1264]: NR扇区
+                  - img [ref=e1266] [cursor=pointer]
+```

@@ -1,23 +1,19 @@
 /**
- * 地图工具栏组件
+ * 地图工具栏组件 - 简化版，只保留模式切换
  */
-import { Layers, MapPin, Navigation, Crosshair, Home } from 'lucide-react'
+import { MapPin, Layers } from 'lucide-react'
 
 interface MapToolbarProps {
   viewMode: 'online' | 'offline'
   onViewModeChange: (mode: 'online' | 'offline') => void
-  onRecenter: () => void
-  onLocate: () => void
 }
 
 export function MapToolbar({
   viewMode,
-  onViewModeChange,
-  onRecenter,
-  onLocate
+  onViewModeChange
 }: MapToolbarProps) {
   return (
-    <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
+    <div className="absolute top-4 right-4 z-[1000]">
       {/* 视图模式切换 */}
       <div className="bg-card border border-border rounded-lg shadow-lg p-1">
         <button
@@ -41,24 +37,6 @@ export function MapToolbar({
         >
           <Layers size={16} />
           离线地图
-        </button>
-      </div>
-
-      {/* 地图控制按钮 */}
-      <div className="bg-card border border-border rounded-lg shadow-lg p-1">
-        <button
-          onClick={onRecenter}
-          className="flex items-center justify-center w-10 h-10 rounded-md hover:bg-muted transition-colors"
-          title="重新定位"
-        >
-          <Home size={18} />
-        </button>
-        <button
-          onClick={onLocate}
-          className="flex items-center justify-center w-10 h-10 rounded-md hover:bg-muted transition-colors mt-1"
-          title="定位到当前位置"
-        >
-          <Crosshair size={18} />
         </button>
       </div>
     </div>

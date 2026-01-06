@@ -16,7 +16,7 @@ const API_BASE_URL = '/api/v1'
 // 创建axios实例
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  timeout: 300000,
   headers: {
     'Content-Type': 'application/json'
   }
@@ -110,18 +110,24 @@ export const licenseApi = {
 // 数据管理API
 export const dataApi = {
   // 上传工参文件
-  uploadExcel: async (file: File): Promise<ApiResponse<UploadResponse>> => {
+  uploadExcel: async (file: File, filePath?: string): Promise<ApiResponse<UploadResponse>> => {
     const formData = new FormData()
     formData.append('file', file)
+    if (filePath) {
+      formData.append('file_path', filePath)
+    }
     return apiClient.post('/data/upload/excel', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
   },
 
   // 上传地图文件
-  uploadMap: async (file: File): Promise<ApiResponse<UploadResponse>> => {
+  uploadMap: async (file: File, filePath?: string): Promise<ApiResponse<UploadResponse>> => {
     const formData = new FormData()
     formData.append('file', file)
+    if (filePath) {
+      formData.append('file_path', filePath)
+    }
     return apiClient.post('/data/upload/map', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
@@ -140,6 +146,11 @@ export const dataApi = {
   // 获取数据详情
   get: async (id: string): Promise<ApiResponse<any>> => {
     return apiClient.get(`/data/${id}`)
+  },
+
+  // 工参更新
+  updateParameters: async (fullParamId: string, currentParamId: string): Promise<ApiResponse<{ success: boolean; message: string; newFileId: string }>> => {
+    return apiClient.post('/data/update-parameters', { fullParamId, currentParamId })
   }
 }
 
@@ -212,6 +223,19 @@ export const mapApi = {
   // 获取离线地图路径
   getOfflinePath: async (): Promise<ApiResponse<{ path: string }>> => {
     return apiClient.get('/map/offline-path')
+  }
+}
+
+// 图层文件API
+export const layerApi = {
+  // 获取数据集的图层文件列表
+  getLayers: async (dataId: string): Promise<ApiResponse<any>> => {
+    return apiClient.get(`/data/${dataId}/layers`)
+  },
+
+  // 获取图层要素数据
+  getLayerData: async (dataId: string, layerId: string): Promise<ApiResponse<any>> => {
+    return apiClient.get(`/data/${dataId}/layers/${layerId}/data`)
   }
 }
 
