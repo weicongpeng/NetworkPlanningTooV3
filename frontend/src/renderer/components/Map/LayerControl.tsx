@@ -224,22 +224,22 @@ export function LayerControl({
     onMapTypeChange?.(type)
   }
 
-  // 添加吸附状态管理
-  const [isPinned, setIsPinned] = useState(false)
+  // 添加显示/隐藏状态管理
+  const [isVisible, setIsVisible] = useState(true)
 
   return (
     <>
-      {/* 吸附/还原控件 */}
+      {/* 显示/隐藏控件 - 独立于面板，始终可见 */}
       <div
-        onClick={() => setIsPinned(!isPinned)}
+        onClick={() => setIsVisible(!isVisible)}
         style={{
           position: 'absolute',
           top: '10px',
-          right: isPinned ? '10px' : '220px',
+          right: isVisible ? '210px' : '10px',
           zIndex: 1001,
-          backgroundColor: 'rgba(240, 240, 240, 0.95)',
+          backgroundColor: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(8px)',
-          borderRadius: '8px',
+          borderRadius: '50%',
           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
           width: '24px',
           height: '24px',
@@ -248,41 +248,37 @@ export function LayerControl({
           justifyContent: 'center',
           cursor: 'pointer',
           fontSize: '12px',
-          color: isPinned ? '#3b82f6' : '#666',
+          color: '#3b82f6',
           fontWeight: 'bold',
           border: '1px solid rgba(0, 0, 0, 0.1)',
           transition: 'all 0.3s ease'
         }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = 'rgba(230, 230, 230, 0.98)'
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = 'rgba(240, 240, 240, 0.95)'
-        }}
       >
-        {isPinned ? '📌' : '📍'}
+        ⇋
       </div>
       
+      {/* 图层控制面板 - 默认显示在右侧 */}
       <div
         className="layer-control"
         style={{
           position: 'absolute',
           top: '10px',
-          right: isPinned ? '0px' : '10px',
+          right: isVisible ? '10px' : '-220px',
           zIndex: 1000,
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(8px)',
-          borderRadius: isPinned ? '8px 0 0 8px' : '8px',
+          borderRadius: '8px 0 0 8px',
           boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.8)',
-          minWidth: '180px',
+          minWidth: '200px',
           maxWidth: '220px',
           overflow: 'hidden',
           fontSize: '13px',
-          border: isPinned ? '1px solid rgba(0, 0, 0, 0.1)' : '1px solid rgba(0, 0, 0, 0.1)',
-          borderRight: isPinned ? 'none' : '1px solid rgba(0, 0, 0, 0.1)',
+          border: '1px solid rgba(0, 0, 0, 0.1)',
+          borderRight: 'none',
           padding: '4px',
-          background: 'linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(245,245,245,0.95) 100%)',
-          transition: 'all 0.3s ease'
+          transition: 'all 0.3s ease',
+          opacity: isVisible ? 1 : 0,
+          visibility: isVisible ? 'visible' : 'hidden'
         }}
       >
       {/* 渲染树 */}
