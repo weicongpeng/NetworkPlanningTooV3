@@ -614,45 +614,46 @@ export function MapPage() {
           </div>
 
           {/* 搜索输入框 */}
-          <div className="relative w-64">
-            <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <input
-              ref={searchInputRef}
-              type="text"
-              value={searchKeyword}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyDown}
-              onFocus={() => {
-                if (searchResults.length > 0) setShowSearchResults(true)
-              }}
-              onBlur={() => {
-                // 延迟隐藏，以便点击搜索结果
-                setTimeout(() => setShowSearchResults(false), 200)
-              }}
-              placeholder={searchMode === 'map' ? '搜索地名，按回车搜索...' : '搜索小区名称、基站名称、基站ID...'}
-              className="w-full pl-8 pr-14 py-1.5 text-xs border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary placeholder:text-xs"
-            />
-            
-            {/* 清除输入按钮 */}
-            <div className="absolute right-1 top-1/2 -translate-y-1/2">
-              {searchKeyword && (
-                <button
-                  onClick={clearSearchInput}
-                  className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-                  title="清除输入"
-                >
-                  <Trash2 size={12} />
-                </button>
-              )}
+            <div className="relative w-64">
+              <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchKeyword}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+                onFocus={() => {
+                  if (searchResults.length > 0) setShowSearchResults(true)
+                }}
+                onBlur={() => {
+                  // 延迟隐藏，以便点击搜索结果
+                  setTimeout(() => setShowSearchResults(false), 200)
+                }}
+                placeholder={searchMode === 'map' ? '输入地名、道路名称等' : '输入小区名称、基站ID'}
+                className="w-full pl-8 pr-14 py-1.5 text-xs border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary placeholder:text-xs"
+              />
+              
+              {/* 清除输入按钮 */}
+              <div className="absolute right-1 top-1/2 -translate-y-1/2">
+                {searchKeyword && (
+                  <button
+                    onClick={clearSearchInput}
+                    className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                    title="清除输入"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
           
           {/* 独立的清除搜索标记按钮，使用文字标签 */}
           <button
             onClick={clearAllSearch}
-            className="px-2 py-1.5 text-xs rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+            className="px-2 py-1.5 text-xs rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground flex items-center gap-1"
             title="清除所有搜索标记"
           >
+            <X size={12} className="mr-1" />
             清除
           </button>
 
@@ -671,15 +672,15 @@ export function MapPage() {
 
             {/* 工具下拉菜单 */}
             {showToolMenu && (
-              <div className="absolute top-full right-0 mt-1 z-[3000] bg-card border border-border rounded-lg shadow-lg w-28">
+              <div className="absolute top-full right-0 mt-1 z-[3000] bg-card border border-border rounded-lg shadow-lg w-24 translate-x-0">
                 <button
                   onClick={() => {
                     setShowToolMenu(false);
                     setShowLocationModal(true);
                   }}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors flex items-center gap-2"
+                  className="w-full text-left px-2 py-2 text-xs hover:bg-muted transition-colors flex items-center gap-1"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-map-pin"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-map-pin"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
                   定位
                 </button>
                 <button
@@ -687,9 +688,9 @@ export function MapPage() {
                     setShowToolMenu(false);
                     setMeasureMode(true);
                   }}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors flex items-center gap-2"
+                  className="w-full text-left px-2 py-2 text-xs hover:bg-muted transition-colors flex items-center gap-1"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-ruler"><path d="M12 2v20"></path><path d="m17 5-5 5"></path><path d="m9 5 5 5"></path><path d="m17 19-5-5"></path><path d="m9 19 5-5"></path></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-ruler"><path d="M12 2v20"></path><path d="m17 5-5 5"></path><path d="m9 5 5 5"></path><path d="m17 19-5-5"></path><path d="m9 19 5-5"></path></svg>
                   测距
                 </button>
               </div>
