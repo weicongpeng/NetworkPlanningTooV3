@@ -41,12 +41,12 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="p-2 rounded-md hover:bg-muted transition-colors"
           >
-            {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+            <Menu size={20} />
           </button>
         </div>
 
         {/* 导航菜单 */}
-        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+        <nav className={`flex-1 overflow-y-auto ${sidebarOpen ? 'p-4 space-y-2' : 'p-2 space-y-2'}`}>
           {navigation.map((item) => {
             const Icon = item.icon
             const isActive = location.pathname === item.href
@@ -59,7 +59,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                   isActive
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                } flex items-center gap-3 px-4 py-3 rounded-lg transition-colors`}
+                } flex items-center ${sidebarOpen ? 'justify-start px-4' : 'justify-center px-2'} gap-3 py-3 rounded-lg transition-colors`}
               >
                 <Icon size={20} />
                 {sidebarOpen && <span>{item.name}</span>}

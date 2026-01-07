@@ -253,7 +253,7 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
     },
 
     refreshData: async () => {
-      await loadSectorData()
+      await loadSectorData(true)
     },
 
     addLocationMarker: (marker: LocationMarker, index: number) => {
@@ -328,10 +328,10 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
   /**
    * 加载扇区数据（不自动调整地图位置）
    */
-  const loadSectorData = useCallback(async () => {
+  const loadSectorData = useCallback(async (forceRefresh = false) => {
     try {
       const zoom = mapInstanceRef.current?.getZoom() ?? mapStateService.getState().zoom
-      const data = await mapDataService.getMapData(zoom)
+      const data = await mapDataService.getMapData(zoom, forceRefresh)
 
       setSectorData({
         lte: data.lteSectors,

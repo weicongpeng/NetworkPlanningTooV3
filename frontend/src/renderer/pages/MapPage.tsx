@@ -15,7 +15,7 @@ import { OnlineMap, OfflineMap, LayerControl, createDefaultLayers } from '../com
 import type { LayerOption, SectorLayerOption } from '../components/Map'
 import { mapStateService } from '../services/mapStateService'
 import { CoordinateTransformer } from '../utils/coordinate'
-import { mapApi, layerApi } from '../services/api'
+import { mapApi, layerApi, dataApi } from '../services/api'
 import { useDataStore } from '../store/dataStore'
 import { useMapStore } from '../store/mapStore'
 import type { OnlineMapRef } from '../components/Map/OnlineMap'
@@ -188,6 +188,7 @@ export function MapPage() {
   const [measurePoints, setMeasurePoints] = useState<Array<{ lng: number; lat: number }>>([])
   const [totalDistance, setTotalDistance] = useState<number | null>(null)
   const [locationInput, setLocationInput] = useState({ lng: '', lat: '' })
+
   
   // 从mapStore获取定位点数据
   const { locationPoints, addLocationPoint, clearLocationPoints } = useMapStore()
@@ -533,42 +534,20 @@ export function MapPage() {
       <div className="h-14 bg-card border-b border-border flex items-center justify-start px-4 flex-shrink-0 gap-4">
         <div className="flex items-center gap-4">
           <h1 className="text-lg font-semibold">地图浏览</h1>
-          {/* 数据源文件名显示 */}
-          {currentDataSourceFile && (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 rounded-md">
-              <Database size={14} className="text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">工参: {currentDataSourceFile}</span>
-              {/* 刷新按钮 */}
-              <button 
-                onClick={async () => {
-                  setRefreshStatus('loading');
-                  try {
-                    // 重新获取数据列表
-                    await useDataStore.getState().fetchList();
-                    // 刷新工参数据缓存
-                    await loadSectorDataForSearch();
-                    // 调用OnlineMap的refreshData方法刷新地图数据
-                    if (onlineMapRef.current) {
-                      await onlineMapRef.current.refreshData();
-                    }
-                    setRefreshStatus('loaded');
-                  } catch (error) {
-                    console.error('[MapPage] 刷新工参数据失败:', error);
-                    setRefreshStatus('idle');
-                  }
-                }}
-                className="transition-colors cursor-pointer"
-                title="刷新工参数据"
-              >
-                <Loader2 
-                  size={14} 
-                  className={`${
-                    refreshStatus === 'loading' ? 'animate-spin text-yellow-500' : 
-                    refreshStatus === 'loaded' ? 'text-green-500' : 
-                    'text-red-500'
-                  }`} 
-                />
-              </button>
+            {/* 数据源文件名显示 */}
+          {currentDataSourceFile ? (
+            <div className="px-3 py-1.5 bg-muted/50 rounded-md">
+              <div className="flex items-center gap-2">
+                <Database size={14} className="text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">工参: {currentDataSourceFile}</span>
+              </div>
+            </div>
+          ) : (
+            <div className="px-3 py-1.5 bg-muted/50 rounded-md">
+              <div className="flex items-center gap-2">
+                <Database size={14} className="text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">未导入工参文件</span>
+              </div>
             </div>
           )}
         </div>
@@ -653,7 +632,7 @@ export function MapPage() {
             className="px-2 py-1.5 text-xs rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground flex items-center gap-1"
             title="清除所有搜索标记"
           >
-            <X size={12} className="mr-1" />
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-broom"><path d="M18 11h-5l-5 9v-9H3L12 2l9 9z"></path><path d="M2 2v3h3"></path><path d="M21 2v3h3"></path><path d="M11 15h1"></path><path d="M8 18h8"></path></svg>
             清除
           </button>
 
@@ -672,13 +651,13 @@ export function MapPage() {
 
             {/* 工具下拉菜单 */}
             {showToolMenu && (
-              <div className="absolute top-full right-0 mt-1 z-[3000] bg-card border border-border rounded-lg shadow-lg w-24 translate-x-0">
+              <div className="absolute top-full right-0 mt-1 z-[3000] bg-card border border-border rounded-lg shadow-lg w-16">
                 <button
                   onClick={() => {
                     setShowToolMenu(false);
                     setShowLocationModal(true);
                   }}
-                  className="w-full text-left px-2 py-2 text-xs hover:bg-muted transition-colors flex items-center gap-1"
+                  className="w-full text-left px-1 py-2 text-xs hover:bg-muted transition-colors flex items-center justify-center gap-1"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-map-pin"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
                   定位
@@ -688,7 +667,7 @@ export function MapPage() {
                     setShowToolMenu(false);
                     setMeasureMode(true);
                   }}
-                  className="w-full text-left px-2 py-2 text-xs hover:bg-muted transition-colors flex items-center gap-1"
+                  className="w-full text-left px-1 py-2 text-xs hover:bg-muted transition-colors flex items-center justify-center gap-1"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-ruler"><path d="M12 2v20"></path><path d="m17 5-5 5"></path><path d="m9 5 5 5"></path><path d="m17 19-5-5"></path><path d="m9 19 5-5"></path></svg>
                   测距

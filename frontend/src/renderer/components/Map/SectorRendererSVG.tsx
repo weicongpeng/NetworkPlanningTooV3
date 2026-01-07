@@ -191,9 +191,12 @@ export class SectorSVGLayer extends L.Layer {
         
         // 渲染扇区标签（如果需要）
         if (this.showLabels) {
-          const label = this._createSectorLabel(sector)
-          label.addTo(this.featureGroup)
-          this.sectorLabels.set(sector.id, label)
+          // 当同一个物理站点扇区数大于3时，只显示一个扇区名字
+          if (groupSectors.length <= 3 || i === 0) {
+            const label = this._createSectorLabel(sector, i, groupSectors.length)
+            label.addTo(this.featureGroup)
+            this.sectorLabels.set(sector.id, label)
+          }
         }
       }
     }
@@ -307,8 +310,11 @@ export class SectorSVGLayer extends L.Layer {
   /**
    * 创建扇区标签
    * 显示小区名称，使用简洁的文字样式，无边框
+   * @param sector 扇区数据
+   * @param labelIndex 标签在组内的索引
+   * @param totalLabels 组内标签总数
    */
-  private _createSectorLabel(sector: RenderSectorData): L.Marker {
+  private _createSectorLabel(sector: RenderSectorData, labelIndex: number, totalLabels: number): L.Marker {
     const centerLatLng = L.latLng(sector.displayLat, sector.displayLng)
     const config = SECTOR_CONFIG[sector.networkType]
     
@@ -316,17 +322,48 @@ export class SectorSVGLayer extends L.Layer {
     const labelContent = sector.name || ''
     const strokeColor = config.strokeColor || '#333'
     
+    // 根据标签索引计算偏移量，避免重叠
+    let offsetLat = 0
+    let offsetLng = 0
+    
+    if (totalLabels > 1) {
+      // 计算标签偏移半径（根据扇区类型和缩放级别调整）
+      const offsetRadius = this.currentZoom > 15 ? 25 : 20
+      
+      // 将标签沿圆周均匀分布
+      const angleStep = 360 / totalLabels
+      const angle = angleStep * labelIndex
+      
+      // 转换角度为弧度
+      const angleRad = (angle * Math.PI) / 180
+      
+      // 计算偏移坐标
+      offsetLat = Math.sin(angleRad) * offsetRadius
+      offsetLng = Math.cos(angleRad) * offsetRadius
+    }
+    
     // 创建简洁的文字标签
     const labelIcon = L.divIcon({
       className: 'sector-label',
-      html: `<div style="font-size: 10px; color: #000; font-weight: 500; white-space: nowrap; padding: 2px 4px; border-radius: 2px;">${labelContent}</div>`,
+      html: `<div style="font-size: 10px; color: #000; font-weight: 500; white-space: nowrap;">${labelContent}</div>`,
       iconSize: L.point(0, 0),
       iconAnchor: L.point(0, 0),
       popupAnchor: L.point(0, 0)
     })
     
     // 创建标记并添加到地图
-    const marker = L.marker(centerLatLng, {
+    // 使用L.map.latLngToLayerPoint和L.map.layerPointToLatLng来计算偏移后的位置
+    let labelLatLng = centerLatLng
+    if (offsetLat !== 0 || offsetLng !== 0) {
+      // 将地理坐标转换为像素坐标
+      const centerPoint = this._map!.latLngToLayerPoint(centerLatLng)
+      // 添加偏移
+      const offsetPoint = centerPoint.add(L.point(offsetLng, offsetLat))
+      // 将像素坐标转换回地理坐标
+      labelLatLng = this._map!.layerPointToLatLng(offsetPoint)
+    }
+    
+    const marker = L.marker(labelLatLng, {
       icon: labelIcon,
       interactive: false,
       zIndexOffset: 1000
