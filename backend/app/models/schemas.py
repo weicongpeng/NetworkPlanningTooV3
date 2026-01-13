@@ -63,6 +63,11 @@ class UpdateParametersRequest(BaseModel):
     currentParamId: str
 
 
+class ImportPointsRequest(BaseModel):
+    """导入点数据请求"""
+    file_path: str
+
+
 # ============== 数据管理相关 ==============
 class UploadResponse(BaseModel):
     """上传响应"""
@@ -115,12 +120,18 @@ class SiteData(BaseModel):
 
 
 # ============== PCI规划相关 ==============
+class PCIRange(BaseModel):
+    """PCI范围"""
+    min: int = Field(default=0, ge=0)
+    max: int = Field(default=503, ge=0)
+
 class PCIConfig(BaseModel):
     """PCI规划配置"""
     networkType: NetworkType
     distanceThreshold: float = Field(default=3.0, ge=0.1, le=50.0)
     pciModulus: int = Field(default=3, ge=1, le=50)
     inheritModulus: bool = Field(default=False, description="是否继承全量工参小区对应的模3或模30")
+    pciRange: Optional[PCIRange] = None
     customRules: Optional[List[Dict[str, Any]]] = None
 
 

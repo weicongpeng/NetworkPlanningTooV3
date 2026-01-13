@@ -127,11 +127,18 @@ class TaskManager:
             logger.info(f"[TaskManager] 配置: networkType={config.networkType}, distance={config.distanceThreshold}, inheritModulus={config.inheritModulus}")
 
             # 创建规划配置
+            # 处理PCI范围
+            pci_range = None
+            if hasattr(config, 'pciRange') and config.pciRange:
+                pci_range = (config.pciRange.min, config.pciRange.max)
+                logger.info(f"[TaskManager] 使用自定义PCI范围: {pci_range}")
+
             planning_config = PlanningConfig(
                 network_type=NetworkType(config.networkType),
                 distance_threshold=config.distanceThreshold,
                 pci_modulus=config.pciModulus,
-                inherit_modulus=config.inheritModulus
+                inherit_modulus=config.inheritModulus,
+                pci_range=pci_range
             )
 
             # 获取数据 - 支持网络类型特定的数据结构
@@ -142,47 +149,165 @@ class TaskManager:
                 data_items = data_service.list_data()
                 logger.info(f"找到 {len(data_items)} 个数据项")
 
-                if data_items:
-                    # 遍历所有Excel数据，查找匹配的数据
-                    for item in data_items:
-                        if item.type.value == "excel":
-                            logger.info(f"尝试加载数据: {item.name} ({item.id})")
-                            data = data_service.get_data(item.id)
+                # 1. 查找待规划小区文件和全量工参文件
+                target_cells_data = None
+                full_params_data = None
 
-                            # 检查数据结构：可能是扁平结构或网络特定结构
-                            if data:
-                                if isinstance(data, dict):
-                                    # 新结构：{"LTE": [...], "NR": [...]}
-                                    if network_type_str in data:
-                                        network_data = data[network_type_str]
-                                        if network_data:
-                                            logger.info(f"成功从{network_type_str}子表加载 {len(network_data)} 个基站")
-                                            sites_data = network_data
-                                            break
-                                elif isinstance(data, list):
-                                    # 旧结构：直接是基站列表 - 需要按networkType过滤
-                                    logger.info(f"数据是列表格式，共 {len(data)} 个基站，需要按networkType过滤")
-                                    # 过滤出指定网络类型的基站
-                                    filtered_data = [s for s in data if s.get('networkType') == network_type_str]
-                                    if filtered_data:
-                                        logger.info(f"成功过滤出 {len(filtered_data)} 个{network_type_str}基站")
-                                        sites_data = filtered_data
-                                        break
-                                    else:
-                                        # 列表中没有该网络类型的数据，继续查找下一个数据项
-                                        logger.info(f"列表中没有找到{network_type_str}类型的基站，继续查找")
-                                        continue
-                            else:
-                                logger.warning(f"数据加载返回None")
-                        else:
-                            logger.info(f"跳过非Excel数据: {item.name} (type: {item.type})")
+                for item in data_items:
+                    if item.type.value == "excel":
+                        logger.info(f"检查数据项: {item.name} ({item.id})")
+                        
+                        # 根据文件名前缀判断文件类型
+                        filename = item.name.lower()
+                        if filename.startswith('cell-tree-export'):
+                            logger.info(f"找到待规划小区文件: {item.name}")
+                            target_cells_data = data_service.get_data(item.id)
+                        elif filename.startswith('projectparameter_mongoose'):
+                            logger.info(f"找到全量工参文件: {item.name}")
+                            full_params_data = data_service.get_data(item.id)
+                        
+                        # 如果两种数据都找到了，就可以退出循环
+                        if target_cells_data and full_params_data:
+                            logger.info("已找到待规划小区文件和全量工参文件，退出循环")
+                            break
+
+                # 验证数据是否找到
+                if not target_cells_data:
+                    raise ValueError(f"未找到待规划小区文件（前缀为'cell-tree-export'的Excel文件）")
+                if not full_params_data:
+                    raise ValueError(f"未找到全量工参文件（前缀为'ProjectParameter_mongoose'的Excel文件）")
+
+                # 2. 从待规划小区文件中提取待规划小区的唯一标识
+                target_cell_keys = set()
+                
+                # 待规划小区数据结构：{'LTE': [...], 'NR': [...]} 或 [site1, site2, ...]
+                if isinstance(target_cells_data, dict):
+                    # 新结构：{"LTE": [...], "NR": [...]
+                    if network_type_str in target_cells_data:
+                        target_sites = target_cells_data[network_type_str]
+                        logger.info(f"从待规划小区文件加载 {len(target_sites)} 个{network_type_str}站点")
+                        
+                        # 提取待规划小区的唯一标识
+                        for site in target_sites:
+                            site_id = site.get('id', '')
+                            for sector in site.get('sectors', []):
+                                sector_id = sector.get('id', '')
+                                # 待规划小区的sector_id已经是site_id_cell_id格式，直接作为cell_key
+                                # 检查sector_id是否包含site_id的重复（如"540946_540946_51"）
+                                if f"{site_id}_{site_id}" in sector_id:
+                                    # 提取最后一部分作为真正的sector_id
+                                    real_sector_id = sector_id.split('_')[-1]
+                                    cell_key = f"{site_id}_{real_sector_id}"
+                                    logger.info(f"添加待规划小区: 原始sector_id={sector_id}, 解析为site_id={site_id}, real_sector_id={real_sector_id}, cell_key={cell_key}")
+                                else:
+                                    # 直接使用sector_id作为cell_key，因为它已经是site_id_cell_id格式
+                                    cell_key = sector_id
+                                    logger.info(f"添加待规划小区: site_id={site_id}, sector_id={sector_id}, cell_key={cell_key}")
+                                target_cell_keys.add(cell_key)
+                    else:
+                        raise ValueError(f"待规划小区文件中没有{network_type_str}数据")
+                elif isinstance(target_cells_data, list):
+                    # 旧结构：直接是基站列表
+                    logger.info(f"待规划小区文件是列表结构，共 {len(target_cells_data)} 个站点")
+                    
+                    # 提取待规划小区的唯一标识
+                    for site in target_cells_data:
+                        site_id = site.get('id', '')
+                        network_type = site.get('networkType', 'LTE')
+                        if network_type == network_type_str:
+                            for sector in site.get('sectors', []):
+                                sector_id = sector.get('id', '')
+                                cell_key = f"{site_id}_{sector_id}"
+                                target_cell_keys.add(cell_key)
+                                logger.info(f"添加待规划小区: {cell_key}")
+                else:
+                    raise ValueError(f"待规划小区数据格式不支持: {type(target_cells_data)}")
+
+                logger.info(f"共找到 {len(target_cell_keys)} 个待规划小区")
+                if not target_cell_keys:
+                    raise ValueError(f"待规划小区文件中没有{network_type_str}数据")
+
+                # 3. 从全量工参中提取待规划小区的完整信息
+                full_sites = []
+                
+                # 全量工参数据结构：{'LTE': [...], 'NR': [...]} 或 [site1, site2, ...]
+                if isinstance(full_params_data, dict):
+                    # 新结构：{"LTE": [...], "NR": [...]
+                    if network_type_str in full_params_data:
+                        full_sites = full_params_data[network_type_str]
+                        logger.info(f"从全量工参文件加载 {len(full_sites)} 个{network_type_str}站点")
+                    else:
+                        raise ValueError(f"全量工参文件中没有{network_type_str}数据")
+                elif isinstance(full_params_data, list):
+                    # 旧结构：直接是基站列表
+                    logger.info(f"全量工参文件是列表结构，共 {len(full_params_data)} 个站点")
+                    full_sites = [site for site in full_params_data if site.get('networkType') == network_type_str]
+                    logger.info(f"过滤出 {len(full_sites)} 个{network_type_str}站点")
+                else:
+                    raise ValueError(f"全量工参数据格式不支持: {type(full_params_data)}")
+
+                # 4. 生成sites_data：只包含待规划小区的完整信息
+                combined_sites = {}
+                for site in full_sites:
+                    site_id = site.get('id', '')
+                    
+                    # 遍历该站点下的所有小区
+                    for sector in site.get('sectors', []):
+                        sector_id = sector.get('id', '')
+                        
+                        # 生成可能的cell_key格式
+                        # 全量工参的sector_id只是cell_id格式，需要与site_id组合
+                        # 待规划小区的sector_id是site_id_cell_id格式
+                        possible_cell_keys = [
+                            f"{site_id}_{sector_id}",  # 组合成site_id_cell_id格式，与待规划小区的cell_key匹配
+                            sector_id  # 直接使用cell_id格式（以防万一）
+                        ]
+                        
+                        # 检查该小区是否在待规划列表中
+                        matched_key = None
+                        for cell_key in possible_cell_keys:
+                            if cell_key in target_cell_keys:
+                                matched_key = cell_key
+                                break
+                        
+                        if matched_key:
+                            logger.info(f"找到待规划小区的完整信息: site_id={site_id}, sector_id={sector_id}, matched_key={matched_key}")
+                            
+                            # 将该小区添加到sites_data中
+                            if site_id not in combined_sites:
+                                combined_site = {
+                                    'id': site_id,
+                                    'name': site.get('name', f"Site_{site_id}"),
+                                    'longitude': site.get('longitude', 0.0),
+                                    'latitude': site.get('latitude', 0.0),
+                                    'networkType': network_type_str,
+                                    'sectors': []
+                                }
+                                # 添加管理网元ID（如果存在）
+                                if site.get('managedElementId'):
+                                    combined_site['managedElementId'] = site.get('managedElementId')
+                                combined_sites[site_id] = combined_site
+                            
+                            combined_sites[site_id]['sectors'].append(sector)
+                            
+                            # 从待规划列表中移除，避免重复处理
+                            target_cell_keys.remove(matched_key)
+
+                # 检查是否所有待规划小区都找到了完整信息
+                if target_cell_keys:
+                    logger.warning(f"以下待规划小区未在全量工参中找到: {target_cell_keys}")
+
+                sites_data = list(combined_sites.values())
+                logger.info(f"生成了 {len(sites_data)} 个待规划站点，包含 {sum(len(s.get('sectors', [])) for s in sites_data)} 个小区")
+
             except Exception as e:
                 logger.error(f"获取数据失败: {e}")
                 import traceback
                 traceback.print_exc()
+                raise
 
             if not sites_data:
-                raise ValueError(f"没有可用的{network_type_str}工参数据，请先导入包含{network_type_str}基站信息的Excel文件")
+                raise ValueError(f"没有可用的{network_type_str}待规划小区数据，请检查导入的Excel文件")
 
             # 进度回调
             async def progress_callback(progress: float):
@@ -192,7 +317,8 @@ class TaskManager:
             result = await run_pci_planning(
                 planning_config,
                 sites_data,
-                progress_callback
+                progress_callback,
+                full_sites
             )
 
             # 完成任务
@@ -370,12 +496,32 @@ class TaskManager:
                 for site_result in task.result.get("results", []):
                     site_id = site_result.get("siteId", "")
                     site_name = site_result.get("siteName", "")
+                    # 从站点信息中获取网络类型
+                    network_type = site_result.get("networkType", "LTE")
+                    
                     for sector_result in site_result.get("sectors", []):
+                        # 根据网络类型确定网元ID
+                        if network_type == "NR":
+                            # NR小区的网元ID对应全量工参NR表的“管理网元ID”
+                            # 优先使用站点的managedElementId，否则使用基站ID
+                            net_element_id = site_result.get("managedElementId", site_id)
+                            # 将NR网元ID转换为整数类型，避免小数
+                            if isinstance(net_element_id, (int, float)):
+                                net_element_id = int(net_element_id)
+                        else:
+                            # LTE小区的网元ID对应全量工参LTE表的“管理网元ID”
+                            # 优先使用站点的managedElementId，否则使用站点名称
+                            net_element_id = site_result.get("managedElementId", site_name)
+                        
+                        # 获取频点信息
+                        frequency = sector_result.get("frequency", "") or sector_result.get("earfcn", "") or sector_result.get("ssb_frequency", "")
+                        
                         data.append({
                             "基站ID": site_id,
-                            "基站名称": site_name,
+                            "网元ID": net_element_id,
                             "小区ID": sector_result.get("sectorId", ""),
                             "小区名称": sector_result.get("sectorName", ""),
+                            "频点": frequency,
                             "原PCI": sector_result.get("originalPCI", ""),
                             "新PCI": sector_result.get("newPCI", ""),
                             "原模值": sector_result.get("originalMod", ""),

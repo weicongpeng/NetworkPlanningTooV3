@@ -4,6 +4,8 @@
  * 定义扇区的视觉样式、性能目标和渲染行为
  */
 
+import { frequencyColorMapper } from '../utils/frequencyColors'
+
 /**
  * 网络类型
  */
@@ -80,19 +82,19 @@ export interface PerformanceTarget {
 export const SECTOR_CONFIG: Record<NetworkType, SectorStyle> = {
   LTE: {
     color: '#3b82f6',      // 蓝色
-    opacity: 0.6,          // 60%透明度
+    opacity: 1,            // 0%透明度（完全不透明）
     radius: 60,            // 60米（默认，会根据覆盖类型调整）
     angle: 40,             // 40度夹角（默认，会根据覆盖类型调整）
-    strokeColor: '#2563eb',
-    strokeWidth: 1
+    strokeColor: '#000000',
+    strokeWidth: 0.5
   },
   NR: {
     color: '#10b981',      // 绿色
-    opacity: 0.6,          // 60%透明度
+    opacity: 1,            // 0%透明度（完全不透明）
     radius: 60,            // 60米（默认，会根据覆盖类型调整）
     angle: 40,             // 40度夹角（默认，会根据覆盖类型调整）
-    strokeColor: '#059669',
-    strokeWidth: 1
+    strokeColor: '#000000',
+    strokeWidth: 0.5
   }
 } as const
 
@@ -100,7 +102,7 @@ export const SECTOR_CONFIG: Record<NetworkType, SectorStyle> = {
  * 小区覆盖类型渲染配置
  *
  * - cell_cover_type = 1: 室外小区，扇形
- *   - LTE: 半径60米，夹角20度
+ *   - LTE: 半径60米，夹角40度
  *   - NR: 半径50米，夹角40度
  * - cell_cover_type = 4: 室内小区，圆形，半径22米
  */
@@ -127,29 +129,29 @@ export function getCellCoverStyle(cellCoverType?: number, networkType?: NetworkT
   // 默认为室外小区
   const type: CellCoverType = (cellCoverType === 4) ? 4 : 1;
   const baseStyle = CELL_COVER_CONFIG[type];
-  
+
   if (type === 1) {
     // 室外小区（扇形）
     if (networkType === 'LTE') {
-      // LTE室外小区：固定半径60米，夹角20度
+      // LTE室外小区：固定半径10米，夹角40度
       return {
         ...baseStyle,
-        radius: 60,
-        angle: 20
+        radius: 10,
+        angle: 40
       };
     } else {
-      // NR室外小区：固定半径45米，夹角40度
+      // NR室外小区：固定半径10米，夹角40度
       return {
         ...baseStyle,
-        radius: 45,
+        radius: 10,
         angle: 40
       };
     }
   } else {
-    // 室内小区（圆形）：固定半径20米
+    // 室内小区（圆形）：固定半径10米，与室外小区大小一致
     return {
       ...baseStyle,
-      radius: 20
+      radius: 10
     };
   }
 }
@@ -329,3 +331,36 @@ export const DEFAULT_MAP_LOCATIONS = {
 
 /** 当前使用的默认位置 */
 export const DEFAULT_LOCATION = DEFAULT_MAP_LOCATIONS.HEYUAN
+
+/**
+ * 导出频点颜色映射器（用于图层控制等组件）
+ */
+export { frequencyColorMapper }
+
+/**
+ * 根据扇区数据获取颜色
+ * 优先使用频点颜色，降级使用网络类型颜色
+ * 
+ * @param sector 扇区数据
+ * @returns 颜色配置对象
+ */
+export function getSectorColor(sector: {
+  frequency?: number
+  networkType: NetworkType
+}): { fillColor: string; strokeColor: string } {
+  // 如果有频点信息，使用频点颜色
+  if (sector.frequency && sector.frequency > 0) {
+    const colorObj = frequencyColorMapper.getColor(sector.frequency, sector.networkType)
+    return {
+      fillColor: colorObj.color,
+      strokeColor: colorObj.strokeColor
+    }
+  }
+
+  // 降级：使用网络类型颜色
+  const config = SECTOR_CONFIG[sector.networkType]
+  return {
+    fillColor: config.color,
+    strokeColor: config.strokeColor || config.color
+  }
+}

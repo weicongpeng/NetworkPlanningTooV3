@@ -48,6 +48,8 @@ class DataService:
         self.data_index_file = settings.DATA_DIR / "index.json"
         self._ensure_directories()
         self._load_index()
+        # 扫描uploads目录中的文件并添加到index中
+        self._scan_uploads_directory()
 
     def _ensure_directories(self):
         """确保必要的目录存在"""
@@ -69,6 +71,140 @@ class DataService:
         self.data_index_file.parent.mkdir(parents=True, exist_ok=True)
         with open(self.data_index_file, 'w', encoding='utf-8') as f:
             json.dump(self.index, f, ensure_ascii=False, indent=2)
+
+    def _scan_uploads_directory(self):
+        """扫描uploads目录中的文件并添加到index中"""
+        safe_print(f"[DataService] 开始扫描uploads目录...")
+        
+        # 遍历uploads目录中的所有.xlsx文件
+        for file_path in settings.UPLOAD_DIR.glob("*.xlsx"):
+            # 从文件名中提取data_id
+            filename = file_path.stem
+            if '-' in filename and len(filename.split('-')) == 5:
+                data_id = filename
+                
+                # 检查文件是否已经在index中
+                if data_id not in self.index:
+                    safe_print(f"[DataService] 找到新文件: {file_path.name}")
+                    
+                    # 尝试确定文件类型
+                    try:
+                        xls = pd.ExcelFile(file_path)
+                        sheet_names = xls.sheet_names
+                        
+                        file_type = "default"
+                        if 'LTE Project Parameters' in sheet_names and 'NR Project Parameters' in sheet_names:
+                            file_type = "full_params"
+                        elif 'LTE' in sheet_names and 'NR' in sheet_names:
+                            file_type = "target_cells"
+                        
+                        # 添加到index中
+                        self.index[data_id] = {
+                            "id": data_id,
+                            "name": file_path.name,
+                            "type": "excel",
+                            "fileType": file_type,
+                            "size": file_path.stat().st_size,
+                            "uploadDate": datetime.now().isoformat(),
+                            "status": "ready",
+                            "metadata": {}
+                        }
+                        
+                        safe_print(f"[DataService] 添加文件到索引: {data_id} ({file_type})")
+                        
+                    except Exception as e:
+                        safe_print(f"[DataService] 处理文件 {file_path.name} 失败: {e}")
+                        continue
+        
+        # 保存索引
+        self._save_index()
+        safe_print(f"[DataService] 扫描完成，共 {len(self.index)} 个文件在索引中")
+
+
+    def parse_points(self, file_path: str) -> List[Dict[str, Any]]:
+        """从文件解析点数据"""
+        path = Path(file_path)
+        if not path.exists():
+            raise ValueError(f"文件不存在: {file_path}")
+
+        ext = path.suffix.lower()
+        df = None
+
+        try:
+            if ext in ['.xlsx', '.xls']:
+                df = pd.read_excel(path)
+            elif ext == '.csv':
+                try:
+                    df = pd.read_csv(path, encoding='gbk')
+                except:
+                    df = pd.read_csv(path, encoding='utf-8')
+            elif ext == '.txt':
+                # 尝试各种分隔符
+                success = False
+                for sep in [',', '\t', ';', ' ']:
+                    try:
+                        df = pd.read_csv(path, sep=sep, encoding='gbk')
+                        if len(df.columns) > 1:
+                            success = True
+                            break
+                    except:
+                        continue
+                if not success:
+                    try:
+                        df = pd.read_csv(path, sep=',', encoding='utf-8')
+                    except:
+                        raise ValueError("无法解析TXT文件")
+            else:
+                raise ValueError(f"不支持的文件格式: {ext}")
+        except Exception as e:
+            raise ValueError(f"读取文件失败: {str(e)}")
+
+        if df is None or df.empty:
+            return []
+
+        # 智能匹配列名
+        columns = df.columns.tolist()
+        lat_col = None
+        lng_col = None
+        name_col = None
+
+        lat_patterns = [r'lat', r'纬度', r'緯度', r'latitude']
+        lng_patterns = [r'lon', r'lng', r'经度', r'經度', r'longitude']
+        name_patterns = [r'name', r'名称', r'名稱', r'小区名', r'站名']
+
+        for col in columns:
+            col_lower = str(col).lower()
+            if not lat_col and any(re.search(p, col_lower) for p in lat_patterns):
+                lat_col = col
+            if not lng_col and any(re.search(p, col_lower) for p in lng_patterns):
+                lng_col = col
+            if not name_col and any(re.search(p, col_lower) for p in name_patterns):
+                name_col = col
+
+        if not lat_col or not lng_col:
+             raise ValueError("未找到经纬度列，请确保包含'经度/纬度'或'longitude/latitude'列")
+
+        points = []
+        for _, row in df.iterrows():
+            lat = row[lat_col]
+            lng = row[lng_col]
+            name = row[name_col] if name_col else "未命名点"
+
+            try:
+                lat_val = float(lat)
+                lng_val = float(lng)
+                if pd.isna(lat_val) or pd.isna(lng_val):
+                    continue
+                
+                points.append({
+                    "name": str(name),
+                    "latitude": lat_val,
+                    "longitude": lng_val
+                })
+            except:
+                continue
+
+        return points
 
     def update_parameters(self, full_param_id: str, current_param_id: str) -> Dict[str, Any]:
         """更新工参"""
@@ -779,38 +915,59 @@ class DataService:
         safe_print(f"[DataService] 总共加载 {len(updates)} 条 {network_type} 现网数据")
         return updates
 
-    async def upload_excel(self, file, original_path: Optional[str] = None) -> Dict[str, str]:
-        """上传Excel工参文件"""
+    async def upload_excel(self, file: Optional[Any], original_path: Optional[str] = None) -> Dict[str, Any]:
+        """上传并解析Excel工参文件"""
         safe_print(f"[DataService] ===== 开始上传Excel文件 =====")
-        safe_print(f"[DataService] 文件名: {file.filename}")
+        
+        # 处理路径引号
+        if original_path:
+            original_path = original_path.strip('"\'')
+            
         safe_print(f"[DataService] 原始路径: {original_path}")
         
         # 生成唯一ID
         data_id = str(uuid.uuid4())
         safe_print(f"[DataService] 生成ID: {data_id}")
 
+        # 获取文件名和扩展名
+        # 优先使用 original_path 来获取文件名，因为它包含完整路径和真实文件名
+        if original_path:
+            filename = os.path.basename(original_path)
+            ext = os.path.splitext(filename)[1]
+        elif file:
+            filename = file.filename
+            ext = os.path.splitext(filename)[1]
+        else:
+            raise ValueError("必须提供文件或文件路径")
+
+        safe_print(f"[DataService] 文件名: {filename}")
+
         # 清理文件名：移除或替换可能导致Windows路径问题的字符
         import re
-        safe_filename = re.sub(r'[<>:"/\\|?*]', '_', file.filename)
+        safe_filename = re.sub(r'[<>:"/\\|?*]', '_', filename)
         # 限制文件名长度（避免Windows路径长度限制）
         if len(safe_filename) > 100:
-            name, ext = os.path.splitext(safe_filename)
-            safe_filename = name[:90] + ext
+            name, text_ext = os.path.splitext(safe_filename)
+            safe_filename = name[:90] + text_ext
         safe_print(f"[DataService] 安全文件名: {safe_filename}")
 
         # 保存文件 - 使用UUID避免中文文件名导致的路径问题
-        file_path = settings.UPLOAD_DIR / f"{data_id}.xlsx"
+        file_path = settings.UPLOAD_DIR / f"{data_id}{ext}"
         safe_print(f"[DataService] 目标路径: {file_path}")
         
         try:
-            safe_print(f"[DataService] 读取文件内容...")
-            content = await file.read()
-            safe_print(f"[DataService] 已读取 {len(content):,} 字节")
-            
-            safe_print(f"[DataService] 保存到磁盘...")
-            with open(file_path, 'wb') as f:
-                f.write(content)
-            safe_print(f"[DataService] 文件已保存")
+            # 保存或复制文件
+            if file:
+                safe_print(f"[DataService] 读取上传文件内容...")
+                content = await file.read()
+                safe_print(f"[DataService] 已读取 {len(content):,} 字节")
+                with open(file_path, 'wb') as f:
+                    f.write(content)
+            elif original_path:
+                if not os.path.exists(original_path):
+                    raise ValueError(f"文件不存在: {original_path}")
+                safe_print(f"[DataService] 复制本地文件...")
+                shutil.copy2(original_path, file_path)
             
             # 验证文件
             if file_path.exists():
@@ -820,8 +977,8 @@ class DataService:
                 raise FileNotFoundError(f"文件保存失败: {file_path}")
                 
         except Exception as e:
-            safe_print(f"[DataService] 文件保存失败: {type(e).__name__}: {e}")
-            raise ValueError(f"文件保存失败: {str(e)}")
+            safe_print(f"[DataService] 文件准备失败: {type(e).__name__}: {e}")
+            raise ValueError(f"文件准备失败: {str(e)}")
 
         # 处理数据
         try:
@@ -836,19 +993,46 @@ class DataService:
                 xls = pd.ExcelFile(file_path)
             except PermissionError as e:
                 safe_print(f"[DataService] 权限错误: {e}")
-                raise ValueError(f"文件被其他程序占用，请确保文件未被Excel打开: {str(e)}")
-            except OSError as e:
-                safe_print(f"[DataService] 系统错误 [Errno {e.errno}]: {e}")
-                if e.errno == 22:
-                    raise ValueError(f"无法打开文件 (Errno 22)。可能原因：1) 文件损坏 2) 文件被占用 3) 路径包含特殊字符")
-                else:
-                    raise ValueError(f"无法打开文件: {str(e)}")
-            except Exception as e:
-                safe_print(f"[DataService] 未知错误: {type(e).__name__}: {e}")
-                raise ValueError(f"无法打开Excel文件: {str(e)}")
+            safe_print(f"[DataService] 开始解析文件...")
             
-            try:
-                with xls:
+            # 使用 file_path 作为当前文件路径
+            
+            # 根据文件名后缀判断格式
+            if filename.lower().endswith('.csv'):
+                safe_print(f"[DataService] 检测到CSV文件，使用CSV解析器...")
+                # 处理CSV
+                try:
+                    df = pd.read_csv(file_path, encoding='utf-8')
+                except:
+                    df = pd.read_csv(file_path, encoding='gbk')
+                
+                # CSV文件没有sheet的概念，直接解析为默认类型
+                file_type = "default" 
+                parsed_data = {'default': self._parse_dataframe(df, filename, "unknown")} # "unknown" network type for generic CSV
+                metadata = {'siteCount': len(parsed_data['default'])}
+                safe_print(f"[DataService] CSV文件解析完成: {len(parsed_data['default'])} 个基站")
+
+            else: # 默认为Excel文件
+                safe_print(f"[DataService] 检测到Excel文件，使用Excel解析器...")
+                # 使用pandas.ExcelFile上下文管理器统一管理文件句柄
+                # 这可以避免多次打开/关闭文件导致的Windows文件锁问题 (Errno 22)
+                try:
+                    safe_print(f"[DataService] 打开Excel文件...")
+                    xls = pd.ExcelFile(file_path)
+                except PermissionError as e:
+                    safe_print(f"[DataService] 权限错误: {e}")
+                    raise ValueError(f"文件被其他程序占用，请确保文件未被Excel打开: {str(e)}")
+                except OSError as e:
+                    safe_print(f"[DataService] 系统错误 [Errno {e.errno}]: {e}")
+                    if e.errno == 22:
+                        raise ValueError(f"无法打开文件 (Errno 22)。可能原因：1) 文件损坏 2) 文件被占用 3) 路径包含特殊字符")
+                    else:
+                        raise ValueError(f"无法打开文件: {str(e)}")
+                except Exception as e:
+                    safe_print(f"[DataService] 未知错误: {type(e).__name__}: {e}")
+                    raise ValueError(f"无法打开Excel文件: {str(e)}")
+                
+                try:
                     # 获取sheet名称
                     sheet_names = xls.sheet_names
                     try:
@@ -859,7 +1043,7 @@ class DataService:
                         safe_print(f"[DataService] Excel文件包含的sheet: {safe_sheet_names}")
         
                     # 判断文件类型
-                    file_type = self._classify_file(file.filename, sheet_names)
+                    file_type = self._classify_file(filename, sheet_names)
                     safe_print(f"[DataService] 文件类型: {file_type}")
 
                     # === 单一实例逻辑 ===
@@ -918,10 +1102,9 @@ class DataService:
                         metadata['sectorCount'] = sum(len(s.get('sectors', [])) for s in sites)
                         safe_print(f"[DataService] 默认解析完成: {len(sites)} 个基站")
 
-            finally:
-                # 确保关闭文件句柄
-                # 注意：如果是在with块中，一般会自动关闭，但这里我们显式处理以防万一
-                pass
+                finally:
+                    # 确保关闭文件句柄
+                    xls.close()
                 
         except Exception as e:
             # 清理失败的文件
@@ -932,11 +1115,11 @@ class DataService:
             # 如果是上传过程中的临时文件，FastAPI会处理
             import traceback
             traceback.print_exc()
-            raise ValueError(f"Excel文件解析失败: {str(e)}")
+            raise ValueError(f"文件解析失败: {str(e)}")
 
         # 保存处理后的数据
         # 注意：之前的代码结构有点问题，保存逻辑应该在解析成功之后，且需要在xls关闭之后（如果是在Windows上移动文件的话）
-        # 但这里我们是读取内容，所以xls关闭后数据都在parsed_data里了
+        # 但这里 we are reading content, so xls closing later is fine as long as we data are in parsed_data
         
         safe_print(f"[DataService] 保存解析结果...")
         data_dir = settings.DATA_DIR / data_id
@@ -958,7 +1141,7 @@ class DataService:
         # 更新索引
         self.index[data_id] = {
             "id": data_id,
-            "name": file.filename,
+            "name": filename,
             "type": "excel",
             "fileType": file_type,
             "size": file_path.stat().st_size,
@@ -967,13 +1150,14 @@ class DataService:
             "status": "ready",
             "metadata": metadata
         }
+        safe_print(f"[DataService] 保存到索引: originalPath='{original_path}', filename='{filename}'")
         self._save_index()
         safe_print(f"[DataService] 索引已更新")
 
         safe_print(f"[DataService] ===== 上传成功 =====")
         return {
             "id": data_id,
-            "name": file.filename,
+            "name": filename,
             "status": "ready",
             "fileType": file_type
         }
@@ -1200,7 +1384,7 @@ class DataService:
         if network_type == "LTE":
             # LTE工参需要的列名（中文）
             required_columns = {
-                'site_id': ['eNodeB标识', 'eNodeBID', 'eNodeB ID', '基站ID', '管理网元ID'],
+                'site_id': ['eNodeB标识', 'eNodeBID', 'eNodeB ID', '基站ID'],  # 移除了'管理网元ID'，避免混淆
                 'site_name': ['基站名称'],
                 'longitude': ['基站经度', '经度', '小区经度'],
                 'latitude': ['基站纬度', '纬度', '小区纬度'],
@@ -1227,7 +1411,7 @@ class DataService:
                 'azimuth': ['天线方向角', '方位角'],
                 'height': ['天线挂高', '挂高'],
                 'pci': ['物理小区识别码', 'PCI'],
-                'ssb_frequency': ['填写SSB频点', 'SSB频点'],
+                'ssb_frequency': ['填写SSB频点', 'SSB频点', 'SSB Frequency'],
                 # 可选字段
                 'tac': ['跟踪区码', 'TAC'],
                 'cell_cover_type': ['小区覆盖类型'],
@@ -1237,30 +1421,52 @@ class DataService:
             }
 
         # 智能列名匹配函数
-        def find_column(df_cols, possible_names):
-            """在DataFrame的列名中查找匹配的列"""
-            df_cols_lower = [str(c).strip().lower() for c in df_cols]
+        def find_column(clean_cols, possible_names, column_type=""):
+            """在清理后的列名列表中查找匹配的列，返回列索引"""
+            clean_cols_lower = [str(c).strip().lower() for c in clean_cols]
+            clean_cols_clean = [str(c).strip() for c in clean_cols]
+            
+            print(f"[DataService] {network_type}] 查找列: {possible_names}, 可用列: {clean_cols_clean}")
 
             for possible in possible_names:
                 possible_lower = possible.lower()
+                possible_clean = possible.strip()
+                
+                print(f"[DataService] {network_type}] 尝试匹配: {possible_clean} -> {possible_lower}")
 
                 # 精确匹配
-                if possible_lower in df_cols_lower:
-                    return df.columns[list(df_cols_lower).index(possible_lower)]
+                if possible_lower in clean_cols_lower:
+                    index = clean_cols_lower.index(possible_lower)
+                    print(f"[DataService] {network_type}] 精确匹配成功: {possible_clean} -> {clean_cols_clean[index]}, 索引: {index}")
+                    return index
 
                 # 包含匹配
-                for i, df_col in enumerate(df_cols_lower):
-                    if possible_lower in df_col or df_col in possible_lower:
-                        return df.columns[i]
+                for i, (col, col_lower) in enumerate(zip(clean_cols_clean, clean_cols_lower)):
+                    if possible_lower in col_lower or col_lower in possible_lower:
+                        print(f"[DataService] {network_type}] 包含匹配成功: {possible_clean} -> {col}, 索引: {i}")
+                        return i
+                
+                # 对于管理网元ID，尝试更宽松的匹配
+                if column_type == "managed_element":
+                    for i, (col, col_lower) in enumerate(zip(clean_cols_clean, clean_cols_lower)):
+                        if '网元' in col or 'element' in col_lower or 'managed' in col_lower or '管理' in col:
+                            print(f"[DataService] {network_type}] 宽松匹配成功: {possible_clean} -> {col}, 索引: {i}")
+                            return i
 
+            print(f"[DataService] {network_type}] 未找到匹配列: {possible_names}")
             return None
 
+        # 获取当前DataFrame的列名
+        current_columns = list(df.columns)
+        
         # 执行列名匹配
         mapped_columns = {}
-        print(f"[DataService] {network_type}] 开始列名匹配，可用列: {list(df.columns)}")
+        print(f"[DataService] {network_type}] 开始列名匹配，可用列: {current_columns}")
         for key, possible_names in required_columns.items():
-            found_col = find_column(df.columns, possible_names)
-            if found_col is not None:
+            found_col_index = find_column(current_columns, possible_names)
+            if found_col_index is not None:
+                # 注意：这里返回的是列索引，而不是列名
+                found_col = current_columns[found_col_index]
                 mapped_columns[key] = found_col
                 # 特别关注小区覆盖类型和是否共享列的映射
                 if key in ['cell_cover_type', 'is_shared']:
@@ -1275,6 +1481,22 @@ class DataService:
                 # 只对必需字段输出警告
                 if key in ['site_id', 'longitude', 'latitude', 'sector_id']:
                     print(f"[DataService] 警告: 未找到列 {key}，尝试匹配: {possible_names}")
+        
+        # 额外匹配管理网元ID字段
+        managed_element_columns = ['管理网元ID', 'ManagedElement ID', 'ManagedElement', '网元ID', 'Managed Element', 'MEID']
+        managed_element_col_index = find_column(current_columns, managed_element_columns, column_type="managed_element")
+        if managed_element_col_index is not None:
+            managed_element_col = current_columns[managed_element_col_index]
+            mapped_columns['managed_element_id'] = managed_element_col
+            print(f"[DataService] {network_type}] 找到管理网元ID列: {managed_element_col}")
+        else:
+            # 尝试在所有列中查找包含"网元"或"element"的列
+            print(f"[DataService] {network_type}] 尝试手动匹配管理网元ID列...")
+            for i, col in enumerate(current_columns):
+                if '网元' in col or 'element' in col.lower() or 'managed' in col.lower() or '管理' in col:
+                    mapped_columns['managed_element_id'] = col
+                    print(f"[DataService] {network_type}] 手动匹配管理网元ID列: {col}")
+                    break
         
         print(f"[DataService] {network_type}] 最终映射结果: {mapped_columns}")
 
@@ -1331,7 +1553,7 @@ class DataService:
 
                 # 创建或获取站点（使用字典存储sectors，以唯一键为key实现去重）
                 if site_id not in sites:
-                    sites[site_id] = {
+                    site_data = {
                         "id": site_id,
                         "name": site_name,
                         "longitude": longitude,
@@ -1339,6 +1561,39 @@ class DataService:
                         "networkType": network_type,
                         "sectors": {}  # 改为字典，key为唯一键，value为sector对象
                     }
+                    
+                    # 提取管理网元ID（所有网络类型）
+                    if 'managed_element_id' in mapped_columns:
+                        me_col = mapped_columns['managed_element_id']
+                        try:
+                            # 直接访问列值，因为row是pandas Series对象
+                            managed_element_id = row[me_col]
+                            if pd.notna(managed_element_id):
+                                managed_element_id_str = str(managed_element_id).strip()
+                                if managed_element_id_str and managed_element_id_str.lower() not in ['nan', 'none', '']:
+                                    # 处理数值类型的管理网元ID，转换为整数
+                                    try:
+                                        # 尝试转换为float，再转为int，最后转为字符串
+                                        me_id_float = float(managed_element_id_str)
+                                        if me_id_float.is_integer():
+                                            managed_element_id_str = str(int(me_id_float))
+                                    except (ValueError, TypeError):
+                                        # 如果转换失败，保持原字符串
+                                        pass
+                                    site_data['managedElementId'] = managed_element_id_str
+                                    print(f"[DataService] {network_type}] 站点 {site_id} 的管理网元ID: {managed_element_id_str}")
+                                else:
+                                    print(f"[DataService] {network_type}] 站点 {site_id} 的管理网元ID为空或无效: {managed_element_id}")
+                            else:
+                                print(f"[DataService] {network_type}] 站点 {site_id} 的管理网元ID为NaN")
+                        except KeyError:
+                            print(f"[DataService] {network_type}] 站点 {site_id} 找不到列: {me_col}")
+                        except Exception as e:
+                            print(f"[DataService] {network_type}] 站点 {site_id} 提取管理网元ID失败: {e}")
+                    else:
+                        print(f"[DataService] {network_type}] 站点 {site_id} 没有映射的管理网元ID列")
+                    
+                    sites[site_id] = site_data
 
                 # 提取小区信息
                 sector_id_raw = row.get(mapped_columns['sector_id'])
@@ -1673,34 +1928,74 @@ class DataService:
         print(f"  EARFCN: {earfcn_col}")
         print(f"==============================\n")
 
-        if not site_id_col:
-            raise ValueError("无法找到基站ID列，请检查Excel文件格式。需要的列名包括：基站ID、eNodeBID、gNodeBID、站点ID等")
+        # 撒点文件模式：只要有经纬度即可，不需要基站ID
+        is_point_file = longitude_col is not None and latitude_col is not None
+
+        if not is_point_file:
+            raise ValueError("无法找到经度/纬度列，请检查Excel文件格式。撒点文件必须包含经度和纬度列。")
 
         print(f"[DataService] 开始解析 {len(df)} 行数据...")
+        print(f"[DataService] 解析模式: {'撒点文件模式（只需经纬度）' if is_point_file else '工参文件模式（需基站ID）'}")
 
         parsed_count = 0
         skipped_count = 0
 
         for idx, row in df.iterrows():
             try:
-                # 提取基站ID
-                site_id_raw = row.get(site_id_col)
-                if pd.isna(site_id_raw):
+                # 提取经纬度（撒点文件必须有经纬度）
+                longitude = 0.0
+                latitude = 0.0
+
+                if longitude_col:
+                    lon_raw = row.get(longitude_col)
+                    if pd.notna(lon_raw):
+                        try:
+                            lon_str = str(lon_raw).strip()
+                            longitude = float(lon_str)
+                        except:
+                            try:
+                                longitude = float(lon_raw)
+                            except:
+                                pass
+
+                if latitude_col:
+                    lat_raw = row.get(latitude_col)
+                    if pd.notna(lat_raw):
+                        try:
+                            lat_str = str(lat_raw).strip()
+                            latitude = float(lat_str)
+                        except:
+                            try:
+                                latitude = float(lat_raw)
+                            except:
+                                pass
+
+                # 跳过无效的经纬度
+                if longitude == 0 and latitude == 0:
                     skipped_count += 1
                     continue
-                site_id = str(site_id_raw).strip()
 
-                # 跳过空行或标题行
-                if not site_id or site_id.lower() in ['nan', 'none', ''] or site_id.startswith('Un'):
-                    skipped_count += 1
-                    continue
+                # 撒点文件模式：没有基站ID时使用行号
+                if site_id_col:
+                    site_id_raw = row.get(site_id_col)
+                    if pd.isna(site_id_raw):
+                        site_id = f"point_{idx}"
+                    else:
+                        site_id = str(site_id_raw).strip()
+                        # 跳过空行或标题行
+                        if not site_id or site_id.lower() in ['nan', 'none', ''] or site_id.startswith('Un'):
+                            site_id = f"point_{idx}"
+                else:
+                    site_id = f"point_{idx}"
 
-                # 提取基站名称
-                site_name = "Unknown"
+                # 提取基站名称（撒点文件可能有名称列）
+                site_name = site_id
                 if site_name_col:
                     name_raw = row.get(site_name_col)
                     if pd.notna(name_raw):
-                        site_name = str(name_raw).strip()
+                        name_str = str(name_raw).strip()
+                        if name_str and name_str.lower() not in ['nan', 'none', '']:
+                            site_name = name_str
 
                 # 提取网络类型
                 network_type = "LTE"
@@ -1712,37 +2007,6 @@ class DataService:
                             network_type = "NR"
                         else:
                             network_type = "LTE"
-
-                # 提取经纬度
-                longitude = 0.0
-                latitude = 0.0
-                if longitude_col:
-                    lon_raw = row.get(longitude_col)
-                    if pd.notna(lon_raw):
-                        try:
-                            lon_str = str(lon_raw).strip()
-                            longitude = float(lon_str)
-                        except:
-                            try:
-                                longitude = float(lon_raw)
-                            except:
-                                longitude = 0.0
-                if latitude_col:
-                    lat_raw = row.get(latitude_col)
-                    if pd.notna(lat_raw):
-                        try:
-                            lat_str = str(lat_raw).strip()
-                            latitude = float(lat_str)
-                        except:
-                            try:
-                                latitude = float(lat_raw)
-                            except:
-                                latitude = 0.0
-
-                # 跳过无效的经纬度
-                if longitude == 0 and latitude == 0:
-                    skipped_count += 1
-                    continue
 
                 # 创建或获取站点
                 if site_id not in sites:
@@ -1773,6 +2037,20 @@ class DataService:
                         sname_str = str(sname_raw).strip()
                         if sname_str and sname_str not in ['非必填', 'UserLabel', '必填', 'nan', 'None']:
                             sector_name = sname_str
+
+                # 收集所有其他列作为属性（用于撒点文件的标签显示）
+                point_attributes = {}
+                for col in df.columns:
+                    if col not in [site_id_col, site_name_col, longitude_col, latitude_col,
+                                   network_type_col, sector_id_col, sector_name_col,
+                                   azimuth_col, beamwidth_col, height_col, pci_col, earfcn_col]:
+                        val = row.get(col)
+                        if pd.notna(val):
+                            val_str = str(val).strip()
+                            if val_str and val_str.lower() not in ['nan', 'none', '']:
+                                # 使用列名作为属性名
+                                attr_name = str(col).strip()
+                                point_attributes[attr_name] = val_str
 
                 # 方位角
                 azimuth = 0.0
@@ -1813,7 +2091,8 @@ class DataService:
                     "latitude": latitude,
                     "azimuth": azimuth,
                     "beamwidth": beamwidth,
-                    "height": height
+                    "height": height,
+                    "networkType": network_type
                 }
 
                 # 可选字段：PCI
@@ -1838,6 +2117,10 @@ class DataService:
                         except:
                             pass
 
+                # 添加撒点文件的额外属性（用于标签显示）
+                if point_attributes:
+                    sector['attributes'] = point_attributes
+
                 sites[site_id]['sectors'].append(sector)
                 parsed_count += 1
 
@@ -1859,24 +2142,43 @@ class DataService:
 
         return result
 
-    async def upload_map(self, file, original_path: Optional[str] = None) -> Dict[str, str]:
+    async def upload_map(self, file: Optional[Any], original_path: Optional[str] = None) -> Dict[str, str]:
         """上传地图文件（支持 MapInfo 图层文件）"""
         data_id = str(uuid.uuid4())
 
-        # 保存文件 - 使用UUID避免中文文件名导致的路径问题
-        ext = os.path.splitext(file.filename)[1]
+        # 处理路径引号
+        if original_path:
+            original_path = original_path.strip('"\'')
+
+        # 获取文件名和扩展名
+        if file:
+            filename = file.filename
+            ext = os.path.splitext(filename)[1]
+        elif original_path:
+            filename = os.path.basename(original_path)
+            ext = os.path.splitext(filename)[1]
+        else:
+            raise ValueError("必须提供文件或文件路径")
+
         file_path = settings.UPLOAD_DIR / f"{data_id}{ext}"
-        with open(file_path, 'wb') as f:
-            content = await file.read()
-            f.write(content)
+
+        # 保存或复制文件
+        if file:
+            with open(file_path, 'wb') as f:
+                content = await file.read()
+                f.write(content)
+        elif original_path:
+            if not os.path.exists(original_path):
+                raise ValueError(f"文件不存在: {original_path}")
+            shutil.copy2(original_path, file_path)
 
         # 创建数据目录
         data_dir = settings.DATA_DIR / data_id
         data_dir.mkdir(parents=True, exist_ok=True)
 
         # 检测文件类型
-        is_mapinfo = file.filename.lower().endswith(('.mif', '.tab', '.dat'))
-        is_zip = file.filename.lower().endswith('.zip')
+        is_mapinfo = filename.lower().endswith(('.mif', '.tab', '.dat'))
+        is_zip = filename.lower().endswith('.zip')
 
         # 处理 ZIP 文件（离线地图或 MapInfo 包）
         if is_zip:
@@ -1905,7 +2207,7 @@ class DataService:
                 # 更新索引
                 self.index[data_id] = {
                     "id": data_id,
-                    "name": file.filename,
+                    "name": filename,
                     "type": "map",
                     "subType": "mapinfo",  # 标记为 MapInfo 图层文件
                     "size": file_path.stat().st_size,
@@ -1922,7 +2224,7 @@ class DataService:
                 # 普通离线地图文件
                 self.index[data_id] = {
                     "id": data_id,
-                    "name": file.filename,
+                    "name": filename,
                     "type": "map",
                     "subType": "offline",  # 标记为离线地图
                     "size": file_path.stat().st_size,
@@ -1937,8 +2239,33 @@ class DataService:
         # 处理单个 MapInfo 文件
         elif is_mapinfo:
             # 复制文件到数据目录
-            target_file = data_dir / file.filename
+            target_file = data_dir / filename
             shutil.copy(file_path, target_file)
+
+            # 关键修复: 如果提供了原始路径(Electron/Local模式)，尝试复制关联文件
+            # MapInfo .tab 文件通常依赖 .dat, .map, .id, .ind 等同名文件
+            if original_path:
+                try:
+                    original_dir = os.path.dirname(original_path)
+                    # 获取文件名(不带后缀)
+                    stem = os.path.splitext(filename)[0]
+                    
+                    # 常见的MapInfo关联文件后缀
+                    extensions = ['.dat', '.map', '.id', '.ind', '.mid']
+                    
+                    print(f"[DataService] 检查关联文件: 目录={original_dir}, 基名={stem}")
+                    
+                    for ext in extensions:
+                        # 尝试查找同名不同后缀的文件
+                        sibling_name = f"{stem}{ext}"
+                        sibling_path = os.path.join(original_dir, sibling_name)
+                        
+                        if os.path.exists(sibling_path):
+                            target_sibling = data_dir / sibling_name
+                            shutil.copy2(sibling_path, target_sibling)
+                            print(f"[DataService] 已复制关联文件: {sibling_name}")
+                except Exception as e:
+                    print(f"[DataService] 复制关联文件失败: {e}")
 
             # 解析 MapInfo 图层
             from app.services.mapinfo_service import parse_mapinfo_files
@@ -1954,7 +2281,7 @@ class DataService:
             # 更新索引
             self.index[data_id] = {
                 "id": data_id,
-                "name": file.filename,
+                "name": filename,
                 "type": "map",
                 "subType": "mapinfo",
                 "size": file_path.stat().st_size,
@@ -1971,7 +2298,7 @@ class DataService:
             # 其他地图文件
             self.index[data_id] = {
                 "id": data_id,
-                "name": file.filename,
+                "name": filename,
                 "type": "map",
                 "subType": "other",
                 "size": file_path.stat().st_size,
@@ -1987,7 +2314,7 @@ class DataService:
 
         return {
             "id": data_id,
-            "name": file.filename,
+            "name": filename,
             "status": "ready"
         }
 

@@ -1,13 +1,14 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
-import path from 'path'
-import { spawn } from 'child_process'
+import { app, BrowserWindow, ipcMain, dialog, screen } from 'electron'
+import * as path from 'path'
+import * as fs from 'fs'
+import { spawn, ChildProcess } from 'child_process'
 
 // 在 CommonJS 模式下 __filename 和 __dirname 是全局变量
 declare const __filename: string
 declare const __dirname: string
 
 let mainWindow: BrowserWindow | null = null
-let backendProcess: any = null
+let backendProcess: ChildProcess | null = null
 
 // 开发环境检测
 const isDev = process.env.NODE_ENV !== 'production'
@@ -19,10 +20,10 @@ console.log('__dirname:', __dirname)
 // 创建浏览器窗口
 function createWindow() {
   console.log('Creating browser window...')
-  
+
   const preloadPath = path.join(__dirname, 'preload.js')
   console.log('Preload path:', preloadPath)
-  
+
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -49,15 +50,15 @@ function createWindow() {
     console.log('Loading development URL: http://localhost:5173')
     mainWindow.loadURL('http://localhost:5173')
     mainWindow.webContents.openDevTools()
-    
+
     // 在开发环境中，如果加载失败，自动重试
     let retryCount = 0
     const maxRetries = 10
-    
+
     mainWindow.webContents.on('did-fail-load', () => {
       if (retryCount < maxRetries && mainWindow) {
         retryCount++
-        console.log(`Retrying to load Vite (attempt ${retryCount}/${maxRetries})...`)
+        console.log(`Retrying to load Vite(attempt ${retryCount} / ${maxRetries})...`)
         setTimeout(() => {
           if (mainWindow) {
             mainWindow.loadURL('http://localhost:5173')
@@ -118,8 +119,8 @@ function startBackend() {
   })
 
   backendProcess.on('exit', (code: number) => {
-    console.log(`后端进程退出，代码: ${code}`)
-    if (code !== 0 && !backendProcess.killed) {
+    console.log(`后端进程退出，代码: ${code} `)
+    if (code !== 0 && backendProcess && !backendProcess.killed) {
       // 尝试重启
       setTimeout(startBackend, 5000)
     }
@@ -137,6 +138,41 @@ ipcMain.handle('get-app-path', () => {
 
 ipcMain.handle('is-dev', () => {
   return isDev
+})
+
+// 文件对话框处理
+ipcMain.handle('dialog:open-file', async (_event, options) => {
+  if (!mainWindow) return undefined
+  const result = await dialog.showOpenDialog(mainWindow, options)
+  if (result.canceled) return undefined
+  return result.filePaths[0]
+})
+
+ipcMain.handle('dialog:save-file', async (_event, options) => {
+  if (!mainWindow) return undefined
+  const result = await dialog.showSaveDialog(mainWindow, options)
+  if (result.canceled) return undefined
+  return result.filePath
+})
+
+ipcMain.handle('dialog:select-directory', async (_event, options) => {
+  if (!mainWindow) return undefined
+  const result = await dialog.showOpenDialog(mainWindow, {
+    ...options,
+    properties: ['openDirectory']
+  })
+  if (result.canceled) return undefined
+  return result.filePaths[0]
+})
+
+ipcMain.handle('read-file', async (_event, filePath: string) => {
+  try {
+    const buffer = fs.readFileSync(filePath)
+    return buffer
+  } catch (error) {
+    console.error('Read file error:', error)
+    return null
+  }
 })
 
 // 应用生命周期

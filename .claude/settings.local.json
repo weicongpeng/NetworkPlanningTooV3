@@ -2,7 +2,15 @@
   "permissions": {
     "allow": [
       "Bash(where:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "mcp__zai-mcp-server__analyze_image",
+      "Bash(python -m py_compile:*)",
+      "Bash(ls:*)",
+      "Bash(util \")",
+      "mcp__zai-mcp-server__extract_text_from_screenshot",
+      "Bash(npx tsc:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run dev:web:*)"
     ]
   }
 }

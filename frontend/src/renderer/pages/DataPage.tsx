@@ -311,11 +311,21 @@ export function DataPage() {
                     <div className="text-xs text-muted-foreground mt-1 flex justify-between pr-4">
                       <span>
                         {item.type === 'excel' ? (
-                            item.metadata?.LTESiteCount 
+                            item.metadata?.LTESiteCount
                                 ? `LTE: ${item.metadata.LTESiteCount}站/${item.metadata.LTESectorCount}小区 | NR: ${item.metadata.NRSiteCount}站/${item.metadata.NRSectorCount}小区`
-                                : (item.fileType === 'full_params' ? '全量工参' : '待规划小区')
+                                : (item.fileType === 'full_params'
+                                    ? '全量工参'
+                                    : (item.fileType === 'target_cells'
+                                        ? '待规划小区'
+                                        : (item.fileType === 'default' && item.metadata?.siteCount
+                                            ? `${item.metadata.siteCount}个基站`
+                                            : 'Excel文件')))
                         ) : (
-                            'ZIP文件'
+                            item.type === 'map'
+                                ? (item.subType === 'mapinfo'
+                                    ? `MapInfo图层 (${item.metadata?.layerCount || 0}个图层)`
+                                    : 'ZIP文件')
+                                : '未知类型'
                         )}
                       </span>
                       {item.originalPath && <span className="text-[10px] text-blue-500">已记录路径</span>}

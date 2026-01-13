@@ -70,12 +70,19 @@ export interface SectorData {
 }
 
 // PCI规划相关类型
+export interface PCIRange {
+  min: number
+  max: number
+}
+
 export interface PCIConfig {
   networkType: 'LTE' | 'NR'
   distanceThreshold: number
   pciModulus: 3 | 30
-  enableCollisionCheck: boolean
-  enableConfusionCheck: boolean
+  inheritModulus: boolean
+  pciRange?: PCIRange
+  enableCollisionCheck?: boolean
+  enableConfusionCheck?: boolean
   customRules?: PCIRule[]
 }
 

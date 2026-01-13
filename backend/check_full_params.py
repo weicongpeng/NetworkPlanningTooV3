@@ -1,63 +1,60 @@
+#!/usr/bin/env python3
+"""
+检查uploads目录中的文件，判断是否是全量工参文件
+"""
+
 import pandas as pd
-import sys
+import os
 
-sys.stdout.reconfigure(encoding='utf-8')
+# 检查文件路径
+file_path = "D:/mycode/NetworkPlanningTooV3/backend/uploads/6ee22a46-e8c0-48ca-a9da-81a61295d359.xlsx"
 
-file_path = r'D:\mycode\NetworkPlanningTooV2\全量工参\全量工参1.xlsx'
+if os.path.exists(file_path):
+    print(f"找到文件: {file_path}")
+    
+    try:
+        # 读取Excel文件
+        xls = pd.ExcelFile(file_path)
+        
+        # 查看sheet名称
+        sheet_names = xls.sheet_names
+        print(f"\nsheet名称: {sheet_names}")
+        
+        # 判断是否是全量工参文件
+        if 'LTE Project Parameters' in sheet_names and 'NR Project Parameters' in sheet_names:
+            print(f"\n✅ 是全量工参文件：包含LTE Project Parameters和NR Project Parameters sheet")
+        
+        # 检查LTE Project Parameters sheet
+        if 'LTE Project Parameters' in sheet_names:
+            print(f"\n===== 检查LTE Project Parameters sheet =====")
+            
+            # 读取前几行数据
+            df = pd.read_excel(xls, sheet_name='LTE Project Parameters', header=None, nrows=5)
+            print(f"前5行数据:")
+            print(df)
+            
+            # 提取中文名称（第一行中\n之前的部分）
+            header_row = df.iloc[0]
+            clean_columns = []
+            for col in header_row:
+                col_str = str(col).strip() if pd.notna(col) else ''
+                if '\n' in col_str:
+                    chinese_name = col_str.split('\n')[0].strip()
+                    clean_columns.append(chinese_name)
+                else:
+                    clean_columns.append(col_str)
+            
+            print(f"\n提取到的列名: {clean_columns}")
+            
+            # 检查是否包含管理网元ID列
+            if any('管理网元ID' in col or '网元' in col for col in clean_columns):
+                print(f"\n✅ 包含管理网元ID相关列")
+            
+    except Exception as e:
+        print(f"读取文件失败: {e}")
+        import traceback
+        traceback.print_exc()
+else:
+    print(f"文件不存在: {file_path}")
 
-print("="*60)
-print("检查全量工参1.xlsx文件")
-print("="*60)
-
-# 打开文件
-xls = pd.ExcelFile(file_path)
-print(f"\n1. Sheet列表: {xls.sheet_names}")
-
-# 检查LTE sheet
-print("\n2. 检查LTE sheet...")
-df_lte = pd.read_excel(xls, sheet_name='LTE', header=None, nrows=5)
-print(f"   数据形状: {df_lte.shape}")
-print(f"\n   前5行 x 前10列:")
-print(df_lte.iloc[:, :10])
-
-# 检查第一行列名
-print("\n3. 第一行列名详情:")
-header_row = df_lte.iloc[0]
-for i in range(min(15, len(header_row))):
-    col_val = header_row.iloc[i]
-    print(f"   列{i}: {repr(col_val)}")
-
-# 检查列名中是否有\n
-print("\n4. 检查是否有多行列名(包含\\n):")
-has_newline = False
-for i, col in enumerate(header_row):
-    col_str = str(col)
-    if '\n' in col_str:
-        has_newline = True
-        print(f"   列{i}包含换行符: {repr(col_str[:100])}")
-
-if not has_newline:
-    print("   ❌ 没有发现包含\\n的列名")
-    print("   这不是标准的全量工参格式(Project Parameters)")
-
-# 尝试按照默认方式读取
-print("\n5. 尝试不同方式读取:")
-try:
-    df_default = pd.read_excel(xls, sheet_name='LTE')
-    print(f"   ✅ 默认方式读取成功: {df_default.shape}")
-    print(f"   列名: {list(df_default.columns)[:10]}")
-except Exception as e:
-    print(f"   ❌ 默认方式读取失败: {e}")
-
-try:
-    df_skip3 = pd.read_excel(xls, sheet_name='LTE', header=3)
-    print(f"   ✅ 跳过前3行读取成功: {df_skip3.shape}")
-    print(f"   列名: {list(df_skip3.columns)[:10]}")
-except Exception as e:
-    print(f"   ❌ 跳过前3行读取失败: {e}")
-
-xls.close()
-
-print("\n" + "="*60)
-print("检查完成")
-print("="*60)
+print("\n检查完成!")

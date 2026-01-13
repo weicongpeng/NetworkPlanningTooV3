@@ -29,13 +29,13 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
       {/* 侧边栏 */}
       <aside
         className={`${
-          sidebarOpen ? 'w-64' : 'w-16'
+          sidebarOpen ? 'w-44' : 'w-16'
         } bg-secondary border-r border-border transition-all duration-300 flex flex-col`}
       >
         {/* 头部 */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-border">
           {sidebarOpen && (
-            <h1 className="text-xl font-bold text-primary">网络规划工具</h1>
+            <h1 className="text-lg font-bold text-primary">网络规划</h1>
           )}
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -70,7 +70,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
 
         {/* 底部信息 */}
         {sidebarOpen && (
-          <div className="p-4 border-t border-border text-sm text-muted-foreground">
+          <div className="p-4 border-t border-border text-xs text-muted-foreground">
             <p>版本: 2.0.0</p>
           </div>
         )}

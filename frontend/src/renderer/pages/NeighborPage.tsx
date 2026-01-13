@@ -147,7 +147,14 @@ export function NeighborPage() {
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `neighbor_result_${taskId}.xlsx`
+      
+      // 生成带邻区规划类型、最大距离和时间戳的文件名
+      const now = new Date()
+      const timestamp = now.toISOString().slice(0, 19).replace(/:/g, '-').replace('T', '_')
+      const planningType = config.planningType
+      const distance = config.maxDistance
+      a.download = `neighbor_result_${planningType}_${distance}km_${timestamp}.xlsx`
+      
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)

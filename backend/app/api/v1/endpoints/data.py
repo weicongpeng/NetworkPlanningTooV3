@@ -6,10 +6,29 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 from typing import Dict, Any, List, Optional
 from app.core.config import settings
-from app.models.schemas import UploadResponse, DataItem, UpdateParametersRequest
+from app.models.schemas import UploadResponse, DataItem, UpdateParametersRequest, ImportPointsRequest
 from app.services.data_service import data_service
 
 router = APIRouter()
+
+
+@router.post("/import-points", response_model=Dict[str, Any])
+async def import_points(request: ImportPointsRequest) -> Dict[str, Any]:
+    """解析点数据"""
+    try:
+        points = await run_in_threadpool(data_service.parse_points, request.file_path)
+        return {
+            "success": True,
+            "data": points
+        }
+    except ValueError as e:
+        safe_detail = str(e).encode('gbk', 'replace').decode('gbk')
+        raise HTTPException(status_code=400, detail=safe_detail)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        safe_detail = str(e).encode('gbk', 'replace').decode('gbk')
+        raise HTTPException(status_code=500, detail=safe_detail)
 
 
 @router.get("/{data_id}/download")
@@ -85,25 +104,30 @@ async def update_parameters(request: UpdateParametersRequest) -> Dict[str, Any]:
 
 
 @router.post("/upload/excel", response_model=Dict[str, Any])
-async def upload_excel(file: UploadFile = File(...), file_path: Optional[str] = Form(None)) -> Dict[str, Any]:
+async def upload_excel(file: Optional[UploadFile] = File(None), file_path: Optional[str] = Form(None)) -> Dict[str, Any]:
     """上传Excel工参文件"""
+    print(f"[API] upload_excel: file={file.filename if file else None}, file_path={file_path}")
     try:
         result = await data_service.upload_excel(file, file_path)
+        print(f"[API] upload_excel success: id={result.get('id')}, name={result.get('name')}")
         return {
             "success": True,
             "data": result
         }
     except ValueError as e:
+        print(f"[API] upload_excel ValueError: {e}")
         safe_detail = str(e).encode('gbk', 'replace').decode('gbk')
         raise HTTPException(status_code=400, detail=safe_detail)
     except Exception as e:
+        print(f"[API] upload_excel Exception: {e}")
         safe_detail = str(e).encode('gbk', 'replace').decode('gbk')
         raise HTTPException(status_code=500, detail=safe_detail)
 
 
 @router.post("/upload/map", response_model=Dict[str, Any])
-async def upload_map(file: UploadFile = File(...), file_path: Optional[str] = Form(None)) -> Dict[str, Any]:
+async def upload_map(file: Optional[UploadFile] = File(None), file_path: Optional[str] = Form(None)) -> Dict[str, Any]:
     """上传地图文件"""
+    print(f"[API] upload_map: file={file}, file_path={file_path}")
     try:
         result = await data_service.upload_map(file, file_path)
         return {
@@ -111,9 +135,11 @@ async def upload_map(file: UploadFile = File(...), file_path: Optional[str] = Fo
             "data": result
         }
     except ValueError as e:
+        print(f"[API] upload_map ValueError: {e}")
         safe_detail = str(e).encode('gbk', 'replace').decode('gbk')
         raise HTTPException(status_code=400, detail=safe_detail)
     except Exception as e:
+        print(f"[API] upload_map Exception: {e}")
         safe_detail = str(e).encode('gbk', 'replace').decode('gbk')
         raise HTTPException(status_code=500, detail=safe_detail)
 

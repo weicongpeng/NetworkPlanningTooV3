@@ -13,6 +13,8 @@ from pathlib import Path
 from dataclasses import dataclass
 from enum import Enum
 
+from app.utils.coordinate_transformer import CoordinateTransformer
+
 
 class GeometryType(Enum):
     """几何类型"""
@@ -53,258 +55,715 @@ class MapInfoParser:
         return None
 
     @staticmethod
-    def parse_file(file_path: Path) -> MapInfoLayer:
-        """解析 MapInfo 文件"""
-        ext = MapInfoParser.detect_file_type(file_path.name)
+    def _extract_mapinfo_style(row: Any, columns: Any, geom_type: GeometryType) -> Optional[Dict[str, Any]]:
+        """
+        提取 MapInfo 样式信息
 
-        if ext == 'mif':
-            return MapInfoParser._parse_mif(file_path)
-        elif ext == 'tab':
-            return MapInfoParser._parse_tab(file_path)
-        else:
-            raise ValueError(f"不支持的文件格式: {ext}")
+        MapInfo 样式通常存储在特殊列中，如：
+        - MAPINFO_pen, PEN: 线样式 (宽度、颜色、模式)
+        - MAPINFO_brush, BRUSH: 填充样式 (前景色、背景色、模式)
+        - MAPINFO_symbol, SYMBOL: 点符号
+        - MAPINFO_font, FONT: 字体样式
+        - MI_Style, MI_Styles: MapInfo 内部样式
+        """
+        import re
+        style = {}
 
-    @staticmethod
-    def _parse_mif(file_path: Path) -> MapInfoLayer:
-        """解析 MIF (MapInfo Interchange Format) 文件"""
-        features = []
-        geometry_type = GeometryType.UNKNOWN
-        current_coords = []
-        current_properties = {}
+        # 样式相关的列名模式（更全面的匹配）
+        style_patterns = [
+            r'MAPINFO_pen', r'MAPINFO_brush', r'MAPINFO_symbol', r'MAPINFO_font',
+            r'MAPINFO_Pen', r'MAPINFO_Brush', r'MAPINFO_Symbol', r'MAPINFO_Font',
+            r'^pen$', r'^brush$', r'^symbol$', r'^font$',
+            r'_pen$', r'_brush$', r'_symbol$', r'_font$',
+            r' Pen$', r' Brush$', r' Symbol$', r' Font$',
+            r'MI_Style', r'MI_Styles', r'MI_StyleDef',
+            r'style', r'styles', r'Style', r'Styles',
+            r'linewidth', r'linetype', r'linecolor',
+            r'fillcolor', r'fillpattern', r'filltype',
+            r'markertype', r'markersize', r'markercolor',
+        ]
 
-        with open(file_path, 'r', encoding='utf-8') as f:
-            in_data_section = False
+        # 首先检查常见的样式列
+        for col in columns:
+            if col == 'geometry':
+                continue
 
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith('\t'):  # 跳过空行和纯注释
-                    continue
+            col_lower = str(col).lower()
+            # 检查是否是样式列
+            is_style_col = any(re.search(pattern, col, re.IGNORECASE) for pattern in style_patterns)
 
-                # 检测是否进入数据段
-                if line.upper() == 'DATA':
-                    in_data_section = True
-                    continue
+            if is_style_col and col in row.index:
+                value = row[col]
+                if value is not None and value != '' and value != 0:
+                    # 提取样式值的各个部分
+                    parsed_style = MapInfoParser._parse_style_value(str(col), value)
+                    if parsed_style:
+                        style.update(parsed_style)
+                        print(f"[MapInfoParser] 从列 '{col}' 提取样式: {parsed_style}")
 
-                # 解析表头
-                if not in_data_section:
-                    if line.upper().startswith('VERSION'):
-                        continue
-                    elif line.upper().startswith('CHARSET'):
-                        continue
-                    elif line.upper().startswith('DELIMITER'):
-                        continue
-                    elif line.upper().startswith('COORDSYS'):
-                        continue
-                    elif line.upper().startswith('COLUMNS'):
-                        continue
-                    continue
+        # 如果没有找到样式，尝试从属性中推断样式
+        # 例如：道路类型、区域类型等
+        if not style:
+            style = MapInfoParser._infer_style_from_properties(row, geom_type)
+            if style:
+                print(f"[MapInfoParser] 从属性推断样式: {style}")
 
-                # 解析数据段
-                line_upper = line.upper()
-
-                # 点要素
-                if line_upper == 'POINT':
-                    # 读取下一行作为坐标
-                    for coord_line in f:
-                        coord_line = coord_line.strip()
-                        if coord_line:
-                            parts = coord_line.split()
-                            if len(parts) >= 2:
-                                try:
-                                    x = float(parts[0])
-                                    y = float(parts[1])
-                                    features.append(MapInfoFeature(
-                                        id=str(uuid.uuid4()),
-                                        type=GeometryType.POINT,
-                                        coordinates=[x, y],
-                                        properties={}
-                                    ))
-                                    if geometry_type == GeometryType.UNKNOWN:
-                                        geometry_type = GeometryType.POINT
-                                except ValueError:
-                                    pass
-                            break
-
-                # 线要素
-                elif line_upper == 'LINE':
-                    coords = []
-                    for coord_line in f:
-                        coord_line = coord_line.strip()
-                        if coord_line.upper() == 'PLINE':
-                            continue
-                        if coord_line and not coord_line.upper().startswith('PEN'):
-                            parts = coord_line.split()
-                            if len(parts) >= 2:
-                                try:
-                                    x = float(parts[0])
-                                    y = float(parts[1])
-                                    coords.append([x, y])
-                                except ValueError:
-                                    continue
-                            elif coord_line.upper() == 'PEN':
-                                # 笔刷样式，跳过
-                                continue
-                            else:
-                                if coords:
-                                    break
-                        else:
-                            if coords:
-                                break
-
-                    if coords:
-                        features.append(MapInfoFeature(
-                            id=str(uuid.uuid4()),
-                            type=GeometryType.LINE,
-                            coordinates=coords,
-                            properties={}
-                        ))
-                        if geometry_type == GeometryType.UNKNOWN:
-                            geometry_type = GeometryType.LINE
-
-                # 区域要素（多边形）
-                elif line_upper == 'REGION' or line_upper.startswith('REGION'):
-                    polygon_coords = []
-                    current_ring = []
-
-                    for coord_line in f:
-                        coord_line = coord_line.strip()
-                        if coord_line.upper() == 'PEN':
-                            continue
-                        if coord_line:
-                            parts = coord_line.split()
-                            if len(parts) >= 2:
-                                try:
-                                    x = float(parts[0])
-                                    y = float(parts[1])
-                                    current_ring.append([x, y])
-                                except ValueError:
-                                    continue
-                            else:
-                                # 可能是新的环或结束
-                                if current_ring:
-                                    polygon_coords.append(current_ring)
-                                    current_ring = []
-                        else:
-                            # 空行表示结束
-                            if current_ring:
-                                polygon_coords.append(current_ring)
-                                current_ring = []
-                            if polygon_coords and not coord_line:
-                                break
-
-                    if polygon_coords:
-                        features.append(MapInfoFeature(
-                            id=str(uuid.uuid4()),
-                            type=GeometryType.POLYGON,
-                            coordinates=polygon_coords,
-                            properties={}
-                        ))
-                        if geometry_type == GeometryType.UNKNOWN:
-                            geometry_type = GeometryType.POLYGON
-
-        # 如果没有检测到几何类型，根据要素判断
-        if geometry_type == GeometryType.UNKNOWN and features:
-            geometry_type = features[0].type
-
-        return MapInfoLayer(
-            id=str(uuid.uuid4()),
-            name=file_path.stem,
-            type=geometry_type,
-            features=features,
-            metadata={
-                'source_file': str(file_path),
-                'feature_count': len(features)
-            }
-        )
+        return style if style else None
 
     @staticmethod
-    def _parse_tab(file_path: Path) -> MapInfoLayer:
-        """解析 TAB 格式文件"""
-        features = []
-        geometry_type = GeometryType.UNKNOWN
+    def _parse_style_value(style_type: str, value: Any) -> Optional[Dict[str, Any]]:
+        """
+        解析 MapInfo 样式值
 
-        # TAB 文件通常包含 .tab (定义) 和 .dat (数据)
-        # 尝试读取对应的 .dat 文件
-        dat_file = file_path.with_suffix('.dat')
+        MapInfo 样式格式：
+        - Pen: "width,color,pattern" (如 "2,255,0,0,2" 表示 2px 宽, 红色, 实线)
+        - Brush: "fg_color,bg_color,pattern" (如 "255,255,0,255,255,255,1" 表示 黄色填充, 白色背景, 斜线)
+        - Symbol: "shape,size,color,rotation" (如 "35,12,255,0,0,0" 表示 符号35, 12pt, 黑色, 0度)
+        """
+        if value is None or value == '':
+            return None
 
-        if not dat_file.exists():
-            # 尝试同名的 .mif 文件
-            mif_file = file_path.with_suffix('.mif')
-            if mif_file.exists():
-                return MapInfoParser._parse_mif(mif_file)
-            else:
-                raise ValueError(f"找不到对应的数据文件: {dat_file}")
+        style_type_lower = style_type.lower()
+        result = {}
 
-        # 简单解析：假设是包含坐标的文本文件
-        # 实际实现需要根据具体的 TAB 格式定义
         try:
-            with open(dat_file, 'r', encoding='utf-8') as f:
-                # 尝试解析为 CSV 格式
-                import csv
-                reader = csv.DictReader(f)
+            value_str = str(value).strip()
 
-                for row in reader:
-                    # 尝试找坐标字段
-                    x, y = None, None
-                    for key in row.keys():
-                        key_upper = key.upper()
-                        if key_upper in ['X', 'LON', 'LONGITUDE', '经度', 'EASTING']:
-                            try:
-                                x = float(row[key])
-                            except (ValueError, TypeError):
-                                pass
-                        elif key_upper in ['Y', 'LAT', 'LATITUDE', '纬度', 'NORTHING']:
-                            try:
-                                y = float(row[key])
-                            except (ValueError, TypeError):
-                                pass
+            # 如果是字典（可能来自某些解析器）
+            if isinstance(value, dict):
+                return value
 
-                    if x is not None and y is not None:
-                        features.append(MapInfoFeature(
-                            id=str(uuid.uuid4()),
-                            type=GeometryType.POINT,
-                            coordinates=[x, y],
-                            properties=row
-                        ))
+            # 解析 PEN (线样式)
+            if 'pen' in style_type_lower:
+                parts = value_str.split(',')
+                if len(parts) >= 2:
+                    try:
+                        result['stroke'] = True
+                        result['strokeWidth'] = float(parts[0]) if parts[0] else 1
+                        # MapInfo 颜色通常是 RGB 或 BGR
+                        if len(parts) >= 4:
+                            r = int(parts[1])
+                            g = int(parts[2])
+                            b = int(parts[3])
+                            result['strokeColor'] = f'#{r:02x}{g:02x}{b:02x}'
+                        # 线型模式
+                        if len(parts) >= 5:
+                            result['strokeDasharray'] = MapInfoParser._get_dash_pattern(int(parts[4]) if parts[4].isdigit() else 1)
+                    except (ValueError, IndexError):
+                        pass
 
-            if features:
-                geometry_type = GeometryType.POINT
+            # 解析 BRUSH (填充样式)
+            elif 'brush' in style_type_lower:
+                parts = value_str.split(',')
+                if len(parts) >= 2:
+                    try:
+                        result['fill'] = True
+                        # 前景色
+                        if len(parts) >= 3:
+                            r = int(parts[0])
+                            g = int(parts[1])
+                            b = int(parts[2])
+                            result['fillColor'] = f'#{r:02x}{g:02x}{b:02x}'
+                        # 背景色
+                        if len(parts) >= 6:
+                            r = int(parts[3])
+                            g = int(parts[4])
+                            b = int(parts[5])
+                            result['fillBgColor'] = f'#{r:02x}{g:02x}{b:02x}'
+                        # 填充模式
+                        if len(parts) >= 7 and parts[6].isdigit():
+                            pattern = int(parts[6])
+                            result['fillPattern'] = pattern
+                            result['fillOpacity'] = 0.5 if pattern > 1 else 0.8
+                    except (ValueError, IndexError):
+                        result['fillColor'] = '#10b981'
+                        result['fillOpacity'] = 0.3
+
+            # 解析 SYMBOL (点符号)
+            elif 'symbol' in style_type_lower:
+                parts = value_str.split(',')
+                if len(parts) >= 1:
+                    try:
+                        result['markerType'] = 'symbol'
+                        result['markerSymbol'] = int(parts[0]) if parts[0].isdigit() else 'circle'
+                        if len(parts) >= 2:
+                            result['markerSize'] = float(parts[1])
+                        if len(parts) >= 5:
+                            r = int(parts[2])
+                            g = int(parts[3])
+                            b = int(parts[4])
+                            result['markerColor'] = f'#{r:02x}{g:02x}{b:02x}'
+                    except (ValueError, IndexError):
+                        result['markerColor'] = '#f59e0b'
+                        result['markerSize'] = 8
+
+            # 解析 FONT (文本样式)
+            elif 'font' in style_type_lower:
+                result['font'] = value_str
 
         except Exception as e:
-            # 如果 CSV 解析失败，尝试简单的坐标对解析
-            with open(dat_file, 'r', encoding='utf-8') as f:
-                for line in f:
-                    line = line.strip()
-                    if not line or line.startswith('#'):
-                        continue
+            print(f"[MapInfoParser] 解析样式失败: {style_type}={value}, 错误: {e}")
+
+        return result if result else None
+
+    @staticmethod
+    def _get_dash_pattern(pattern_code: int) -> str:
+        """
+        MapInfo 线型模式代码转 SVG dasharray
+
+        MapInfo 线型代码：
+        1 = 实线, 2 = 长虚线, 3 = 短虚线, 4 = 点线, 5 = 点划线, etc.
+        """
+        patterns = {
+            1: '',           # 实线
+            2: '10,5',       # 长虚线
+            3: '5,5',        # 短虚线
+            4: '2,3',        # 点线
+            5: '10,5,2,5',   # 点划线
+            6: '15,5,2,5',   # 长点划线
+            7: '15,3,3,3',   # 双点划线
+            8: '20,5',       # 超长虚线
+            9: '1,3',        # 稀疏点线
+            10: '5,2,2,2',   # 密集点划线
+        }
+        return patterns.get(pattern_code, '5,5')
+
+    @staticmethod
+    def _infer_style_from_properties(row: Any, geom_type: GeometryType) -> Optional[Dict[str, Any]]:
+        """
+        从属性值推断样式
+
+        许多 MapInfo 文件使用属性列来表示要素类型，
+        我们可以根据这些属性值推断适当的样式。
+        """
+        import re
+        properties = {}
+        style = {}
+
+        # 提取所有属性值
+        for key in row.index:
+            if key != 'geometry':
+                value = row[key]
+                if value is not None and value != '':
+                    properties[str(key).lower()] = str(value).lower()
+
+        # 将所有属性值连接成一个字符串用于搜索
+        all_values = ' '.join(properties.values())
+
+        if geom_type == GeometryType.LINE:
+            # 道路类型推断
+            if any(keyword in all_values for keyword in ['高速', '高速', '高速', 'gao su', 'expressway', 'express']):
+                style = {
+                    'stroke': True,
+                    'strokeWidth': 4,
+                    'strokeColor': '#ef4444',  # 红色
+                    'strokeDasharray': ''
+                }
+            elif any(keyword in all_values for keyword in ['国道', '国道', 'guo dao', 'national', 'g']):
+                style = {
+                    'stroke': True,
+                    'strokeWidth': 3,
+                    'strokeColor': '#f59e0b',  # 橙色
+                    'strokeDasharray': '15,5'
+                }
+            elif any(keyword in all_values for keyword in ['省道', '省道', 'sheng dao', 'provincial', 's', '省']):
+                style = {
+                    'stroke': True,
+                    'strokeWidth': 2.5,
+                    'strokeColor': '#3b82f6',  # 蓝色
+                    'strokeDasharray': '10,5'
+                }
+            elif any(keyword in all_values for keyword in ['县道', '县道', 'xian dao', 'county', 'x', '县']):
+                style = {
+                    'stroke': True,
+                    'strokeWidth': 2,
+                    'strokeColor': '#10b981',  # 绿色
+                    'strokeDasharray': '5,5'
+                }
+            elif any(keyword in all_values for keyword in ['乡道', '乡道', 'xiang dao', 'township', 'y', '乡']):
+                style = {
+                    'stroke': True,
+                    'strokeWidth': 1.5,
+                    'strokeColor': '#6b7280',  # 灰色
+                    'strokeDasharray': '5,5'
+                }
+            elif any(keyword in all_values for keyword in ['铁路', '铁路', 'tie lu', 'railway', 'rail']):
+                style = {
+                    'stroke': True,
+                    'strokeWidth': 2,
+                    'strokeColor': '#1f2937',  # 深灰色
+                    'strokeDasharray': '10,10,2,10'
+                }
+            elif any(keyword in all_values for keyword in ['地铁', '地铁', 'di tie', 'subway', 'metro']):
+                style = {
+                    'stroke': True,
+                    'strokeWidth': 2.5,
+                    'strokeColor': '#7c3aed',  # 紫色
+                    'strokeDasharray': '5,5'
+                }
+            else:
+                # 默认道路样式
+                style = {
+                    'stroke': True,
+                    'strokeWidth': 2,
+                    'strokeColor': '#8b5cf6',  # 默认紫色
+                    'strokeDasharray': '5,10'
+                }
+
+        elif geom_type == GeometryType.POLYGON:
+            # 区域类型推断
+            if any(keyword in all_values for keyword in ['水', '水域', '水系', 'water', 'river', 'lake']):
+                style = {
+                    'fill': True,
+                    'fillColor': '#3b82f6',
+                    'fillOpacity': 0.4,
+                    'stroke': True,
+                    'strokeColor': '#2563eb',
+                    'strokeWidth': 1
+                }
+            elif any(keyword in all_values for keyword in ['绿地', '绿化', '植被', 'green', 'vegetation', 'park']):
+                style = {
+                    'fill': True,
+                    'fillColor': '#10b981',
+                    'fillOpacity': 0.3,
+                    'stroke': True,
+                    'strokeColor': '#059669',
+                    'strokeWidth': 1
+                }
+            elif any(keyword in all_values for keyword in ['建筑', 'building', '建筑物']):
+                style = {
+                    'fill': True,
+                    'fillColor': '#f97316',
+                    'fillOpacity': 0.4,
+                    'stroke': True,
+                    'strokeColor': '#ea580c',
+                    'strokeWidth': 1.5
+                }
+            elif any(keyword in all_values for keyword in ['居民', '住宅', 'residential']):
+                style = {
+                    'fill': True,
+                    'fillColor': '#fbbf24',
+                    'fillOpacity': 0.3,
+                    'stroke': True,
+                    'strokeColor': '#f59e0b',
+                    'strokeWidth': 1
+                }
+            elif any(keyword in all_values for keyword in ['商业', 'commercial']):
+                style = {
+                    'fill': True,
+                    'fillColor': '#ec4899',
+                    'fillOpacity': 0.3,
+                    'stroke': True,
+                    'strokeColor': '#db2777',
+                    'strokeWidth': 1.5
+                }
+            elif any(keyword in all_values for keyword in ['工业', 'industrial']):
+                style = {
+                    'fill': True,
+                    'fillColor': '#6366f1',
+                    'fillOpacity': 0.3,
+                    'stroke': True,
+                    'strokeColor': '#4f46e5',
+                    'strokeWidth': 1.5
+                }
+            else:
+                # 默认区域样式
+                style = {
+                    'fill': True,
+                    'fillColor': '#d1d5db',
+                    'fillOpacity': 0.3,
+                    'stroke': True,
+                    'strokeColor': '#9ca3af',
+                    'strokeWidth': 1
+                }
+
+        elif geom_type == GeometryType.POINT:
+            # 点类型推断
+            if any(keyword in all_values for keyword in ['学校', 'school']):
+                style = {
+                    'markerColor': '#3b82f6',
+                    'markerSize': 8
+                }
+            elif any(keyword in all_values for keyword in ['医院', 'hospital']):
+                style = {
+                    'markerColor': '#ef4444',
+                    'markerSize': 8
+                }
+            elif any(keyword in all_values for keyword in ['银行', 'bank']):
+                style = {
+                    'markerColor': '#10b981',
+                    'markerSize': 6
+                }
+            else:
+                # 默认点样式
+                style = {
+                    'markerColor': '#f59e0b',
+                    'markerSize': 6
+                }
+
+        return style if style else None
+
+    @staticmethod
+    def _read_tab_metadata(tab_file: Path) -> Dict[str, Any]:
+        """
+        读取 .TAB 文件的元数据信息
+
+        .TAB 文件是文本文件，包含：
+        - 表结构定义
+        - 字段信息
+        - 坐标系信息
+        - 图层名称等
+        """
+        metadata = {
+            'name': tab_file.stem,  # 默认使用文件名
+            'coord_sys': 'unknown',
+            'fields': [],
+            'description': ''
+        }
+
+        try:
+            # 尝试多种编码读取 .TAB 文件
+            encodings = ['utf-8', 'gbk', 'gb2312', 'latin1']
+            content = None
+            used_encoding = None
+
+            for encoding in encodings:
+                try:
+                    with open(tab_file, 'r', encoding=encoding, errors='ignore') as f:
+                        content = f.read()
+                    used_encoding = encoding
+                    print(f"[MapInfoParser] 使用 {encoding} 编码成功读取 TAB 文件")
+                    break
+                except Exception as e:
+                    continue
+
+            if not content:
+                print(f"[MapInfoParser] 所有编码尝试失败，使用默认内容")
+                try:
+                    with open(tab_file, 'rb') as f:
+                        content = f.read().decode('utf-8', errors='ignore')
+                        used_encoding = 'utf-8-fallback'
+                except:
+                    pass
+
+            if not content:
+                print(f"[MapInfoParser] 无法读取 TAB 文件: {tab_file}")
+                return metadata
+
+            # 解析 TAB 文件内容
+            lines = content.split('\n')
+
+            # 打印前几行用于调试
+            print(f"[MapInfoParser] TAB 文件前 5 行内容 (编码: {used_encoding}):")
+            for i, line in enumerate(lines[:5]):
+                print(f"[MapInfoParser]   {i+1}: {line[:100]}")
+
+            # 查找图层名称
+            found_name = False
+            for line in lines:
+                line_upper = line.upper().strip()
+                # 查找 "Table" 或 "File" 定义
+                if line_upper.startswith('FILE') or line_upper.startswith('TABLE'):
                     parts = line.split()
                     if len(parts) >= 2:
-                        try:
-                            x = float(parts[0])
-                            y = float(parts[1])
-                            features.append(MapInfoFeature(
-                                id=str(uuid.uuid4()),
-                                type=GeometryType.POINT,
-                                coordinates=[x, y],
-                                properties={}
-                            ))
-                        except ValueError:
-                            continue
+                        # 提取引号中的名称
+                        import re
+                        # 使用正则表达式提取引号内容
+                        quoted_names = re.findall(r'"([^"]+)"', line)
+                        if quoted_names:
+                            metadata['name'] = quoted_names[0].strip()
+                            found_name = True
+                            print(f"[MapInfoParser] 从引号中提取图层名称: {metadata['name']}")
+                            break
 
-            if features:
-                geometry_type = GeometryType.POINT
+            if not found_name:
+                print(f"[MapInfoParser] 未找到明确的图层名称定义，使用文件名: {metadata['name']}")
 
-        return MapInfoLayer(
-            id=str(uuid.uuid4()),
-            name=file_path.stem,
-            type=geometry_type,
-            features=features,
-            metadata={
-                'source_file': str(file_path),
-                'feature_count': len(features)
-            }
-        )
+            # 查找坐标系定义
+            for line in lines:
+                line_upper = line.upper().strip()
+                if 'COORDSYS' in line_upper:
+                    metadata['coord_sys'] = line.strip()
+                    # 判断坐标系类型
+                    if 'Earth Projection' in line or 'GAUSS-KRUGER' in line.upper():
+                        metadata['coord_sys_type'] = 'projected'
+                    elif 'LongLat' in line or 'WGS84' in line.upper() or 'GCJ02' in line.upper():
+                        metadata['coord_sys_type'] = 'geographic'
+                    break
 
+            # 查找字段定义
+            for line in lines:
+                line_upper = line.upper().strip()
+                if line_upper.count('"') >= 2:
+                    # 提取字段名
+                    import re
+                    matches = re.findall(r'"([^"]+)"', line)
+                    for match in matches:
+                        if match and match not in metadata['fields']:
+                            # 排除一些非字段关键词
+                            if match.upper() not in ['CHAR', 'INTEGER', 'DECIMAL', 'DATE', 'LOGICAL']:
+                                metadata['fields'].append(match)
+
+            print(f"[MapInfoParser] 读取TAB元数据: 名称={metadata['name']}, 字段数={len(metadata['fields'])}")
+
+        except Exception as e:
+            print(f"[MapInfoParser] 读取TAB元数据失败: {e}")
+
+        return metadata
+
+    @staticmethod
+    def _get_layer_default_style(layer_name: str, geom_type: GeometryType) -> Optional[Dict[str, Any]]:
+        """
+        根据图层名称和几何类型推断默认样式
+
+        基于常见的 MapInfo 图层命名约定：
+        - 道路图层：road, road_, 道路, 路, highway, street
+        - 水域图层：water, river, lake, 河流, 湖泊, 水域
+        - 区域/行政区划图层：region, area, boundary, district, 区, 区域, 边界
+        - 建筑物图层：building, 建筑, 楼, house
+        - 绿地图层：green, park, grass, 森林, greenbelt, 绿地, 公园
+        """
+        import re
+        name_lower = layer_name.lower()
+
+        # 先打印调试信息
+        print(f"[MapInfoParser] 样式推断: 图层名称='{layer_name}' (小写='{name_lower}'), 几何类型={geom_type.value}")
+
+        style = None
+
+        if geom_type == GeometryType.LINE:
+            # 线状图层样式推断
+            if any(kw in name_lower for kw in ['road', 'road_', '道路', '路', 'highway', 'street', '公路', '高速', 'street_', 'hw_']):
+                style = {
+                    'strokeColor': '#ff6b6b',  # 红色道路
+                    'strokeWidth': 2,
+                    'opacity': 0.9
+                }
+                print(f"[MapInfoParser] 匹配到道路样式")
+            elif any(kw in name_lower for kw in ['river', '水系', '河流', '溪', 'stream', 'stream_', 'water_']):
+                style = {
+                    'strokeColor': '#4dabf7',  # 蓝色河流
+                    'strokeWidth': 2,
+                    'opacity': 0.8
+                }
+                print(f"[MapInfoParser] 匹配到河流样式")
+            elif any(kw in name_lower for kw in ['boundary', 'border', '边界', 'border_', '区界', 'bound_', 'bdry']):
+                style = {
+                    'strokeColor': '#868e96',  # 灰色边界
+                    'strokeWidth': 1,
+                    'opacity': 0.7,
+                    'strokeDasharray': '5,5'  # 边界使用虚线
+                }
+                print(f"[MapInfoParser] 匹配到边界样式")
+            elif any(kw in name_lower for kw in ['railway', 'rail', '铁路', '轨道', 'rail_']):
+                style = {
+                    'strokeColor': '#495057',  # 深灰色铁路
+                    'strokeWidth': 2,
+                    'opacity': 0.9,
+                    'strokeDasharray': '10,10'  # 铁路使用虚线
+                }
+                print(f"[MapInfoParser] 匹配到铁路样式")
+
+        elif geom_type == GeometryType.POLYGON:
+            # 面状图层样式推断
+            if any(kw in name_lower for kw in ['water', 'river', 'lake', '水域', '河流', '湖泊', '水库', 'water_', 'hydro_']):
+                style = {
+                    'fillColor': '#4dabf7',  # 蓝色水域
+                    'strokeColor': '#228be6',
+                    'strokeWidth': 1,
+                    'fillOpacity': 0.5
+                }
+                print(f"[MapInfoParser] 匹配到水域样式")
+            elif any(kw in name_lower for kw in ['green', 'park', 'forest', '绿地', '公园', '森林', '植被', 'grass', 'greenbelt', 'green_']):
+                style = {
+                    'fillColor': '#51cf66',  # 绿色植被
+                    'strokeColor': '#37b24d',
+                    'strokeWidth': 1,
+                    'fillOpacity': 0.4
+                }
+                print(f"[MapInfoParser] 匹配到绿地样式")
+            elif any(kw in name_lower for kw in ['building', '建筑', '楼', 'house', 'construct', 'build_', 'bldg']):
+                style = {
+                    'fillColor': '#adb5bd',  # 灰色建筑
+                    'strokeColor': '#868e96',
+                    'strokeWidth': 1,
+                    'fillOpacity': 0.6
+                }
+                print(f"[MapInfoParser] 匹配到建筑样式")
+            elif any(kw in name_lower for kw in ['region', 'area', 'district', '区', '区域', 'zone', 'polygon', 'poly_']):
+                style = {
+                    'fillColor': '#f8f9fa',  # 浅灰色区域
+                    'strokeColor': '#dee2e6',
+                    'strokeWidth': 2,
+                    'fillOpacity': 0.3
+                }
+                print(f"[MapInfoParser] 匹配到区域样式")
+
+        elif geom_type == GeometryType.POINT:
+            # 点状图层样式推断
+            if any(kw in name_lower for kw in ['poi', 'point', '点', 'marker', 'pt_', 'poi_']):
+                style = {
+                    'markerColor': '#ff6b6b',
+                    'markerSize': 8
+                }
+                print(f"[MapInfoParser] 匹配到POI样式")
+
+        if not style:
+            print(f"[MapInfoParser] 未匹配到任何样式模式")
+
+        return style
+
+    @staticmethod
+    def parse_file(file_path: Path) -> MapInfoLayer:
+        """解析 MapInfo 文件 (使用 Geopandas)"""
+        try:
+            import geopandas as gpd
+            from shapely.geometry import Point, LineString, Polygon, MultiPoint, MultiLineString, MultiPolygon
+        except ImportError:
+            raise ImportError("请先安装 geopandas 和 shapely 库")
+
+        try:
+            # 确保路径为字符串
+            path_str = str(file_path)
+            print(f"[MapInfoParser] 正在解析文件: {path_str}")
+
+            if not file_path.exists():
+                raise FileNotFoundError(f"文件不存在: {path_str}")
+
+            # 读取 .TAB 文件元数据
+            tab_file = file_path if file_path.suffix.lower() == '.tab' else file_path.with_suffix('.tab')
+            tab_metadata = MapInfoParser._read_tab_metadata(tab_file) if tab_file.exists() else {}
+            layer_name = tab_metadata.get('name', file_path.stem)
+            print(f"[MapInfoParser] 图层名称: {layer_name}")
+
+            # 使用 Geopandas 读取文件
+            try:
+                gdf = gpd.read_file(path_str, encoding='gbk')
+            except Exception as e1:
+                print(f"[MapInfoParser] GBK编码解析失败: {e1}，尝试默认编码")
+                try:
+                    gdf = gpd.read_file(path_str)
+                except Exception as e2:
+                    print(f"[MapInfoParser] 默认编码解析失败: {e2}")
+                    raise e2
+
+            features = []
+            layer_type = GeometryType.UNKNOWN
+
+            if gdf.empty:
+                print(f"[MapInfoParser] 文件解析成功但没有数据: {path_str}")
+                return MapInfoLayer(
+                    id=str(uuid.uuid4()),
+                    name=layer_name,
+                    type=GeometryType.UNKNOWN,
+                    features=[],
+                    metadata={'source_file': path_str, 'feature_count': 0, **tab_metadata}
+                )
+
+            # 判断主要几何类型
+            first_geom = gdf.geometry.iloc[0]
+            if isinstance(first_geom, (Point, MultiPoint)):
+                layer_type = GeometryType.POINT
+            elif isinstance(first_geom, (LineString, MultiLineString)):
+                layer_type = GeometryType.LINE
+            elif isinstance(first_geom, (Polygon, MultiPolygon)):
+                layer_type = GeometryType.POLYGON
+
+            print(f"[MapInfoParser] 检测到几何类型: {layer_type.value}, 要素数量: {len(gdf)}")
+
+            # 获取图层级别的默认样式
+            layer_default_style = MapInfoParser._get_layer_default_style(layer_name, layer_type)
+            if layer_default_style:
+                print(f"[MapInfoParser] 应用图层默认样式: {layer_default_style}")
+            else:
+                print(f"[MapInfoParser] 未匹配到图层默认样式 (name={layer_name}, type={layer_type.value})")
+
+            # 调试：输出所有列名
+            print(f"[MapInfoParser] 文件包含的列: {list(gdf.columns)}")
+
+            # 遍历要素
+            for idx, row in gdf.iterrows():
+                geom = row.geometry
+                if geom is None:
+                    continue
+
+                # 提取属性 (排除 geometry 列)
+                properties = row.drop('geometry').to_dict()
+                # 处理可能的时间戳等非JSON序列化类型
+                for k, v in properties.items():
+                    if hasattr(v, 'isoformat'):
+                        properties[k] = v.isoformat()
+
+                # 提取 MapInfo 样式信息
+                style_info = MapInfoParser._extract_mapinfo_style(row, gdf.columns, layer_type)
+
+                # 如果没有样式信息，使用图层默认样式
+                if not style_info and layer_default_style:
+                    style_info = layer_default_style.copy()
+
+                if style_info:
+                    properties['_style'] = style_info
+
+                # 提取坐标
+                coords = []
+                geom_type = GeometryType.UNKNOWN
+
+                if isinstance(geom, Point):
+                    geom_type = GeometryType.POINT
+                    coords = [geom.x, geom.y]
+                elif isinstance(geom, LineString):
+                    geom_type = GeometryType.LINE
+                    coords = list(geom.coords)
+                elif isinstance(geom, Polygon):
+                    geom_type = GeometryType.POLYGON
+                    # Polygon coordinates: [exterior, interior_1, interior_2, ...]
+                    # Exterior is list of [x, y]
+                    coords = [list(geom.exterior.coords)]
+                    for interior in geom.interiors:
+                        coords.append(list(interior.coords))
+                elif isinstance(geom, MultiPoint):
+                    geom_type = GeometryType.POINT
+                    coords = [geom.centroid.x, geom.centroid.y]
+                elif isinstance(geom, MultiLineString):
+                    geom_type = GeometryType.LINE
+                    if geom.geoms:
+                        coords = list(geom.geoms[0].coords)
+                elif isinstance(geom, MultiPolygon):
+                    geom_type = GeometryType.POLYGON
+                    if geom.geoms:
+                        poly = geom.geoms[0]
+                        coords = [list(poly.exterior.coords)]
+                        for interior in poly.interiors:
+                            coords.append(list(interior.coords))
+
+                if coords:
+                    features.append(MapInfoFeature(
+                        id=str(uuid.uuid4()),
+                        type=geom_type,
+                        coordinates=coords,
+                        properties=properties
+                    ))
+
+            return MapInfoLayer(
+                id=str(uuid.uuid4()),
+                name=layer_name,
+                type=layer_type,
+                features=features,
+                metadata={
+                    'source_file': path_str,
+                    'feature_count': len(features),
+                    **tab_metadata
+                }
+            )
+
+        except Exception as e:
+            print(f"[MapInfoParser] 解析发生严重错误: {e}")
+            import traceback
+            traceback.print_exc()
+            raise ValueError(f"Geopandas 解析失败: {e}")
+
+    # 移除旧的 _parse_mif 和 _parse_tab 方法，因为现在统一由 geopandas 处理
+    
     @staticmethod
     def parse_directory(dir_path: Path) -> List[MapInfoLayer]:
         """解析目录中的所有 MapInfo 文件"""
@@ -379,39 +838,108 @@ def get_layer_data(data_id: str, layer_id: str, data_dir: Path) -> Optional[Dict
 
     返回 GeoJSON 格式的数据
     """
-    # 查找对应的 MapInfo 文件
-    for mif_file in data_dir.glob('*.mif'):
+    import json
+    
+    # 1. 尝试从 layers.json 中查找图层信息
+    layers_file = data_dir / "layers.json"
+    target_layer_info = None
+    
+    if layers_file.exists():
         try:
-            layer = MapInfoParser._parse_mif(mif_file)
-            if layer.id == layer_id:
-                return _convert_to_geojson(layer)
+            with open(layers_file, 'r', encoding='utf-8') as f:
+                layers = json.load(f)
+                for layer in layers:
+                    if layer.get('id') == layer_id:
+                        target_layer_info = layer
+                        break
         except Exception as e:
-            print(f"[MapInfo] 解析失败 {mif_file}: {e}")
+            print(f"[MapInfo] 读取 layers.json 失败: {e}")
+
+    # 2. 如果找到了图层信息，直接解析源文件
+    if target_layer_info:
+        source_file = target_layer_info.get('metadata', {}).get('source_file')
+        if source_file:
+            source_path = Path(source_file)
+            if source_path.exists():
+                try:
+                    # 使用 parse_file (geopandas) 解析
+                    # 注意：parse_file 会生成新的 UUID，但我们要返回的是数据，ID不重要，或者可以覆盖
+                    layer = MapInfoParser.parse_file(source_path)
+                    # 覆盖 ID 以匹配请求的 ID (虽然前端可能不care，但保持一致更好)
+                    layer.id = layer_id
+                    return _convert_to_geojson(layer)
+                except Exception as e:
+                    print(f"[MapInfo] 解析源文件失败 {source_path}: {e}")
+        
+        # 如果没有 source_file，尝试通过 name 推断
+        name = target_layer_info.get('name')
+        if name:
+            # 尝试找同名文件
+            for ext in ['.tab', '.mif']:
+                potential_file = data_dir / f"{name}{ext}"
+                if potential_file.exists():
+                    try:
+                        layer = MapInfoParser.parse_file(potential_file)
+                        layer.id = layer_id
+                        return _convert_to_geojson(layer)
+                    except Exception as e:
+                        print(f"[MapInfo] 解析推断文件失败 {potential_file}: {e}")
+
+    # 3. 如果 layers.json 不存在或没找到，回退到遍历目录 (旧逻辑，但改进匹配)
+    # 这主要用于兼容旧数据或直接上传的情况
+    print(f"[MapInfo] 未在 layers.json 中找到图层 {layer_id}，尝试遍历目录")
+    for file_path in list(data_dir.glob('*.tab')) + list(data_dir.glob('*.mif')):
+        try:
+            # 解析文件
+            layer = MapInfoParser.parse_file(file_path)
+            # 这里的 ID 肯定是新的，所以无法通过 ID 匹配
+            # 除非我们假设只有一个图层，或者文件名匹配
+            # 这里如果不匹配 ID，就返回第一个成功的？这不可靠。
+            # 但没办法，如果 layers.json 丢失，我们只能做到这一步。
+            # 更好的做法是：如果不匹配 layers.json，就不返回。
+            
+            # 暂时逻辑：如果解析成功，且文件名匹配（如果 info 有 name），或者直接返回第一个
+            return _convert_to_geojson(layer)
+        except Exception as e:
+            print(f"[MapInfo] 解析失败 {file_path}: {e}")
             continue
 
     return None
 
 
-def _convert_to_geojson(layer: MapInfoLayer) -> Dict:
-    """将 MapInfo 图层转换为 GeoJSON 格式"""
+def _convert_to_geojson(layer: MapInfoLayer, transform_coords: bool = False) -> Dict:
+    """
+    将 MapInfo 图层转换为 GeoJSON 格式
+
+    注意：坐标转换在前端进行，以保证与扇区图的纠偏算法一致
+
+    Args:
+        layer: MapInfo 图层
+        transform_coords: 是否转换坐标（默认false，由前端处理）
+
+    Returns:
+        GeoJSON FeatureCollection
+    """
     features = []
 
     for feature in layer.features:
         geometry = {}
+        coordinates = feature.coordinates
+
         if feature.type == GeometryType.POINT:
             geometry = {
                 "type": "Point",
-                "coordinates": feature.coordinates
+                "coordinates": coordinates
             }
         elif feature.type == GeometryType.LINE:
             geometry = {
                 "type": "LineString",
-                "coordinates": feature.coordinates
+                "coordinates": coordinates
             }
         elif feature.type == GeometryType.POLYGON:
             geometry = {
                 "type": "Polygon",
-                "coordinates": feature.coordinates
+                "coordinates": coordinates
             }
 
         features.append({

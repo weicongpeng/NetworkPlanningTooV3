@@ -328,21 +328,38 @@ export class SectorCanvasLayer extends L.Layer {
 
     // 组合网络类型和覆盖类型配置
     const networkConfig = SECTOR_CONFIG[sector.networkType]
-    const coverConfig = getCellCoverStyle(sector.cell_cover_type)
-
-    const radius = coverConfig.radius
-    const angle = coverConfig.angle
-    const isCircular = coverConfig.isCircular
+    const coverConfig = getCellCoverStyle(sector.cell_cover_type, sector.networkType)
 
     // 计算扇区路径
     const latLng = L.latLng(sector.displayLat, sector.displayLng)
     const point = this._map.latLngToContainerPoint(latLng)
 
-    // 将米转换为像素
-    const metersPerPixel = this._map.containerPointToLatLng(point).distanceTo(
-      this._map.containerPointToLatLng(L.point(point.x + 1, point.y))
-    )
-    const radiusPx = radius / metersPerPixel
+    const angle = coverConfig.angle
+    const isCircular = coverConfig.isCircular
+
+    // 基于缩放级别动态调整扇区视觉大小
+    // 确保扇区在任何缩放级别下都有合适的视觉大小
+    // 缩小地图时增大扇区视觉大小，放大地图时适当减小
+    const zoom = this.currentZoom
+    let visualSizePx: number
+    
+    // 调整缩放级别与视觉大小的映射关系
+    if (zoom < 10) {
+      // 小比例尺（全局视图）：较大的视觉大小，确保可见
+      visualSizePx = 18
+    } else if (zoom < 13) {
+      // 中等比例尺：适中的视觉大小
+      visualSizePx = 14
+    } else if (zoom < 16) {
+      // 大比例尺：正常视觉大小
+      visualSizePx = 10
+    } else {
+      // 超大比例尺：适当减小，避免占用过多空间
+      visualSizePx = 8
+    }
+    
+    // 计算扇区显示半径（像素）
+    const radiusPx = visualSizePx / 2
 
     // 开始绘制路径
     this.ctx.beginPath()

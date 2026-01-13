@@ -10,16 +10,18 @@
  * - 坐标缺失警告
  */
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { Loader2, MapIcon, Search, X, Trash2, MapPin, AlertTriangle, Database } from 'lucide-react'
-import { OnlineMap, OfflineMap, LayerControl, createDefaultLayers } from '../components/Map'
-import type { LayerOption, SectorLayerOption } from '../components/Map'
+import { Loader2, Search, X, MapPin, AlertTriangle, Database } from 'lucide-react'
+import { OnlineMap, OnlineMapRef, CustomLayerOption } from '../components/Map/OnlineMap'
+import { LayerControl, SectorLayerOption, LayerFileOption } from '../components/Map/LayerControl'
+import { OfflineMap, createDefaultLayers } from '../components/Map'
+import type { LayerOption, FrequencyOption } from '../components/Map'
 import { mapStateService } from '../services/mapStateService'
 import { CoordinateTransformer } from '../utils/coordinate'
 import { mapApi, layerApi, dataApi } from '../services/api'
 import { useDataStore } from '../store/dataStore'
 import { useMapStore } from '../store/mapStore'
-import type { OnlineMapRef } from '../components/Map/OnlineMap'
 import { mapDataService, type RenderSectorData } from '../services/mapDataService'
+import { frequencyColorMapper } from '../config/sector-config'
 
 /**
  * 搜索模式
@@ -65,13 +67,23 @@ export function MapPage() {
   // 地图类型（平面/卫星）
   const [mapType, setMapType] = useState<'roadmap' | 'satellite'>(() => mapStateService.getState().mapLayerType)
 
+  // 在线地图可见性
+  const [onlineMapVisible, setOnlineMapVisible] = useState(true)
+
   // 数据存储 - 获取工参文件名
   const { items } = useDataStore()
 
   // 刷新按钮状态：idle(红色), loading(旋转), loaded(绿色)
   const [refreshStatus, setRefreshStatus] = useState<'idle' | 'loading' | 'loaded'>('idle')
 
-  // 获取当前工参文件名（最新的前缀为"ProjectParameter_mongoose"的excel类型文件）
+  // 离线地图数据
+  const [offlinePath, setOfflinePath] = useState('')
+  const [offlineData, setOfflineData] = useState({
+    sites: [],
+    center: { latitude: 23.74, longitude: 114.69 }
+  })
+
+  // 获取当前工参文件名
   const currentDataSourceFile = useMemo(() => {
     const excelFiles = items
       .filter(item => item.type === 'excel' && item.status === 'ready' && item.name.startsWith('ProjectParameter_mongoose'))
@@ -94,6 +106,21 @@ export function MapPage() {
     }
   }, [refreshStatus])
 
+  // 获取离线地图配置
+  useEffect(() => {
+    const fetchOfflineConfig = async () => {
+      try {
+        const response = await mapApi.getOfflinePath()
+        if (response.success && response.data?.path) {
+          setOfflinePath(response.data.path)
+        }
+      } catch (error) {
+        console.error('[MapPage] 获取离线地图路径失败:', error)
+      }
+    }
+    fetchOfflineConfig()
+  }, [])
+
   // 图层控制
   const [layers, setLayers] = useState<LayerOption[]>(createDefaultLayers())
   // 扇区标签可见性
@@ -101,41 +128,63 @@ export function MapPage() {
     'lte-sectors': false,
     'nr-sectors': false
   })
-  // 外部图层文件（MapInfo导入）
-  const [layerFiles, setLayerFiles] = useState<Array<{
-    id: string
-    name: string
-    type: 'point' | 'line' | 'polygon'
-    visible: boolean
-    dataId: string
-  }>>([])
+  // 点文件标签可见性（撒点文件的属性标签）
+  const [pointFileLabelVisibility, setPointFileLabelVisibility] = useState<Record<string, boolean>>({})
+  const [layerFiles, setLayerFiles] = useState<LayerFileOption[]>([])
+  const [pointFiles, setPointFiles] = useState<LayerFileOption[]>([])
 
-  // 转换旧的 LayerOption 格式到新的 SectorLayerOption 格式
-  const sectorLayers: SectorLayerOption[] = layers.map(layer => ({
+  // 菜单引用
+  const importMenuRef = useRef<HTMLDivElement>(null)
+  const toolMenuRef = useRef<HTMLDivElement>(null)
+
+  // 频点列表（按网络类型分组）
+  const [frequencies, setFrequencies] = useState<{ lte: FrequencyOption[]; nr: FrequencyOption[] }>({
+    lte: [],
+    nr: []
+  })
+
+  // 自定义图层 (用户创建的点)
+  const [customLayers, setCustomLayers] = useState<CustomLayerOption[]>([])
+  const [showImportMenu, setShowImportMenu] = useState(false)
+  const [showToolMenu, setShowToolMenu] = useState(false)
+
+  // 点击外部自动隐藏菜单
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (importMenuRef.current && !importMenuRef.current.contains(event.target as Node)) {
+        setShowImportMenu(false)
+      }
+      if (toolMenuRef.current && !toolMenuRef.current.contains(event.target as Node)) {
+        setShowToolMenu(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [])
+
+  const sectorLayers = useMemo((): SectorLayerOption[] => layers.map(layer => ({
     id: layer.id,
     label: layer.label,
-    type: layer.type,
+    type: (layer.type as any),
     visible: layer.visible,
     icon: layer.icon,
     color: layer.color
-  }))
+  })), [layers])
 
   /**
-   * 加载MapInfo图层文件列表
+   * 加载图层文件列表 (MapInfo 和 Excel点文件)
    */
   const loadLayerFiles = useCallback(async () => {
     try {
-      // 从数据列表中获取所有map类型的数据项
+      // 从数据列表中获取所有数据项
       const items = useDataStore.getState().items
+      
+      // 1. 处理 MapInfo 文件
       const mapItems = items.filter(item => item.type === 'map')
-
-      const allLayerFiles: Array<{
-        id: string
-        name: string
-        type: 'point' | 'line' | 'polygon'
-        visible: boolean
-        dataId: string
-      }> = []
+      const mapInfoFiles: LayerFileOption[] = []
 
       for (const mapItem of mapItems) {
         try {
@@ -143,12 +192,13 @@ export function MapPage() {
           if (response.success && response.data?.layers) {
             const layers = response.data.layers
             for (const layer of layers) {
-              allLayerFiles.push({
+              mapInfoFiles.push({
                 id: layer.id,
                 name: layer.name,
                 type: layer.type as 'point' | 'line' | 'polygon',
                 visible: false,  // 默认不显示
-                dataId: mapItem.id
+                dataId: mapItem.id,
+                sourceType: 'mapinfo'
               })
             }
           }
@@ -156,8 +206,20 @@ export function MapPage() {
           console.error('[MapPage] 获取图层文件失败:', mapItem.id, error)
         }
       }
+      setLayerFiles(mapInfoFiles)
 
-      setLayerFiles(allLayerFiles)
+      // 2. 处理 Excel 点文件 (fileType='default' 或空)
+      const excelItems = items.filter(item => item.type === 'excel' && (item.fileType === 'default' || !item.fileType))
+      const excelPointFiles: LayerFileOption[] = excelItems.map(item => ({
+        id: item.id,
+        name: item.name,
+        type: 'point',
+        visible: false,
+        dataId: item.id,
+        sourceType: 'excel'
+      }))
+      setPointFiles(excelPointFiles)
+
     } catch (error) {
       console.error('[MapPage] 加载图层文件失败:', error)
     }
@@ -182,14 +244,13 @@ export function MapPage() {
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   // 工具控件状态
-  const [showToolMenu, setShowToolMenu] = useState(false)
   const [showLocationModal, setShowLocationModal] = useState(false)
   const [measureMode, setMeasureMode] = useState(false)
   const [measurePoints, setMeasurePoints] = useState<Array<{ lng: number; lat: number }>>([])
   const [totalDistance, setTotalDistance] = useState<number | null>(null)
   const [locationInput, setLocationInput] = useState({ lng: '', lat: '' })
 
-  
+
   // 从mapStore获取定位点数据
   const { locationPoints, addLocationPoint, clearLocationPoints } = useMapStore()
 
@@ -198,10 +259,10 @@ export function MapPage() {
     lte: RenderSectorData[]
     nr: RenderSectorData[]
   }>({ lte: [], nr: [] })
-  
+
   // 使用ref保存最新的sectorDataCache状态，解决闭包问题
   const sectorDataCacheRef = useRef(sectorDataCache)
-  
+
   // 当sectorDataCache状态更新时，同步更新ref
   useEffect(() => {
     sectorDataCacheRef.current = sectorDataCache
@@ -245,6 +306,129 @@ export function MapPage() {
 
     setSearchKeyword(result.name)
     setShowSearchResults(false)
+  }, [])
+
+  /**
+   * 导入：创建点 (上传Excel文件)
+   */
+  const handleCreatePoint = useCallback(async () => {
+    setShowImportMenu(false)
+    try {
+      const filePath = await (window as any).electronAPI.openFile({
+        title: '选择点工程文件',
+        filters: [
+          { name: 'Excel/CSV文件', extensions: ['xlsx', 'xls', 'csv'] }
+        ]
+      })
+
+      if (!filePath) return
+
+      console.log('[MapPage] Create points from:', filePath)
+
+      // 使用 uploadExcel 上传文件，使其保存到数据管理中
+      const result = await dataApi.uploadExcel(null, filePath)
+      
+      if (result.success) {
+        console.log('[MapPage] 导入点工程成功:', result.data)
+        // 刷新数据列表以确保新上传的文件能被检索到
+        await useDataStore.getState().fetchList()
+        // 重新加载图层列表
+        await loadLayerFiles()
+      } else {
+        console.error('[MapPage] 导入点工程失败:', result.message)
+      }
+    } catch (error) {
+      console.error('[MapPage] 导入点工程失败:', error)
+    }
+  }, [loadLayerFiles])
+
+  /**
+   * 导入：图层
+   */
+  const handleImportLayer = useCallback(async () => {
+    setShowImportMenu(false)
+    try {
+      const filePath = await (window as any).electronAPI.openFile({
+        title: '选择图层文件',
+        filters: [
+          { name: 'MapInfo文件', extensions: ['tab', 'mif'] }
+        ]
+      })
+
+      if (!filePath) return
+
+      console.log('[MapPage] Import layer from:', filePath)
+
+      // 在 Electron 环境下，我们直接发送路径给后端，后端负责读取/复制
+      const result = await dataApi.uploadMap(null, filePath)
+      if (result.success) {
+        console.log('[MapPage] 上传成功:', result.data)
+        // 刷新数据列表以确保新上传的文件能被检索到
+        await useDataStore.getState().fetchList()
+        // 重新加载图层列表
+        await loadLayerFiles()
+      } else {
+        console.error('[MapPage] 上传失败:', result.message)
+      }
+    } catch (error) {
+      console.error('[MapPage] 导入图层失败:', error)
+    }
+  }, [loadLayerFiles])
+
+  /**
+   * 切换自定义图层可见性
+   */
+  const handleCustomLayerToggle = useCallback((layerId: string, visible: boolean) => {
+    setCustomLayers(prev => prev.map(layer =>
+      layer.id === layerId ? { ...layer, visible } : layer
+    ))
+
+    if (onlineMapRef.current) {
+      onlineMapRef.current.setCustomLayerVisibility(layerId, visible)
+    }
+  }, [])
+
+  /**
+   * 切换图层文件可见性 (MapInfo 和 Excel)
+   */
+  const handleLayerFileToggle = useCallback((fileId: string, visible: boolean) => {
+    setLayerFiles(prev => prev.map(f =>
+      f.id === fileId ? { ...f, visible } : f
+    ))
+    setPointFiles(prev => prev.map(f =>
+      f.id === fileId ? { ...f, visible } : f
+    ))
+
+    if (onlineMapRef.current) {
+      onlineMapRef.current.setMapInfoLayerVisibility(fileId, visible)
+    }
+  }, [])
+
+  /**
+   * 移除图层文件 (MapInfo)
+   */
+  const handleRemoveLayerFile = useCallback(async (fileId: string) => {
+    try {
+      // 使用 dataStore 的 deleteItem 方法，确保与数据管理模块同步，并自动刷新列表
+      const success = await useDataStore.getState().deleteItem(fileId)
+      if (success) {
+        console.log('[MapPage] 移除图层文件成功:', fileId)
+        // 重新加载图层列表 (此时 store 中的 items 已经更新)
+        await loadLayerFiles()
+      }
+    } catch (error) {
+      console.error('[MapPage] 移除图层文件失败:', error)
+    }
+  }, [loadLayerFiles])
+
+  /**
+   * 移除自定义图层 (创建点)
+   */
+  const handleRemoveCustomLayer = useCallback((layerId: string) => {
+    setCustomLayers(prev => prev.filter(layer => layer.id !== layerId))
+    if (onlineMapRef.current) {
+      onlineMapRef.current.setCustomLayerVisibility(layerId, false)
+    }
   }, [])
 
   /**
@@ -312,7 +496,7 @@ export function MapPage() {
       setSearching(false)
     }
   }, [])
-  
+
   /**
    * 预加载工参数据
    */
@@ -324,9 +508,75 @@ export function MapPage() {
         console.error('[MapPage] 预加载工参数据失败:', error)
       }
     }
-    
+
     preloadSectorData()
   }, [loadSectorDataForSearch])
+
+  /**
+   * 扫描扇区数据提取频点列表
+   */
+  useEffect(() => {
+    const extractFrequencies = () => {
+      const lteFreqSet = new Set<number>()
+      const nrFreqSet = new Set<number>()
+
+      // 扫描LTE扇区频点
+      sectorDataCache.lte.forEach(sector => {
+        if (sector.frequency && sector.frequency > 0) {
+          lteFreqSet.add(sector.frequency)
+        }
+      })
+
+      // 扫描NR扇区频点
+      sectorDataCache.nr.forEach(sector => {
+        if (sector.frequency && sector.frequency > 0) {
+          nrFreqSet.add(sector.frequency)
+        }
+      })
+
+      // 清除旧的颜色映射
+      frequencyColorMapper.clear()
+
+      // 为LTE频点生成颜色
+      const lteFrequencies: FrequencyOption[] = Array.from(lteFreqSet)
+        .sort((a, b) => a - b)
+        .map(freq => {
+          const colorObj = frequencyColorMapper.getColor(freq, 'LTE')
+          return {
+            frequency: freq,
+            color: colorObj.color,
+            strokeColor: colorObj.strokeColor,
+            visible: true, // 默认显示
+            networkType: 'LTE' as const
+          }
+        })
+
+      // 为NR频点生成颜色
+      const nrFrequencies: FrequencyOption[] = Array.from(nrFreqSet)
+        .sort((a, b) => a - b)
+        .map(freq => {
+          const colorObj = frequencyColorMapper.getColor(freq, 'NR')
+          return {
+            frequency: freq,
+            color: colorObj.color,
+            strokeColor: colorObj.strokeColor,
+            visible: true, // 默认显示
+            networkType: 'NR' as const
+          }
+        })
+
+      setFrequencies({
+        lte: lteFrequencies,
+        nr: nrFrequencies
+      })
+    }
+
+    // 只在数据加载完成后扫描
+    if (sectorDataCache.lte.length > 0 || sectorDataCache.nr.length > 0) {
+      extractFrequencies()
+    }
+  }, [sectorDataCache.lte, sectorDataCache.nr])
+
 
   /**
    * 渲染定位点 - 当组件挂载或locationPoints变化时
@@ -407,16 +657,16 @@ export function MapPage() {
    */
   // 防抖定时器引用
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
-  
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
     setSearchKeyword(value)
-    
+
     // 清除之前的定时器
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current)
     }
-    
+
     // 实时搜索，显示预览结果 - 添加150ms防抖
     if (value.trim()) {
       debounceTimerRef.current = setTimeout(() => {
@@ -435,7 +685,7 @@ export function MapPage() {
     if (e.key === 'Enter') {
       e.preventDefault()
       console.log('Enter key pressed, executing search with keyword:', searchKeyword)
-      
+
       // 如果有搜索结果，默认选择第一条
       if (searchResults.length > 0) {
         selectSearchResult(searchResults[0])
@@ -456,12 +706,11 @@ export function MapPage() {
       searchInputRef.current.focus()
     }
   }
-  
+
   /**
-   * 清除所有搜索 - 清空输入框、搜索结果和地图标记
+   * 清除所有搜索 - 清空搜索结果和地图标记，但保留搜索框内容
    */
   const clearAllSearch = () => {
-    setSearchKeyword('')
     setSearchResults([])
     setShowSearchResults(false)
     if (onlineMapRef.current) {
@@ -510,6 +759,38 @@ export function MapPage() {
   }, [])
 
   /**
+   * 处理在线地图可见性切换
+   */
+  const handleOnlineMapToggle = useCallback((visible: boolean) => {
+    console.log('[MapPage] Online map visibility toggle:', visible)
+    setOnlineMapVisible(visible)
+    // 调用 OnlineMap 的 setBaseMapVisibility 方法
+    if (onlineMapRef.current) {
+      onlineMapRef.current.setBaseMapVisibility(visible)
+    }
+  }, [])
+
+  /**
+   * 处理频点可见性切换
+   */
+  const handleFrequencyToggle = useCallback((networkType: 'LTE' | 'NR', frequency: number, visible: boolean) => {
+    console.log('[MapPage] Frequency toggle:', networkType, frequency, visible)
+
+    // 更新本地频点状态
+    setFrequencies(prev => ({
+      ...prev,
+      [networkType.toLowerCase()]: prev[networkType.toLowerCase() as 'lte' | 'nr'].map(freq =>
+        freq.frequency === frequency ? { ...freq, visible } : freq
+      )
+    }))
+
+    // 通知地图组件
+    if (onlineMapRef.current) {
+      onlineMapRef.current.setFrequencyVisibility(networkType, frequency, visible)
+    }
+  }, [])
+
+  /**
    * 处理扇区标签可见性切换
    */
   const handleSectorLabelToggle = useCallback((layerId: string, visible: boolean) => {
@@ -528,13 +809,29 @@ export function MapPage() {
     }
   }, [])
 
+  /**
+   * 处理点文件标签可见性切换
+   */
+  const handlePointFileLabelToggle = useCallback((fileId: string, visible: boolean) => {
+    console.log('[MapPage] Point file label toggle:', fileId, visible)
+    setPointFileLabelVisibility(prev => ({
+      ...prev,
+      [fileId]: visible
+    }))
+
+    // 通知地图组件
+    if (onlineMapRef.current) {
+      onlineMapRef.current.setPointFileLabelVisibility(fileId, visible)
+    }
+  }, [])
+
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* 地图工具栏 */}
       <div className="h-14 bg-card border-b border-border flex items-center justify-start px-4 flex-shrink-0 gap-4">
         <div className="flex items-center gap-4">
           <h1 className="text-lg font-semibold">地图浏览</h1>
-            {/* 数据源文件名显示 */}
+          {/* 数据源文件名显示 */}
           {currentDataSourceFile ? (
             <div className="px-3 py-1.5 bg-muted/50 rounded-md">
               <div className="flex items-center gap-2">
@@ -562,11 +859,10 @@ export function MapPage() {
                 setSearchResults([])
                 setShowSearchResults(false)
               }}
-              className={`text-xs px-2 py-1 rounded transition-colors ${
-                searchMode === 'map'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:bg-muted'
-              }`}
+              className={`text-xs px-2 py-1 rounded transition-colors ${searchMode === 'map'
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:bg-muted'
+                }`}
             >
               地名搜索
             </button>
@@ -576,11 +872,10 @@ export function MapPage() {
                 setSearchResults([])
                 setShowSearchResults(false)
               }}
-              className={`text-xs px-2 py-1 rounded transition-colors ${
-                searchMode === 'parameter'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:bg-muted'
-              }`}
+              className={`text-xs px-2 py-1 rounded transition-colors ${searchMode === 'parameter'
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:bg-muted'
+                }`}
             >
               工参搜索
             </button>
@@ -593,51 +888,89 @@ export function MapPage() {
           </div>
 
           {/* 搜索输入框 */}
-            <div className="relative w-64">
-              <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input
-                ref={searchInputRef}
-                type="text"
-                value={searchKeyword}
-                onChange={handleInputChange}
-                onKeyDown={handleKeyDown}
-                onFocus={() => {
-                  if (searchResults.length > 0) setShowSearchResults(true)
-                }}
-                onBlur={() => {
-                  // 延迟隐藏，以便点击搜索结果
-                  setTimeout(() => setShowSearchResults(false), 200)
-                }}
-                placeholder={searchMode === 'map' ? '输入地名、道路名称等' : '输入小区名称、基站ID'}
-                className="w-full pl-8 pr-14 py-1.5 text-xs border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary placeholder:text-xs"
-              />
-              
-              {/* 清除输入按钮 */}
-              <div className="absolute right-1 top-1/2 -translate-y-1/2">
-                {searchKeyword && (
-                  <button
-                    onClick={clearSearchInput}
-                    className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-                    title="清除输入"
-                  >
-                    <X size={12} />
-                  </button>
-                )}
-              </div>
+          <div className="relative w-64">
+            <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchKeyword}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              onFocus={() => {
+                if (searchResults.length > 0) setShowSearchResults(true)
+              }}
+              onBlur={() => {
+                // 延迟隐藏，以便点击搜索结果
+                setTimeout(() => setShowSearchResults(false), 200)
+              }}
+              placeholder={searchMode === 'map' ? '输入地名、道路名称等' : '输入小区名称、基站ID'}
+              className="w-full pl-8 pr-14 py-1.5 text-xs border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary placeholder:text-xs"
+            />
+
+            {/* 清除输入按钮 */}
+            <div className="absolute right-1 top-1/2 -translate-y-1/2">
+              {searchKeyword && (
+                <button
+                  onClick={clearSearchInput}
+                  className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                  title="清除输入"
+                >
+                  <X size={12} />
+                </button>
+              )}
             </div>
-          
+          </div>
+
           {/* 独立的清除搜索标记按钮，使用文字标签 */}
           <button
             onClick={clearAllSearch}
             className="px-2 py-1.5 text-xs rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground flex items-center gap-1"
             title="清除所有搜索标记"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-broom"><path d="M18 11h-5l-5 9v-9H3L12 2l9 9z"></path><path d="M2 2v3h3"></path><path d="M21 2v3h3"></path><path d="M11 15h1"></path><path d="M8 18h8"></path></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m20 20-7.05-7.05"></path><path d="m22 20-5-5"></path><path d="m7 5 6 6"></path><path d="M21 11.5 15.5 17"></path><path d="M10.7 20.3a2 2 0 0 1-2.8 0L2.3 14.7a2 2 0 0 1 0-2.8l7-7a2 2 0 0 1 2.8 0l5.6 5.6a2 2 0 0 1 0 2.8l-7 7Z"></path></svg>
             清除
           </button>
 
+          {/* 导入控件 */}
+          <div className="relative" ref={importMenuRef}>
+            <button
+              className="px-2 py-1.5 text-xs rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground flex items-center gap-1"
+              onClick={() => setShowImportMenu(!showImportMenu)}
+              title="导入表格文件或图层文件"
+            >
+              <div className="w-4 h-4 flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-import"><path d="M12 3v12" /><path d="m8 11 4 4 4-4" /><path d="M8 5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-4" /></svg>
+              </div>
+              <span>导入</span>
+            </button>
+
+            {/* 导入下拉菜单 */}
+            {showImportMenu && (
+              <div className="absolute top-full right-0 mt-1 z-[3000] bg-card border border-border rounded-lg shadow-lg w-28 overflow-hidden">
+                <button
+                  onClick={handleCreatePoint}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors flex items-center gap-2"
+                  title="导入带经纬度、站点名称的表格文件"
+                >
+                  <MapPin size={12} />
+                  撒点文件
+                </button>
+                <button
+                  onClick={handleImportLayer}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors flex items-center gap-2 border-t border-border"
+                  title="导入TAB文件"
+                >
+                  <div className="w-3 h-3 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-layers"><polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" /></svg>
+                  </div>
+                  图层文件
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* 工具控件 */}
-          <div className="relative">
+          <div className="relative" ref={toolMenuRef}>
             <button
               className="px-2 py-1.5 text-xs rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground flex items-center gap-1"
               onClick={() => setShowToolMenu(!showToolMenu)}
@@ -669,13 +1002,13 @@ export function MapPage() {
                   }}
                   className="w-full text-left px-1 py-2 text-xs hover:bg-muted transition-colors flex items-center justify-center gap-1"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-ruler"><path d="M12 2v20"></path><path d="m17 5-5 5"></path><path d="m9 5 5 5"></path><path d="m17 19-5-5"></path><path d="m9 19 5-5"></path></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2h8v20H8V2z"></path><path d="M13 6h3"></path><path d="M13 10h3"></path><path d="M13 14h3"></path><path d="M13 18h3"></path></svg>
                   测距
                 </button>
               </div>
             )}
           </div>
-          
+
           {/* 搜索结果容器 */}
           <div className="absolute top-full left-0 mt-1 z-[2000] w-64">
             {/* 搜索结果下拉框 */}
@@ -714,17 +1047,15 @@ export function MapPage() {
                         className="w-full px-3 py-2 text-left text-sm hover:bg-muted transition-colors border-b border-border last:border-0"
                       >
                         <div className="flex items-start gap-2">
-                          <Database size={14} className={`mt-0.5 shrink-0 ${
-                            result.networkType === 'LTE' ? 'text-blue-500' : 'text-green-500'
-                          }`} />
+                          <Database size={14} className={`mt-0.5 shrink-0 ${result.networkType === 'LTE' ? 'text-blue-500' : 'text-green-500'
+                            }`} />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <span className="font-medium truncate">{result.name}</span>
-                              <span className={`text-xs px-1.5 py-0.5 rounded ${
-                                result.networkType === 'LTE'
-                                  ? 'bg-blue-100 text-blue-700'
-                                  : 'bg-green-100 text-green-700'
-                              }`}>
+                              <span className={`text-xs px-1.5 py-0.5 rounded ${result.networkType === 'LTE'
+                                ? 'bg-blue-100 text-blue-700'
+                                : 'bg-green-100 text-green-700'
+                                }`}>
                                 {result.networkType}
                               </span>
                             </div>
@@ -761,6 +1092,80 @@ export function MapPage() {
                 {searchMode === 'map' ? '未找到相关地点' : '未找到相关小区'}
               </div>
             )}
+          </div>
+        </div>
+
+        {/* 右侧地图控件 */}
+        <div className="flex items-center gap-3 ml-auto">
+          {/* 地图类型切换按钮组 */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                if (onlineMapVisible) {
+                  handleMapTypeChange('roadmap')
+                }
+              }}
+              className={`px-2 py-1 text-xs rounded transition-colors ${
+                mapType === 'roadmap'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-muted'
+              } ${!onlineMapVisible ? 'opacity-50 cursor-not-allowed' : ''}`}
+              disabled={!onlineMapVisible}
+            >
+              平面图
+            </button>
+            <button
+              onClick={() => {
+                if (onlineMapVisible) {
+                  handleMapTypeChange('satellite')
+                }
+              }}
+              className={`px-2 py-1 text-xs rounded transition-colors ${
+                mapType === 'satellite'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-muted'
+              } ${!onlineMapVisible ? 'opacity-50 cursor-not-allowed' : ''}`}
+              disabled={!onlineMapVisible}
+            >
+              卫星图
+            </button>
+          </div>
+
+          {/* 在线地图开关 */}
+          <div className="flex items-center">
+            <button
+              onClick={() => handleOnlineMapToggle(!onlineMapVisible)}
+              style={{
+                width: '18px',
+                height: '18px',
+                border: onlineMapVisible ? '#22c55e solid 2px' : 'rgba(120, 120, 120, 0.5) solid 2px',
+                borderRadius: '5px',
+                backgroundColor: onlineMapVisible ? '#22c55e' : 'rgba(200, 200, 200, 0.5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              {onlineMapVisible && (
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 10 10"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M1 4L3.5 6.5L9 1"
+                    stroke="white"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              )}
+            </button>
           </div>
         </div>
       </div>
@@ -837,46 +1242,46 @@ export function MapPage() {
         </div>
       )}
 
-      {/* 地图容器 */}
-      <div className="flex-1 relative min-h-0">
-        {/* 地图内容 */}
+      {/* 地图内容区域 */}
+      <div className="flex-1 relative min-h-0 bg-muted/20 map-container" style={{ overflow: 'hidden' }}>
         {viewMode === 'online' ? (
           <>
-            {/* 在线地图 */}
-            <div className="w-full h-full">
-              <OnlineMap
-                ref={onlineMapRef}
-                dataSourceFileName={currentDataSourceFile}
-                layerFiles={layerFiles}
-                onViewModeChange={setViewMode}
-                measureMode={measureMode}
-                onMeasureModeEnd={() => setMeasureMode(false)}
-              />
-            </div>
+            <OnlineMap
+              ref={onlineMapRef}
+              layerFiles={[...layerFiles, ...pointFiles]}
+              measureMode={measureMode}
+              onMeasureModeEnd={() => setMeasureMode(false)}
+              frequencies={frequencies}
+              customLayers={customLayers}
+              onViewModeChange={setViewMode}
+              initialLayerVisibility={{
+                lte: layers.find(l => l.id === 'lte-sectors')?.visible ?? false,
+                nr: layers.find(l => l.id === 'nr-sectors')?.visible ?? false
+              }}
+            />
 
-            {/* 图层控制 - 只在在线地图模式显示 */}
             <LayerControl
               sectors={sectorLayers}
               layerFiles={layerFiles}
+              pointFiles={pointFiles}
               onSectorToggle={handleLayerToggle}
               onSectorLabelToggle={handleSectorLabelToggle}
-              sectorLabelVisibility={sectorLabelVisibility}
-              onLayerFileToggle={(fileId, visible) => {
-                setLayerFiles(prev => prev.map(f =>
-                  f.id === fileId ? { ...f, visible } : f
-                ))
-                // 通知地图组件更新图层可见性
-                if (onlineMapRef.current) {
-                  onlineMapRef.current.setMapInfoLayerVisibility(fileId, visible)
-                }
-              }}
+              onLayerFileToggle={handleLayerFileToggle}
               onMapTypeChange={handleMapTypeChange}
               mapType={mapType}
+              sectorLabelVisibility={sectorLabelVisibility}
+              pointFileLabelVisibility={pointFileLabelVisibility}
+              onPointFileLabelToggle={handlePointFileLabelToggle}
+              frequencies={frequencies}
+              onFrequencyToggle={handleFrequencyToggle}
+              customLayers={customLayers}
+              onCustomLayerToggle={handleCustomLayerToggle}
+              onLayerFileRemove={handleRemoveLayerFile}
+              onCustomLayerRemove={handleRemoveCustomLayer}
             />
           </>
         ) : (
-          /* 离线地图 */
-          <OfflineMap />
+          <OfflineMap data={offlineData} offlinePath={offlinePath} />
         )}
       </div>
     </div>

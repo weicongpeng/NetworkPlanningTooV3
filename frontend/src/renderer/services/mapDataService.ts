@@ -36,6 +36,7 @@ export interface SectorData {
   mcc?: string  // 移动国家码
   mnc?: string  // 移动网络码
   is_shared?: string  // 是否共享
+  attributes?: Record<string, string>  // 撒点文件的额外属性（用于标签显示）
 }
 
 /**

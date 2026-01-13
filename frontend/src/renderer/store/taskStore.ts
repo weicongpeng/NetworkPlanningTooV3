@@ -48,6 +48,9 @@ interface TaskState {
 
   // 清除所有已完成/失败的任务
   clearFinishedTasks: () => void
+  
+  // 获取最新的PCI规划任务结果
+  getLatestPCITask: () => Task | undefined
 }
 
 export const useTaskStore = create<TaskState>((set, get) => ({
@@ -150,13 +153,29 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
   clearFinishedTasks: () => {
     set(state => {
-      const newTasks: Record<string, Task> = {}
+      const newTasks: Record<string, Task> = {};
       for (const [id, task] of Object.entries(state.tasks)) {
         if (task.status === 'running') {
-          newTasks[id] = task
+          newTasks[id] = task;
         }
       }
-      return { tasks: newTasks }
-    })
+      return { tasks: newTasks };
+    });
+  },
+  
+  getLatestPCITask: () => {
+    const state = get();
+    // 获取所有PCI规划任务
+    const pciTasks = Object.values(state.tasks)
+      .filter(task => task.type === 'pci_planning');
+    
+    // 按结束时间降序排序，获取最新的任务
+    const sortedTasks = pciTasks.sort((a, b) => {
+      const endTimeA = a.endTime || a.startTime || 0;
+      const endTimeB = b.endTime || b.startTime || 0;
+      return endTimeB - endTimeA;
+    });
+    
+    return sortedTasks.length > 0 ? sortedTasks[0] : undefined;
   }
 }))
