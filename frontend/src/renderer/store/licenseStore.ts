@@ -1,69 +1,98 @@
 import { create } from 'zustand'
-import { licenseApi } from '../services/api'
-import type { LicenseStatus, ApiResponse } from '@shared/types'
+import { persist } from 'zustand/middleware'
 
 interface LicenseState {
-  status: LicenseStatus | null
-  loading: boolean
-  error: string | null
-  fetchStatus: () => Promise<void>
-  activate: (licenseKey: string) => Promise<boolean>
-  upload: (file: File) => Promise<boolean>
+  isAuthorized: boolean
+  isLoading: boolean
+  expiryDate: string | null
+  remainingDays: number | null
+  errorMessage: string | null
+  checkAuthorization: () => Promise<void>
+  refreshStatus: () => Promise<void>
 }
 
-export const useLicenseStore = create<LicenseState>((set, get) => ({
-  status: null,
-  loading: false,
-  error: null,
+export const useLicenseStore = create<LicenseState>()(
+  persist(
+    (set, get) => ({
+      isAuthorized: false,
+      isLoading: false,
+      expiryDate: null,
+      remainingDays: null,
+      errorMessage: null,
 
-  fetchStatus: async () => {
-    set({ loading: true, error: null })
-    try {
-      const response: ApiResponse<LicenseStatus> = await licenseApi.getStatus()
-      set({ status: response.data, loading: false })
-    } catch (error: any) {
-      set({
-        error: error.message || '获取许可证状态失败',
-        loading: false
-      })
-    }
-  },
+      checkAuthorization: async () => {
+        set({ isLoading: true })
 
-  activate: async (licenseKey: string) => {
-    set({ loading: true, error: null })
-    try {
-      const response: ApiResponse<{ success: boolean }> = await licenseApi.activate(licenseKey)
-      if (response.success) {
-        await get().fetchStatus()
-        return true
+        try {
+          const response = await fetch('/api/v1/license/check')
+          const result = await response.json()
+
+          if (result.success) {
+            const { valid } = result.data
+
+            // 如果已授权，获取详细信息
+            if (valid) {
+              const statusResponse = await fetch('/api/v1/license/status')
+              const statusResult = await statusResponse.json()
+
+              if (statusResult.success && statusResult.data) {
+                set({
+                  isAuthorized: true,
+                  isLoading: false,
+                  expiryDate: statusResult.data.expiryDate || null,
+                  remainingDays: statusResult.data.remainingDays || null,
+                  errorMessage: null
+                })
+              } else {
+                set({
+                  isAuthorized: false,
+                  isLoading: false,
+                  errorMessage: '获取许可证状态失败'
+                })
+              }
+            } else {
+              // 获取错误消息
+              const statusResponse = await fetch('/api/v1/license/status')
+              const statusResult = await statusResponse.json()
+
+              set({
+                isAuthorized: false,
+                isLoading: false,
+                expiryDate: statusResult.data?.expiryDate || null,
+                remainingDays: 0,
+                errorMessage: statusResult.data?.errorMessage || '未授权'
+              })
+            }
+          } else {
+            set({
+              isAuthorized: false,
+              isLoading: false,
+              errorMessage: '授权检查失败'
+            })
+          }
+        } catch (error) {
+          console.error('授权检查失败:', error)
+          set({
+            isAuthorized: false,
+            isLoading: false,
+            errorMessage: '授权检查失败，请检查网络连接'
+          })
+        }
+      },
+
+      refreshStatus: async () => {
+        const { checkAuthorization } = get()
+        await checkAuthorization()
       }
-      set({ loading: false, error: '激活失败' })
-      return false
-    } catch (error: any) {
-      set({
-        error: error.message || '激活失败',
-        loading: false
-      })
-      return false
-    }
-  },
-
-  upload: async (file: File) => {
-    set({ loading: true, error: null })
-    try {
-      const response: ApiResponse<{ success: boolean }> = await licenseApi.upload(file)
-      if (response.success) {
-        await get().fetchStatus()
-        return true
+    }),
+    {
+      name: 'license-storage',
+      onRehydrateStorage: () => (state) => {
+        // 重新加载时再次检查授权状态
+        if (state) {
+          state.checkAuthorization()
+        }
       }
-      set({ loading: false, error: '上传失败' })
-      return false
-    } catch (error: any) {
-      set({
-        error: error.message || '上传失败',
-        loading: false
-      })
-      return false
     }
-  }
-}))
+  )
+)

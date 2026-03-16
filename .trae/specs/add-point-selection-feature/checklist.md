@@ -1,0 +1,11 @@
+# Checklist
+- [x] selectionManager.ts 中 SelectionMode 类型已添加 'point' 类型
+- [x] selectionManager.ts 支持 Shift+点击多选功能
+- [x] MapPage.tsx 框选菜单中添加了点选选项
+- [x] 点选选项位于圆形工具上方
+- [x] OnlineMap.tsx 支持 point 模式的 selectionMode prop
+- [x] 点选模式下点击扇区显示阴影高亮
+- [x] 点选模式下点击扇区不显示属性弹窗
+- [x] 点选模式下悬停不显示小区名称
+- [x] 按住 Shift 键可以选中多个元素
+- [x] SectorRendererSVG.tsx 对点选模式应用正确的阴影样式

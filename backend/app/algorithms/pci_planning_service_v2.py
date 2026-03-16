@@ -63,6 +63,8 @@ class SectorPlanningResult:
     latitude: float
     assignment_reason: str
     min_reuse_distance: float
+    min_distance_sector_name: Optional[str] = None  # 最小复用距离的对端小区名称
+    tac: Optional[str] = None  # TAC规划值
 
 
 @dataclass
@@ -92,8 +94,17 @@ class PCIPlanningResult:
 class PCIPlanningService:
     """PCI规划服务 - 简化版本，匹配V1代码逻辑"""
 
-    def __init__(self, config: PlanningConfig):
+    def __init__(self, config: PlanningConfig, enable_tac_planning: bool = False, data_dir: Optional[str] = None):
         self.config = config
+        self.enable_tac_planning = enable_tac_planning
+        self.data_dir = data_dir
+        self.tac_planning_service = None
+
+        # 如果启用TAC规划，初始化TAC规划服务
+        if self.enable_tac_planning and self.data_dir:
+            from app.services.tac_planning_service import TACPlanningService
+            from pathlib import Path
+            self.tac_planning_service = TACPlanningService(Path(self.data_dir))
 
         # 设置默认PCI范围
         if self.config.network_type == NetworkType.LTE:
@@ -138,25 +149,6 @@ class PCIPlanningService:
         """计算两点之间的距离（公里）"""
         return DistanceCalculator.calculate_distance(lon1, lat1, lon2, lat2)
 
-    def get_same_site_sectors(
-        self,
-        target_lat: float,
-        target_lon: float,
-        exclude_sector_id: str,
-        all_sectors: List[SiteSectorInfo],
-    ) -> List[SiteSectorInfo]:
-        """获取同站点的其他小区"""
-        tolerance = 0.0001  # 约10米精度
-        same_site = []
-        for sector in all_sectors:
-            if sector.id == exclude_sector_id:
-                continue
-            if (
-                abs(sector.latitude - target_lat) < tolerance
-                and abs(sector.longitude - target_lon) < tolerance
-            ):
-                same_site.append(sector)
-        return same_site
 
     def check_same_site_mod_conflict(
         self,
@@ -171,6 +163,8 @@ class PCIPlanningService:
 
         LTE网络：检查同频小区的mod3冲突
         NR网络：同时检查同频小区的mod3和mod30冲突
+        
+        注意：此方法同时检查PCI完全相同的情况（硬约束）
         """
         same_site_sectors = self.get_same_site_sectors(
             target_lat, target_lon, exclude_sector_id, all_sectors
@@ -179,18 +173,36 @@ class PCIPlanningService:
         # 统计同站点已有的模值
         existing_mods = set()
         existing_mods_3 = set()  # 用于NR的mod3检查
-
+        all_existing_pcis = set()  # 强制约束：同站点小区不能使用相同的PCI
+        
+        # 从已分配的PCI列表中获取同站小区的PCI
+        for assigned in self.assigned_pcis:
+            assigned_pci, assigned_lat, assigned_lon, assigned_earfcn = assigned
+            # 检查是否是同站小区
+            if abs(assigned_lat - target_lat) < 0.0001 and abs(assigned_lon - target_lon) < 0.0001:
+                # 这是同站小区，强制使用不同的PCI
+                all_existing_pcis.add(assigned_pci)
+                # 检查是否同频，计算模值
+                if self._is_same_frequency(target_earfcn, assigned_earfcn):
+                    existing_mods.add(assigned_pci % self.mod_value)
+                    existing_mods_3.add(assigned_pci % 3)
+        
+        # 从原始数据中获取同站小区的PCI
         for sector in same_site_sectors:
-            # 只检查同频小区
-            if target_earfcn is not None and sector.earfcn is not None:
-                if abs(target_earfcn - sector.earfcn) >= 0.1:
-                    continue
-
             if sector.pci is not None and sector.pci >= 0:
-                existing_mods.add(sector.pci % self.mod_value)
-                existing_mods_3.add(sector.pci % 3)  # 始终计算mod3
+                # 同站小区，强制使用不同的PCI
+                all_existing_pcis.add(sector.pci)
+                # 检查是否同频，计算模值
+                if self._is_same_frequency(target_earfcn, sector.earfcn):
+                    existing_mods.add(sector.pci % self.mod_value)
+                    existing_mods_3.add(sector.pci % 3)
 
-        # 检查冲突
+        # 首先检查PCI是否完全相同（硬约束，最高优先级）
+        # 强制约束：同站点小区不能使用完全相同的PCI
+        if candidate_pci in all_existing_pcis:
+            return True
+
+        # 检查模值冲突
         if self.config.network_type == NetworkType.NR:
             # NR网络：同时检查mod3和mod30
             candidate_mod = candidate_pci % self.mod_value
@@ -200,6 +212,81 @@ class PCIPlanningService:
             # LTE网络：只检查mod3
             candidate_mod = candidate_pci % self.mod_value
             return candidate_mod in existing_mods
+
+    def is_distance_constraint_satisfied(
+        self, actual_distance: float, constraint_distance: float
+    ) -> Tuple[bool, str]:
+        """
+        判断实际距离是否满足距离约束
+
+        Args:
+            actual_distance: 实际的最小复用距离
+            constraint_distance: 用户的距离约束阈值
+
+        Returns:
+            (is_satisfied, reason_message)
+        """
+        is_satisfied = actual_distance >= constraint_distance
+
+        if is_satisfied:
+            reason = f"✅ 满足复用距离约束 (实际{actual_distance:.2f}km ≥ 约束{constraint_distance:.1f}km)"
+        else:
+            reason = f"❌ 不满足复用距离约束 (实际{actual_distance:.2f}km < 约束{constraint_distance:.1f}km)"
+
+        return is_satisfied, reason
+
+    def _is_same_frequency(
+        self, earfcn1: Optional[float], earfcn2: Optional[float]
+    ) -> bool:
+        """
+        判断两个频点是否相同
+
+        规则：
+        - 如果两者都有值且差值 <= 0.1，视为同频
+        - 如果两者都为None，视为不同频（频点信息缺失，无法判断同频）
+        - 如果一个有值一个为None，视为不同频
+
+        Args:
+            earfcn1: 第一个频点
+            earfcn2: 第二个频点
+
+        Returns:
+            True表示同频，False表示不同频
+        """
+        if earfcn1 is not None and earfcn2 is not None:
+            # 两者都有值，严格匹配
+            return abs(earfcn1 - earfcn2) <= 0.1
+        else:
+            # 频点信息缺失，视为不同频
+            return False
+    
+    def _is_same_frequency_or_unknown(
+        self, earfcn1: Optional[float], earfcn2: Optional[float]
+    ) -> bool:
+        """
+        判断两个频点是否相同或无法判断（同频或频点缺失）
+
+        规则：
+        - 如果两者都有值且差值 <= 0.1，视为同频
+        - 如果两者都为None，视为同频（无法判断，保守处理）
+        - 如果一个有值一个为None，视为不同频（只检查确定同频的情况）
+
+        Args:
+            earfcn1: 第一个频点
+            earfcn2: 第二个频点
+
+        Returns:
+            True表示同频或无法判断，False表示不同频
+        """
+        if earfcn1 is not None and earfcn2 is not None:
+            # 两者都有值，严格匹配
+            return abs(earfcn1 - earfcn2) <= 0.1
+        elif earfcn1 is None and earfcn2 is None:
+            # 两者都为None，无法判断，保守处理为同频
+            return True
+        else:
+            # 一个有值一个为None，视为不同频
+            return False
 
     def validate_pci_reuse_distance(
         self,
@@ -220,10 +307,9 @@ class PCIPlanningService:
             pci, lat, lon, earfcn = assigned
             if pci != candidate_pci:
                 continue
-            # 只检查同频小区
-            if target_earfcn is not None and earfcn is not None:
-                if abs(target_earfcn - earfcn) > 0.1:  # 频点不同
-                    continue
+            # 只检查同频小区（使用改进的频点判断逻辑）
+            if not self._is_same_frequency(target_earfcn, earfcn):
+                continue  # 不同频，跳过
             # 计算距离
             dist = self.calculate_distance(target_lat, target_lon, lat, lon)
             if dist < min_distance:
@@ -234,10 +320,9 @@ class PCIPlanningService:
             pci, lat, lon, earfcn = bg
             if pci != candidate_pci:
                 continue
-            # 只检查同频小区
-            if target_earfcn is not None and earfcn is not None:
-                if abs(target_earfcn - earfcn) > 0.1:  # 频点不同
-                    continue
+            # 只检查同频小区（使用改进的频点判断逻辑）
+            if not self._is_same_frequency(target_earfcn, earfcn):
+                continue  # 不同频，跳过
 
             # 计算距离
             dist = self.calculate_distance(target_lat, target_lon, lat, lon)
@@ -272,8 +357,40 @@ class PCIPlanningService:
         else:
             candidate_pcis = self.pci_range
 
+        # 获取同站点已分配的PCI，用于直接冲突检查
+        same_site_sectors = self.get_same_site_sectors(
+            target_lat, target_lon, exclude_sector_id, all_sectors
+        )
+        
+        # 同站所有PCI集合（强制约束：同站点小区不能使用相同的PCI）
+        same_site_all_pcis = set()
+        
+        print(f"[DEBUG get_available_pcis] target_earfcn={target_earfcn}, exclude_sector_id={exclude_sector_id}")
+        
+        # 从已分配的PCI列表中获取同站小区的PCI
+        for assigned in self.assigned_pcis:
+            assigned_pci, assigned_lat, assigned_lon, assigned_earfcn = assigned
+            # 检查是否是同站小区
+            if abs(assigned_lat - target_lat) < 0.0001 and abs(assigned_lon - target_lon) < 0.0001:
+                print(f"[DEBUG] 同站小区(assigned): pci={assigned_pci}, earfcn={assigned_earfcn}")
+                # 这是同站小区，强制使用不同的PCI
+                same_site_all_pcis.add(assigned_pci)
+        
+        # 从原始数据中获取同站小区的PCI
+        for sector in same_site_sectors:
+            print(f"[DEBUG] 同站小区(sector): id={sector.id}, pci={sector.pci}, earfcn={sector.earfcn}")
+            if sector.pci is not None and sector.pci >= 0:
+                # 同站小区，强制使用不同的PCI
+                same_site_all_pcis.add(sector.pci)
+
+        print(f"[DEBUG] same_site_all_pcis={same_site_all_pcis}")
+
         # 检查每个候选PCI
         for pci in candidate_pcis:
+            # 硬约束：同站点小区不能使用完全相同的PCI（无论频点是否相同）
+            if pci in same_site_all_pcis:
+                continue  # 跳过同站点已使用的PCI
+
             # 检查同站点模值冲突
             if self.check_same_site_mod_conflict(
                 pci,
@@ -370,18 +487,16 @@ class PCIPlanningService:
                         (assigned_pci, sector.latitude, sector.longitude, sector.earfcn)
                     )
 
-                    # 生成透明的返回信息
+                    # 生成透明的返回信息（注明这是"分配时"的距离）
                     if threshold_idx == 0:
                         # 第一轮：满足原始约束
-                        reason = f"[OK] 满足原始约束 (距离={min_distance:.2f}km >= {original_threshold:.1f}km)"
+                        reason = f"[分配时] 满足原始约束 (当时最小距离={min_distance:.2f}km ≥ {original_threshold:.1f}km)"
                     else:
                         # 后续轮次：放宽了约束
                         constraint_status = (
-                            "[OK]"
-                            if min_distance >= original_threshold
-                            else "[VIOLATION]"
+                            "✅" if min_distance >= original_threshold else "❌"
                         )
-                        reason = f"{constraint_status} 放宽距离约束至{distance_threshold}km (原始约束{original_threshold}km, 实际距离={min_distance:.2f}km)"
+                        reason = f"{constraint_status} [分配时] 放宽距离约束至{distance_threshold}km (原始{original_threshold}km, 当时距离={min_distance:.2f}km)"
 
                     return assigned_pci, min_distance, reason
 
@@ -412,21 +527,21 @@ class PCIPlanningService:
                                     )
                                 )
 
-                                # 生成透明的返回信息
+                                # 生成透明的返回信息（注明这是"分配时"的距离）
                                 if threshold_idx == 0:
                                     constraint_status = (
                                         "✅"
                                         if min_distance >= original_threshold
                                         else "❌"
                                     )
-                                    reason = f"{constraint_status} 放宽模值约束, 同站连续 (原始约束{original_threshold}km, 实际距离={min_distance:.2f}km)"
+                                    reason = f"{constraint_status} [分配时] 放宽模值约束, 同站连续 (原始约束{original_threshold}km, 当时距离={min_distance:.2f}km)"
                                 else:
                                     constraint_status = (
                                         "✅"
                                         if min_distance >= original_threshold
                                         else "❌"
                                     )
-                                    reason = f"{constraint_status} 放宽模值+距离约束至{distance_threshold}km, 同站连续 (原始约束{original_threshold}km, 实际距离={min_distance:.2f}km)"
+                                    reason = f"{constraint_status} [分配时] 放宽模值+距离约束至{distance_threshold}km, 同站连续 (原始约束{original_threshold}km, 当时距离={min_distance:.2f}km)"
 
                                 return pci, min_distance, reason
 
@@ -437,73 +552,92 @@ class PCIPlanningService:
                         (assigned_pci, sector.latitude, sector.longitude, sector.earfcn)
                     )
 
-                    # 生成透明的返回信息
+                    # 生成透明的返回信息（注明这是"分配时"的距离）
                     if threshold_idx == 0:
                         constraint_status = (
-                            "[OK]"
-                            if min_distance >= original_threshold
-                            else "[VIOLATION]"
+                            "✅" if min_distance >= original_threshold else "❌"
                         )
-                        reason = f"{constraint_status} 放宽模值约束 (原始约束{original_threshold}km, 实际距离={min_distance:.2f}km)"
+                        reason = f"{constraint_status} [分配时] 放宽模值约束 (原始约束{original_threshold}km, 当时距离={min_distance:.2f}km)"
                     else:
                         constraint_status = (
-                            "[OK]"
-                            if min_distance >= original_threshold
-                            else "[VIOLATION]"
+                            "✅" if min_distance >= original_threshold else "❌"
                         )
-                        reason = f"{constraint_status} 放宽模值+距离约束至{distance_threshold}km (原始约束{original_threshold}km, 实际距离={min_distance:.2f}km)"
+                        reason = f"{constraint_status} [分配时] 放宽模值+距离约束至{distance_threshold}km (原始约束{original_threshold}km, 当时距离={min_distance:.2f}km)"
 
                     return assigned_pci, min_distance, reason
             finally:
                 # 恢复原始距离阈值
                 self.config.distance_threshold = original_threshold
 
-        # 最后尝试：如果所有策略都失败，强制分配一个PCI（跳过部分约束）
-        # 这是最后的保障，确保不返回-1
         # 最后尝试：如果所有策略都失败，强制分配一个PCI（最佳妥协策略）
-        # 收集所有满足"同站同频非冲突"的PCI，计算它们的复用距离，选择距离最大的一个
+        # 收集所有满足"同站非冲突"的PCI，计算它们的复用距离，选择距离最大的一个
         best_compromise_pci = None
         max_compromise_distance = -1.0
 
+        # 获取同站点已分配的PCI，用于直接冲突检查
+        same_site_all_pcis_fallback = set()
+        
+        # 从已分配的PCI列表中获取同站小区的PCI
+        for assigned in self.assigned_pcis:
+            assigned_pci, assigned_lat, assigned_lon, _ = assigned
+            # 检查是否是同站小区
+            if abs(assigned_lat - sector.latitude) < 0.0001 and abs(assigned_lon - sector.longitude) < 0.0001:
+                same_site_all_pcis_fallback.add(assigned_pci)
+        
+        # 从原始数据中获取同站小区的PCI
+        for s in self.get_same_site_sectors(sector.latitude, sector.longitude, sector.id, all_sectors):
+            if s.pci is not None and s.pci >= 0:
+                same_site_all_pcis_fallback.add(s.pci)
+
         for pci in self.pci_range:
-            # 必须满足同站同频模值/PCI约束（这是硬约束，不能打破）
-            if not self.check_same_site_mod_conflict(
+            # 硬约束：同站点小区不能使用完全相同的PCI
+            if pci in same_site_all_pcis_fallback:
+                print(f"[DEBUG best_compromise] 跳过PCI {pci} (同站已使用)")
+                continue
+
+            # 必须满足同站同频模值约束（这是硬约束，不能打破）
+            has_conflict = self.check_same_site_mod_conflict(
                 pci,
                 sector.latitude,
                 sector.longitude,
                 sector.earfcn,
                 sector.id,
                 all_sectors,
-            ):
-                # 计算实际最小距离
-                _, min_distance = self.validate_pci_reuse_distance(
-                    pci,
-                    sector.latitude,
-                    sector.longitude,
-                    sector.earfcn,
-                    sector.id,
-                    all_sectors,
-                )
+            )
+            if has_conflict:
+                print(f"[DEBUG best_compromise] 跳过PCI {pci} (模值冲突)")
+                continue
 
-                if min_distance > max_compromise_distance:
-                    max_compromise_distance = min_distance
-                    best_compromise_pci = pci
+            # 计算实际最小距离
+            _, min_distance = self.validate_pci_reuse_distance(
+                pci,
+                sector.latitude,
+                sector.longitude,
+                sector.earfcn,
+                sector.id,
+                all_sectors,
+            )
+            print(f"[DEBUG best_compromise] PCI {pci}: min_distance={min_distance}")
+
+            if min_distance > max_compromise_distance:
+                max_compromise_distance = min_distance
+                best_compromise_pci = pci
+
+        print(f"[DEBUG best_compromise] best_compromise_pci={best_compromise_pci}")
 
         if best_compromise_pci is not None:
             self.assigned_pcis.append(
                 (best_compromise_pci, sector.latitude, sector.longitude, sector.earfcn)
             )
 
-            # 生成透明的返回信息
+            # 生成透明的返回信息（注明这是"分配时"的距离）
             constraint_status = (
-                "[OK]"
-                if max_compromise_distance >= original_threshold
-                else "[VIOLATION]"
+                "✅" if max_compromise_distance >= original_threshold else "❌"
             )
             if max_compromise_distance >= original_threshold:
-                reason = f"{constraint_status} 最佳妥协解满足原始约束 (距离={max_compromise_distance:.2f}km ≥ {original_threshold:.1f}km)"
+                reason = f"{constraint_status} [分配时] 最佳妥协解满足原始约束 (当时距离={max_compromise_distance:.2f}km ≥ {original_threshold:.1f}km)"
             else:
-                reason = f"{constraint_status} 最佳妥协解不满足原始约束 (距离={max_compromise_distance:.2f}km < {original_threshold:.1f}km)"
+                reason = f"{constraint_status} [分配时] 最佳妥协解不满足原始约束 (当时距离={max_compromise_distance:.2f}km < {original_threshold:.1f}km)"
 
             return best_compromise_pci, max_compromise_distance, reason
 
@@ -511,14 +645,8 @@ class PCIPlanningService:
         # 只能随机分配一个（这将导致严重的同站干扰，但总比崩溃好）
         # 实际上应该尽量选择不同PCI，但这已经超出正常规划范畴
         fallback_pci = self.pci_range[0]
-        # 尝试找一个不在同站已经使用的PCI
-        same_site_pcis = {
-            s.pci
-            for s in self.get_same_site_sectors(
-                sector.latitude, sector.longitude, sector.id, all_sectors
-            )
-            if s.pci is not None
-        }
+        # 尝试找一个不在同站点已经使用的PCI
+        same_site_pcis = set(same_site_all_pcis_fallback)
         for pci in self.pci_range:
             if pci not in same_site_pcis:
                 fallback_pci = pci
@@ -535,14 +663,12 @@ class PCIPlanningService:
         self.assigned_pcis.append(
             (fallback_pci, sector.latitude, sector.longitude, sector.earfcn)
         )
-        # 生成透明的返回信息
-        constraint_status = (
-            "[OK]" if min_distance >= original_threshold else "[VIOLATION]"
-        )
+        # 生成透明的返回信息（注明这是"分配时"的距离）
+        constraint_status = "✅" if min_distance >= original_threshold else "❌"
         if min_distance >= original_threshold:
-            reason = f"{constraint_status} 资源耗尽但满足原始约束，强制分配 (距离={min_distance:.2f}km ≥ {original_threshold:.1f}km)"
+            reason = f"{constraint_status} [分配时] 资源耗尽但满足原始约束，强制分配 (当时距离={min_distance:.2f}km ≥ {original_threshold:.1f}km)"
         else:
-            reason = f"{constraint_status} 资源耗尽且不满足原始约束，强制分配 (距离={min_distance:.2f}km < {original_threshold:.1f}km)"
+            reason = f"{constraint_status} [分配时] 资源耗尽且不满足原始约束，强制分配 (当时距离={min_distance:.2f}km < {original_threshold:.1f}km)"
         return fallback_pci, min_distance, reason
 
     async def plan(
@@ -597,12 +723,13 @@ class PCIPlanningService:
             )
 
             for sector_data in sectors:
-                # 获取频点信息
-                frequency = (
-                    sector_data.get("frequency")
-                    or sector_data.get("earfcn")
-                    or sector_data.get("ssb_frequency")
-                )
+                # 获取频点信息（使用统一的频点字段，兼容earfcn、frequency、ssb_frequency）
+                # 注意：使用显式检查而不是or逻辑，因为0是有效值但or会跳过0
+                frequency = sector_data.get("frequency")
+                if frequency is None:
+                    frequency = sector_data.get("earfcn")
+                if frequency is None:
+                    frequency = sector_data.get("ssb_frequency")
                 ssb_frequency = sector_data.get("ssb_frequency")
 
                 all_sectors.append(
@@ -620,7 +747,7 @@ class PCIPlanningService:
                         beamwidth=sector_data.get("beamwidth", 65),
                         height=sector_data.get("height", 30),
                         pci=sector_data.get("pci"),
-                        earfcn=sector_data.get("earfcn"),
+                        earfcn=frequency,  # 修复：使用统一的频点变量而不是直接获取earfcn
                     )
                 )
 
@@ -634,11 +761,11 @@ class PCIPlanningService:
         if background_sites_data:
             bg_count = 0
             for site in background_sites_data:
-                site_id = site.get('id', '')
-                site_lon = site.get('longitude', 0)
-                site_lat = site.get('latitude', 0)
-                
-                for sector_data in site.get('sectors', []):
+                site_id = site.get("id", "")
+                site_lon = site.get("longitude", 0)
+                site_lat = site.get("latitude", 0)
+
+                for sector_data in site.get("sectors", []):
                     # 构造可能的ID格式 (兼顾 sectorId 和 siteId_sectorId)
                     # 我们需要确保能匹配到 all_sectors 中的 ID
                     # 这里简化为：如果频点和位置极其接近，或者ID匹配，就认为是同一个
@@ -662,20 +789,29 @@ class PCIPlanningService:
                         continue
 
                     bg_count += 1
-                    
+
                     # 获取坐标，优先使用小区坐标，如果没有则使用站点坐标
-                    s_lon = sector_data.get('longitude')
-                    s_lat = sector_data.get('latitude')
-                    
+                    s_lon = sector_data.get("longitude")
+                    s_lat = sector_data.get("latitude")
+
                     final_lon = s_lon if s_lon is not None and s_lon != 0 else site_lon
                     final_lat = s_lat if s_lat is not None and s_lat != 0 else site_lat
-                    
-                    self.background_assigned_pcis.append((
-                        pci,
-                        final_lon,
-                        final_lat,
-                        sector_data.get('frequency') or sector_data.get('earfcn') or sector_data.get('ssb_frequency')
-                    ))
+
+                    # 获取频点（使用显式检查，因为0是有效值）
+                    bg_frequency = sector_data.get("frequency")
+                    if bg_frequency is None:
+                        bg_frequency = sector_data.get("earfcn")
+                    if bg_frequency is None:
+                        bg_frequency = sector_data.get("ssb_frequency")
+
+                    self.background_assigned_pcis.append(
+                        (
+                            pci,
+                            final_lon,
+                            final_lat,
+                            bg_frequency,
+                        )
+                    )
             print(f"[PCI规划] 加载背景小区: {bg_count} 个 (已剔除待规划小区)")
 
         total_sites = len(sites_data)
@@ -716,13 +852,22 @@ class PCIPlanningService:
                 for site_data in sites_data:
                     if site_data.get("id") == site_id:
                         for sector_data in site_data.get("sectors", []):
-                            if sector_data.get("id") == sector.id:
-                                frequency = (
-                                    sector_data.get("frequency")
-                                    or sector_data.get("earfcn")
-                                    or sector_data.get("ssb_frequency")
-                                )
+                            # sector.id 格式是 "site_id_cell_id" 或 "cell_id"，需要提取cell_id部分进行匹配
+                            sector_id_parts = sector.id.split("_")
+                            cell_id = sector_id_parts[-1] if len(sector_id_parts) > 1 else sector.id
+                            sector_data_id = sector_data.get("id")
+                            print(f"[DEBUG] 匹配频点: sector.id={sector.id}, cell_id={cell_id}, sector_data_id={sector_data_id}")
+                            if sector_data_id == cell_id or sector_data_id == sector.id:
+                                # 使用显式检查，因为0是有效值
+                                frequency = sector_data.get("frequency")
+                                if frequency is None:
+                                    frequency = sector_data.get("earfcn")
+                                if frequency is None:
+                                    frequency = sector_data.get("ssb_frequency")
                                 ssb_frequency = sector_data.get("ssb_frequency")
+                                print(f"[DEBUG] 匹配成功: frequency={frequency}")
+                                # 将解析到的频点赋值给sector，确保后续分配PCI时使用正确的频点
+                                sector.earfcn = frequency
                                 break
                         break
 
@@ -765,7 +910,9 @@ class PCIPlanningService:
 
                 processed += 1
                 if progress_callback:
-                    await progress_callback(processed / total_sectors * 100)
+                    callback_result = progress_callback(processed / total_sectors * 100)
+                    if asyncio.iscoroutine(callback_result):
+                        await callback_result
 
             site_results.append(
                 SitePlanningResult(
@@ -858,36 +1005,44 @@ class PCIPlanningService:
                         for site in sites_list:
                             # 确保site是字典
                             if isinstance(site, dict):
-                                site_id = site.get('id')
-                                site_lon = site.get('longitude', 0)
-                                site_lat = site.get('latitude', 0)
-                                
+                                site_id = site.get("id")
+                                site_lon = site.get("longitude", 0)
+                                site_lat = site.get("latitude", 0)
+
                                 if site_id:
-                                    for sector in site.get('sectors', []):
+                                    for sector in site.get("sectors", []):
                                         # 确保sector是字典
                                         if isinstance(sector, dict):
-                                            sector_id = sector.get('id')
+                                            sector_id = sector.get("id")
                                             if sector_id:
                                                 # 全量工参的sector_id是纯数字，需要组合站点ID
                                                 # 但如果已经是完整格式，则直接使用
-                                                if '_' in str(sector_id):
+                                                if "_" in str(sector_id):
                                                     cell_key = str(sector_id)
                                                 else:
                                                     cell_key = f"{site_id}_{sector_id}"
-                                                
+
                                                 # 获取坐标，优先使用小区坐标
-                                                s_lon = sector.get('longitude')
-                                                s_lat = sector.get('latitude')
-                                                final_lon = s_lon if s_lon is not None and s_lon != 0 else site_lon
-                                                final_lat = s_lat if s_lat is not None and s_lat != 0 else site_lat
+                                                s_lon = sector.get("longitude")
+                                                s_lat = sector.get("latitude")
+                                                final_lon = (
+                                                    s_lon
+                                                    if s_lon is not None and s_lon != 0
+                                                    else site_lon
+                                                )
+                                                final_lat = (
+                                                    s_lat
+                                                    if s_lat is not None and s_lat != 0
+                                                    else site_lat
+                                                )
 
                                                 # 记录基本信息
                                                 cell_info = {
-                                                    'cell_key': cell_key,
-                                                    'longitude': final_lon,
-                                                    'latitude': final_lat,
-                                                    'earfcn': sector.get('earfcn'),
-                                                    'pci': sector.get('pci')
+                                                    "cell_key": cell_key,
+                                                    "longitude": final_lon,
+                                                    "latitude": final_lat,
+                                                    "earfcn": sector.get("earfcn"),
+                                                    "pci": sector.get("pci"),
                                                 }
 
                                                 full_params_cells[cell_key] = cell_info
@@ -923,6 +1078,9 @@ class PCIPlanningService:
                             cell_lon = full_params_cells[cell["cell_key"]]["longitude"]
                             cell_lat = full_params_cells[cell["cell_key"]]["latitude"]
 
+                        # 用于记录最小复用距离的对端小区名称
+                        min_distance_sector_name = None
+
                         # 1. 查找规划结果中同频同PCI的其他小区
                         for j, other_cell in enumerate(planned_cells):
                             if i == j:  # 跳过自身
@@ -932,14 +1090,13 @@ class PCIPlanningService:
                             if cell["new_pci"] != other_cell["new_pci"]:
                                 continue
 
-                            # 检查是否同频(处理earfcn为None的情况)
+                            # 检查是否同频(使用改进的频点判断逻辑)
                             cell_earfcn = cell.get("earfcn")
                             other_earfcn = other_cell.get("earfcn")
 
-                            # 如果两者都有earfcn值,检查是否同频
-                            if cell_earfcn is not None and other_earfcn is not None:
-                                if abs(cell_earfcn - other_earfcn) >= 0.1:
-                                    continue  # 不同频,跳过
+                            # 使用改进的频点判断逻辑
+                            if not self._is_same_frequency(cell_earfcn, other_earfcn):
+                                continue  # 不同频，跳过
 
                             # 获取其他小区的经纬度（优先使用全量工参中的经纬度）
                             other_lon = other_cell["longitude"]
@@ -958,29 +1115,94 @@ class PCIPlanningService:
                             )
                             if distance < min_distance:
                                 min_distance = distance
+                                # 记录对端小区名称
+                                min_distance_sector_name = other_cell.get(
+                                    "sector_obj"
+                                ).sector_name
 
                         # 2. 查找全量工参中同频同PCI的存量小区
-                        target_pci = cell["new_pci"]
-                        if target_pci in full_params_by_pci:
-                            for other_cell in full_params_by_pci[target_pci]:
+                        # 构建同频同PCI的存量小区列表（用于距离计算）
+                        same_pci_same_freq_cells = []
+
+                        # 先从planned_cells中收集同频同PCI的小区
+                        for j, other_cell in enumerate(planned_cells):
+                            if i == j:
+                                continue  # 跳过自身
+
+                            # 检查是否同频
+                            cell_earfcn = cell.get("earfcn")
+                            other_earfcn = other_cell.get("earfcn")
+
+                            if self._is_same_frequency(cell_earfcn, other_earfcn):
+                                same_pci_same_freq_cells.append(
+                                    {
+                                        "cell": other_cell,
+                                        "longitude": other_cell.get("longitude"),
+                                        "latitude": other_cell.get("latitude"),
+                                        "earfcn": other_cell.get("earfcn"),
+                                    }
+                                )
+
+                        # 再从full_params_cells中查找同频同PCI的存量小区
+                        if cell["new_pci"] in full_params_by_pci:
+                            for other_cell_info in full_params_by_pci[cell["new_pci"]]:
                                 # 注意：full_params_by_pci已经排除了本次规划的小区，所以不需要检查key
 
                                 # 检查是否同频
                                 cell_earfcn = cell.get("earfcn")
-                                other_earfcn = other_cell.get("earfcn")
+                                other_earfcn = other_cell_info.get("earfcn")
 
-                                # 如果两者都有earfcn值,检查是否同频
-                                if cell_earfcn is not None and other_earfcn is not None:
-                                    if abs(cell_earfcn - other_earfcn) >= 0.1:
-                                        continue  # 不同频,跳过
+                                if self._is_same_frequency(cell_earfcn, other_earfcn):
+                                    # 添加到列表，同时查找sector_name
+                                    sector_name = None
+                                    cell_key = other_cell_info.get("cell_key")
+                                    for site in sites_list:
+                                        for sector in site.get("sectors", []):
+                                            if (
+                                                sector.get("id")
+                                                == cell_key.split("_")[-1]
+                                            ):
+                                                sector_name = sector.get(
+                                                    "name", f"小区_{cell_key}"
+                                                )
+                                                break
+                                        if sector_name:
+                                            break
 
-                                # 获取存量小区的经纬度
-                                other_lon = other_cell["longitude"]
-                                other_lat = other_cell["latitude"]
+                                    same_pci_same_freq_cells.append(
+                                        {
+                                            "cell": other_cell_info,
+                                            "longitude": other_cell_info.get(
+                                                "longitude"
+                                            ),
+                                            "latitude": other_cell_info.get("latitude"),
+                                            "earfcn": other_cell_info.get("earfcn"),
+                                            "sector_name": sector_name,
+                                        }
+                                    )
 
-                                # 计算距离
+                        # 现在从所有同频同PCI的小区中找到距离最近的
+                        min_distance = float("inf")
+                        min_distance_sector_name = None
+
+                        for same_freq_cell in same_pci_same_freq_cells:
+                            # 计算距离
+                            if (
+                                same_freq_cell["longitude"] is not None
+                                and same_freq_cell["latitude"] is not None
+                            ):
+                                if (
+                                    same_freq_cell["longitude"] == cell_lon
+                                    and same_freq_cell["latitude"] == cell_lat
+                                ):
+                                    # 同一小区，跳过
+                                    continue
+
                                 distance = self.calculate_distance(
-                                    cell_lat, cell_lon, other_lat, other_lon
+                                    cell_lat,
+                                    cell_lon,
+                                    same_freq_cell["latitude"],
+                                    same_freq_cell["longitude"],
                                 )
 
                                 # 过滤自身(距离非常小的情况)
@@ -989,10 +1211,130 @@ class PCIPlanningService:
 
                                 if distance < min_distance:
                                     min_distance = distance
+                                    # 记录对端小区名称
+                                    if "sector_name" in same_freq_cell:
+                                        min_distance_sector_name = same_freq_cell[
+                                            "sector_name"
+                                        ]
+                                    else:
+                                        # 从映射中查找
+                                        if (
+                                            "cell" in same_freq_cell
+                                            and "cell_key" in same_freq_cell["cell"]
+                                        ):
+                                            cell_key = same_freq_cell["cell"][
+                                                "cell_key"
+                                            ]
+                                            if cell_key in cell_key_to_name:
+                                                min_distance_sector_name = (
+                                                    cell_key_to_name[cell_key]
+                                                )
 
-                        # 更新规划结果中的最小复用距离
+                        # 更新规划结果中的最小复用距离、对端小区名称和分配原因
+                        # 无论是否找到同频同PCI的小区，都更新分配原因
                         if min_distance != float("inf"):
                             cell["sector_obj"].min_reuse_distance = min_distance
+                            cell[
+                                "sector_obj"
+                            ].min_distance_sector_name = min_distance_sector_name
+
+                            # 重新生成分配原因，确保与实际距离匹配
+                            original_threshold = self.config.distance_threshold
+                            is_satisfied, new_reason = (
+                                self.is_distance_constraint_satisfied(
+                                    min_distance, original_threshold
+                                )
+                            )
+
+                            # 追加原因说明（保留原始分配原因）
+                            original_reason = cell["sector_obj"].assignment_reason
+                            if is_satisfied:
+                                # 如果最终满足约束，标记为"最终核查通过"
+                                cell[
+                                    "sector_obj"
+                                ].assignment_reason = (
+                                    f"{new_reason} (原始:{original_reason})"
+                                )
+                            else:
+                                # 如果最终不满足约束，标记为"最终核查未通过"
+                                # 查找具体原因（资源不足或频点缺失）
+                                if (
+                                    min_distance < 0.001
+                                ):  # 实际上没有找到同频同PCI的小区
+                                    reason_detail = "无同频同PCI小区"
+                                else:
+                                    reason_detail = (
+                                        f"最近同频同PCI小区距离{min_distance:.2f}km过近"
+                                    )
+
+                                cell[
+                                    "sector_obj"
+                                ].assignment_reason = f"{new_reason}, {reason_detail} (原始:{original_reason})"
+                        else:
+                            # 没有找到同频同PCI的小区，说明该PCI在频点范围内是唯一的
+                            cell["sector_obj"].min_reuse_distance = float("inf")
+                            cell["sector_obj"].min_distance_sector_name = None
+                            original_reason = cell["sector_obj"].assignment_reason
+
+                            # 标记为无同频同PCI小区
+                            cell[
+                                "sector_obj"
+                            ].assignment_reason = (
+                                f"✅ 无同频同PCI小区 (原始:{original_reason})"
+                            )
+
+                        # 更新规划结果中的最小复用距离、对端小区名称和分配原因
+                        # 无论是否找到同频同PCI的小区，都更新分配原因
+                        if min_distance != float("inf"):
+                            cell["sector_obj"].min_reuse_distance = min_distance
+                            cell[
+                                "sector_obj"
+                            ].min_distance_sector_name = min_distance_sector_name
+
+                            # 重新生成分配原因，确保与实际距离匹配
+                            original_threshold = self.config.distance_threshold
+                            is_satisfied, new_reason = (
+                                self.is_distance_constraint_satisfied(
+                                    min_distance, original_threshold
+                                )
+                            )
+
+                            # 追加原因说明（保留原始分配原因）
+                            original_reason = cell["sector_obj"].assignment_reason
+                            if is_satisfied:
+                                # 如果最终满足约束，标记为"最终核查通过"
+                                cell[
+                                    "sector_obj"
+                                ].assignment_reason = (
+                                    f"{new_reason} (原始:{original_reason})"
+                                )
+                            else:
+                                # 如果最终不满足约束，标记为"最终核查未通过"
+                                # 查找具体原因（资源不足或频点缺失）
+                                if (
+                                    min_distance < 0.001
+                                ):  # 实际上没有找到同频同PCI的小区
+                                    reason_detail = "无同频同PCI小区"
+                                else:
+                                    reason_detail = (
+                                        f"最近同频同PCI小区距离{min_distance:.2f}km过近"
+                                    )
+
+                                cell[
+                                    "sector_obj"
+                                ].assignment_reason = f"{new_reason}, {reason_detail} (原始:{original_reason})"
+                        else:
+                            # 没有找到同频同PCI的小区，说明该PCI在频点范围内是唯一的
+                            cell["sector_obj"].min_reuse_distance = float("inf")
+                            cell["sector_obj"].min_distance_sector_name = None
+                            original_reason = cell["sector_obj"].assignment_reason
+
+                            # 标记为无同频同PCI小区
+                            cell[
+                                "sector_obj"
+                            ].assignment_reason = (
+                                f"✅ 无同频同PCI小区 (原始:{original_reason})"
+                            )
 
                     print(f"[PCI规划] 最小复用距离计算完成")
         except Exception as e:
@@ -1002,6 +1344,67 @@ class PCIPlanningService:
             traceback.print_exc()
             # 继续执行，不影响规划结果
 
+        # 如果启用了TAC规划，执行TAC规划
+        if self.enable_tac_planning and self.tac_planning_service:
+            try:
+                print(f"[PCI规划] 开始执行TAC规划...")
+                network_type_str = self.config.network_type.value
+
+                # 使用plan_tac_for_list方法对规划的小区进行TAC规划
+                # 构建待规划小区列表
+                cells_to_plan = []
+                for site in sites_data:
+                    site_data = {
+                        "siteId": site.get("id", ""),
+                        "siteName": site.get("name", ""),
+                        "sectors": []
+                    }
+                    for sector in site.get("sectors", []):
+                        sector_data = {
+                            "sectorId": sector.get("id", ""),
+                            "sectorName": sector.get("name", ""),
+                            "longitude": sector.get("longitude", 0),
+                            "latitude": sector.get("latitude", 0),
+                        }
+                        site_data["sectors"].append(sector_data)
+                    if site_data["sectors"]:
+                        cells_to_plan.append(site_data)
+
+                # 执行TAC规划
+                tac_results, planned_count, unplanned_count = self.tac_planning_service.plan_tac_for_list(
+                    network_type=network_type_str,
+                    cells_to_plan=cells_to_plan,
+                    progress_callback=None  # 不单独显示TAC规划进度
+                )
+
+                # 将TAC规划结果合并到PCI规划结果中
+                # 创建TAC结果查找字典
+                tac_result_map = {}
+                for tac_result in tac_results:
+                    key = f"{tac_result.get('siteId', '')}_{tac_result.get('sectorId', '')}"
+                    tac_result_map[key] = tac_result.get("tac")
+
+                # 更新PCI规划结果中的TAC值
+                for site in result.sites:
+                    for sector in site.sectors:
+                        # 尝试多种key格式匹配
+                        keys_to_try = [
+                            f"{site.site_id}_{sector.sector_id}",
+                            sector.sector_id,
+                        ]
+                        for key in keys_to_try:
+                            if key in tac_result_map:
+                                sector.tac = tac_result_map[key]
+                                break
+
+                print(f"[PCI规划] TAC规划完成: 已规划{planned_count}个小区, 未规划{unplanned_count}个小区")
+
+            except Exception as e:
+                print(f"[PCI规划] TAC规划执行失败: {e}")
+                import traceback
+                traceback.print_exc()
+                # TAC规划失败不影响PCI规划结果
+
         return result
 
 
@@ -1010,6 +1413,8 @@ async def run_pci_planning(
     sites_data: List[Dict],
     progress_callback: Optional[Callable[[float], Awaitable[None]]] = None,
     background_sites_data: Optional[List[Dict]] = None,
+    enable_tac_planning: bool = False,
+    data_dir: Optional[str] = None,
 ) -> Dict:
     """
     运行PCI规划
@@ -1018,11 +1423,14 @@ async def run_pci_planning(
         config: 规划配置
         sites_data: 站点数据
         progress_callback: 进度回调
+        background_sites_data: 背景工参数据
+        enable_tac_planning: 是否启用TAC规划
+        data_dir: 数据目录路径
 
     Returns:
         规划结果字典
     """
-    service = PCIPlanningService(config)
+    service = PCIPlanningService(config, enable_tac_planning, data_dir)
     result = await service.plan(sites_data, progress_callback, background_sites_data)
 
     # 转换为前端需要的格式
@@ -1040,6 +1448,11 @@ async def run_pci_planning(
         }
 
         for sector in site.sectors:
+            # 处理Infinity值，JSON无法序列化Infinity
+            min_reuse_distance = sector.min_reuse_distance
+            if min_reuse_distance == float("inf") or min_reuse_distance is None:
+                min_reuse_distance = None  # 使用null表示无同频同PCI小区
+            
             site_data["sectors"].append(
                 {
                     "sectorId": sector.sector_id,
@@ -1054,7 +1467,9 @@ async def run_pci_planning(
                     "longitude": sector.longitude,
                     "latitude": sector.latitude,
                     "assignmentReason": sector.assignment_reason,
-                    "minReuseDistance": sector.min_reuse_distance,
+                    "minReuseDistance": min_reuse_distance,
+                    "minDistanceSectorName": sector.min_distance_sector_name,
+                    "tac": sector.tac,  # 添加TAC规划值
                 }
             )
 

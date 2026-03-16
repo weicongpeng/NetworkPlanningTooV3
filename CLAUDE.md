@@ -4,11 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概述
 
-**NetworkPlanningTooV3** (网络规划工具 v3.0) 是一个用于电信网络规划的桌面应用程序。该工具支持地图可视化、邻区规划和 PCI (物理小区标识) 规划功能。
+**NetworkPlanningTooV3** (网络规划工具 v3.0) 是一个用于电信网络规划的桌面应用程序。该工具支持地图可视化、邻区规划、PCI (物理小区标识) 规划和 TAC (跟踪区域码) 规划功能。
 
 **架构模式**: Electron 桌面应用 + FastAPI 后端服务
 - 可以作为独立的 Electron 桌面应用运行
 - 前端也可以作为纯 Web 应用运行（`npm run dev:web`）
+
+**主要功能**:
+- **PCI 规划**: 物理小区标识规划，支持碰撞/混淆检测、模 3/模 30 约束
+- **邻区规划**: 自动邻区关系规划，基于覆盖圆算法
+- **TAC 规划**: 跟踪区域码规划，支持异 TAC 孤岛检测
+- **地图可视化**: 支持在线/离线地图，工参数据和规划结果展示
+- **地理化数据**: 支持上传 Excel/CSV/TXT 地理数据文件，自动识别点状/扇区图层
 
 ## 常用开发命令
 
@@ -267,9 +274,10 @@ npm test                # 运行测试（需要配置测试框架）
 | 模块 | 前缀 | 主要端点 |
 |------|------|---------|
 | 许可证 | `/api/v1/license` | `/status`, `/activate`, `/upload` |
-| 数据管理 | `/api/v1/data` | `/upload/excel`, `/upload/map`, `/list`, `/{id}`, `/update-parameters` |
+| 数据管理 | `/api/v1/data` | `/upload/excel`, `/upload/map`, `/upload/geo`, `/list`, `/{id}`, `/update-parameters` |
 | PCI 规划 | `/api/v1/pci` | `/plan`, `/progress/{id}`, `/result/{id}`, `/export/{id}` |
 | 邻区规划 | `/api/v1/neighbor` | `/plan`, `/progress/{id}`, `/result/{id}`, `/export/{id}` |
+| TAC 规划 | `/api/v1/tac` | `/plan`, `/planning/plan`, `/progress/{id}`, `/result/{id}`, `/export/{id}` |
 | 地图服务 | `/api/v1/map` | `/data`, `/online-config`, `/offline-path` |
 
 ## Vite 配置说明
@@ -314,6 +322,30 @@ npm test                # 运行测试（需要配置测试框架）
 1. **Electron 桌面模式**: 完整功能，支持文件对话框
 2. **Web 模式** (`npm run dev:web`): 纯浏览器运行，某些桌面功能受限
 
+## 代码检查与质量
+
+### 前端
+
+```bash
+cd frontend
+npm run lint         # ESLint 检查 (配置见 frontend/.eslintrc.js)
+npm run type-check   # TypeScript 类型检查
+```
+
+**ESLint 配置要点** (`frontend/.eslintrc.js`):
+- `@typescript-eslint/no-unused-vars`: 允许以 `_` 开头的参数
+- `@typescript-eslint/no-explicit-any`: 警告级别 (尽量避免但允许)
+- `react-refresh/only-export-components`: 警告级别
+
+### 后端
+
+```bash
+cd backend
+pytest                 # 运行所有测试
+pytest -v             # 详细输出
+pytest tests/test_specific.py  # 运行单个测试文件
+```
+
 ## 开发注意事项
 
 1. **Electron 启动流程**: 需要先编译 TypeScript (`npm run build:electron`)，然后启动 Vite，最后启动 Electron
@@ -345,6 +377,81 @@ npm test                # 运行测试（需要配置测试框架）
 - 使用 Zustand 创建 store (`frontend/src/renderer/store/`)
 - 遵循现有模式：定义 state、actions、selectors
 - 在组件中使用 `useXxxStore()` hook 获取状态和方法
+
+## 代码风格指南
+
+### 前端导入顺序
+
+```typescript
+// 1. 外部库
+import React from 'react'
+import { Shield } from 'lucide-react'
+
+// 2. 内部模块 (@/ 别名)
+import { apiClient } from '@/services/api'
+
+// 3. 类型导入 (始终使用 'type' 关键字)
+import type { ApiResponse } from '@shared/types'
+```
+
+### 后端导入顺序
+
+```python
+# 1. 标准库
+import asyncio
+from typing import List
+
+# 2. 第三方
+from fastapi import APIRouter
+import pandas as pd
+
+# 3. 内部
+from app.models.schemas import DataItem
+```
+
+### 命名约定
+
+| 位置 | 组件/函数 | 变量/函数 | 常量 | 文件 |
+|------|----------|----------|------|------|
+| 前端 | PascalCase | camelCase | UPPER_SNAKE_CASE | kebab-case |
+| 后端 | PascalCase | snake_case | UPPER_SNAKE_CASE | snake_case |
+
+## 关键模式与注意事项
+
+### Windows GBK 编码处理（后端关键）
+
+所有错误消息必须进行 GBK 安全处理：
+
+```python
+# 错误处理模式
+try:
+    result = operation()
+except Exception as e:
+    safe_detail = str(e).encode("gbk", "replace").decode("gbk")
+    raise HTTPException(status_code=400, detail=safe_detail)
+```
+
+### CPU 密集型操作异步处理
+
+使用 `run_in_threadpool` 处理 pandas/geopandas 操作：
+
+```python
+from fastapi import background_tasks
+
+# CPU 密集型操作
+result = await run_in_threadpool(heavy_pandas_operation, df)
+```
+
+### API 响应格式
+
+统一返回格式：`{"success": True, "data": result, "message": "..."}`
+
+### 前端 Blob 下载
+
+```typescript
+const response = await apiClient.get('/api/download', { responseType: 'blob' })
+return response.data  // 直接返回 blob
+```
 
 ## 故障排除
 

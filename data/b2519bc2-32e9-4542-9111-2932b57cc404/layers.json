@@ -1,0 +1,18 @@
+[
+  {
+    "id": "6a992366-a69e-4e11-a493-836ec7d15116",
+    "name": "场景图层",
+    "type": "polygon",
+    "feature_count": 1592,
+    "metadata": {
+      "source_file": "D:\\mycode\\NetworkPlanningTooV3\\data\\b2519bc2-32e9-4542-9111-2932b57cc404\\场景图层.tab",
+      "feature_count": 1592,
+      "name": "场景图层",
+      "coord_sys": "unknown",
+      "fields": [
+        "Neutral"
+      ],
+      "description": ""
+    }
+  }
+]

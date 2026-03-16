@@ -33,7 +33,10 @@ export interface DataItem {
   status: 'processing' | 'ready' | 'error'
   metadata?: Record<string, any>
   originalPath?: string
-  fileType?: 'full_params' | 'current_params'
+  fileType?: 'full_params' | 'current_params' | 'target_cells' | 'tac_layer' | 'mapinfo_layer' | 'geo_data' | 'default'
+  geometryType?: 'point' | 'sector'
+  sourceType?: 'excel' | 'mapinfo'
+  subType?: string
 }
 
 export interface UploadResponse {
@@ -81,6 +84,7 @@ export interface PCIConfig {
   pciModulus: 3 | 30
   inheritModulus: boolean
   pciRange?: PCIRange
+  enableTACPlanning?: boolean
   enableCollisionCheck?: boolean
   enableConfusionCheck?: boolean
   customRules?: PCIRule[]
@@ -124,8 +128,10 @@ export interface SectorPCIResult {
   latitude?: number
   assignmentReason?: string
   minReuseDistance?: number
+  minDistanceSectorName?: string
   collisionCount?: number
   confusionCount?: number
+  tac?: string | null
 }
 
 export interface PCIConflict {
@@ -137,10 +143,11 @@ export interface PCIConflict {
 
 // 邻区规划相关类型
 export interface NeighborConfig {
-  sourceType: 'LTE' | 'NR'
-  targetType: 'LTE' | 'NR'
-  maxDistance: number
+  planningType: 'LTE-LTE' | 'NR-NR' | 'NR-LTE'
+  maxDistance?: number  // 已弃用，改用覆盖圆算法
   maxNeighbors: number
+  coverageDistanceFactor: number  // 覆盖圆距离系数
+  coverageRadiusFactor: number    // 覆盖圆半径系数
   customRules?: NeighborRule[]
 }
 
@@ -187,6 +194,60 @@ export interface NeighborRelation {
   distance: number
   bearing?: number
   relationType: 'LTE-LTE' | 'LTE-NR' | 'NR-LTE' | 'NR-NR'
+}
+
+// TAC规划相关类型
+export interface TACConfig {
+  networkType: 'LTE' | 'NR'
+  enableSingularityCheck?: boolean
+  singularityConfig?: {
+    searchRadius: number
+    singularityThreshold: number
+  }
+}
+
+export interface TACResult {
+  taskId: string
+  status: 'pending' | 'processing' | 'completed' | 'failed'
+  progress: number
+  totalCells: number
+  matchedCells: number
+  unmatchedCells: number
+  singularityCount?: number
+  results: CellTACResult[]
+  startTime: string
+  endTime?: string
+  error?: string
+}
+
+export interface CellTACResult {
+  sectorId: string
+  sectorName: string
+  siteId: string
+  siteName: string
+  networkType: 'LTE' | 'NR'
+  longitude: number
+  latitude: number
+  tac: string | null
+  tacAreaName?: string
+  existingTac?: string | null
+  matched: boolean
+  isSingularity?: boolean
+  singularityDetails?: TACSingularityDetails
+  firstGroup?: string
+  suggestedTac?: string | null  // TAC建议值，对于插花小区取图层TAC值
+}
+
+export interface TACSingularityDetails {
+  sectorId: string
+  sectorName: string
+  siteId: string
+  siteName: string
+  cellTAC: string
+  dominantTac: string
+  validNeighborCount: number
+  异TAC占比: number
+  dominantTacRatio: number
 }
 
 // 地图相关类型

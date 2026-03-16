@@ -27,41 +27,106 @@ export class FrequencyColorMapper {
     ])
 
     // LTE和NR使用不同的起始色调
-    private readonly LTE_HUE_BASE = 220 // 蓝色基准
-    private readonly NR_HUE_BASE = 140  // 绿色基准
+    private readonly LTE_HUE_BASE = 210 // 蓝色基准
+    private readonly NR_HUE_BASE = 120  // 绿色基准
 
-    // 黄金比例共轭值 (约 0.618)，用于在色相环上产生尽可能分散的颜色
-    private readonly GOLDEN_RATIO_CONJUGATE = 0.618033988749895
+    // 扩大色调范围，覆盖更宽的色相环
+    private readonly HUE_RANGE = 240  // 色调变化范围（240度）
 
     // 基准样式
-    private readonly BASE_SATURATION = 80
-    private readonly BASE_LIGHTNESS = 50
-    private readonly STROKE_LIGHTNESS_OFFSET = -25
+    private readonly BASE_SATURATION = 75
+    private readonly BASE_LIGHTNESS = 55
+    private readonly STROKE_LIGHTNESS_OFFSET = -30
+
+    // 特定频点颜色映射表
+    private readonly specificFrequencyColors: Map<number, Map<NetworkType, { color: string; strokeColor: string }>> = new Map([
+        // LTE扇区特定频点颜色
+        [874.2, new Map([
+            ['LTE', { color: '#87CEEB', strokeColor: '#1E90FF' }] // 亮蓝
+        ])],
+        [951.5, new Map([
+            ['LTE', { color: '#D2B48C', strokeColor: '#A0522D' }] // 棕褐
+        ])],
+        [954, new Map([
+            ['LTE', { color: '#ADD8E6', strokeColor: '#87CEFA' }] // 浅蓝
+        ])],
+        [1835, new Map([
+            ['LTE', { color: '#00FF7F', strokeColor: '#006400' }] // 翠绿
+        ])],
+        [1850, new Map([
+            ['LTE', { color: '#228B22', strokeColor: '#006400' }] // 深绿
+        ])],
+        [1865, new Map([
+            ['LTE', { color: '#00CED1', strokeColor: '#4682B4' }] // 湖水蓝
+        ])],
+        [1867.5, new Map([
+            ['LTE', { color: '#8B4513', strokeColor: '#654321' }] // 咖啡棕
+        ])],
+        [1870, new Map([
+            ['LTE', { color: '#FFA500', strokeColor: '#FF8C00' }] // 橙黄
+        ])],
+        [2120, new Map([
+            ['LTE', { color: '#0000CD', strokeColor: '#00008B' }] // 深蓝色
+        ])],
+        [2125, new Map([
+            ['LTE', { color: '#32CD32', strokeColor: '#228B22' }] // 青柠绿
+        ])],
+        [2137.5, new Map([
+            ['LTE', { color: '#4B0082', strokeColor: '#2E0854' }] // 靛蓝
+        ])],
+        [2140, new Map([
+            ['LTE', { color: '#FF7F50', strokeColor: '#FF6347' }] // 珊瑚橙
+        ])],
+        // NR扇区特定频点颜色
+        [877.35, new Map([
+            ['NR', { color: '#DDA0DD', strokeColor: '#9370DB' }] // 粉紫
+        ])],
+        [880.95, new Map([
+            ['NR', { color: '#2F4F4F', strokeColor: '#000000' }] // 墨绿
+        ])],
+        [954, new Map([
+            ['NR', { color: '#00FFFF', strokeColor: '#00CED1' }] // 冰蓝
+        ])],
+        [2114.55, new Map([
+            ['NR', { color: '#800020', strokeColor: '#6B0000' }] // 酒红
+        ])],
+        [2118.15, new Map([
+            ['NR', { color: '#FF8C00', strokeColor: '#FF6347' }] // 亮橙
+        ])],
+        [2144.55, new Map([
+            ['NR', { color: '#800080', strokeColor: '#4B0082' }] // 深紫
+        ])],
+        [3408.96, new Map([
+            ['NR', { color: '#87CEFA', strokeColor: '#1E90FF' }] // 浅蓝色
+        ])],
+        [3509.76, new Map([
+            ['NR', { color: '#B22222', strokeColor: '#8B0000' }] // 砖红
+        ])]
+    ])
 
     /**
      * 计算频点对应的颜色属性 (色调, 饱和度, 亮度)
-     * 使用黄金比例分布算法最大化相邻频点的颜色差异
+     * 使用更分散的色调分布算法，确保频点间颜色差异更大
      */
     private calculateStyles(frequency: number, networkType: NetworkType): { h: number, s: number, l: number } {
         const frequencies = Array.from(this.frequenciesByNetwork.get(networkType) || []).sort((a, b) => a - b)
         const index = frequencies.indexOf(frequency)
 
-        // 1. 色调分布：基于基准色调，利用黄金比例产生离散步进
-        // 我们不使用简单的线性分布，而是让每个索引都产生一个大的色调跳变，但限制在合理范围内
+        // 1. 色调分布：使用更大的步进值，覆盖更宽的色相环
         const baseHue = networkType === 'LTE' ? this.LTE_HUE_BASE : this.NR_HUE_BASE
+        
+        // 使用更大的色调步进值，确保相邻频点颜色差异明显
+        // 采用质数步进法，减少颜色重复
+        const primeStep = 47  // 质数，产生更分散的分布
+        const hue = (baseHue + (index * primeStep)) % this.HUE_RANGE
 
-        // 使用黄金比例步进，由于 Hue 是 360 度循环，这能产生非常分散的颜色
-        // 我们将其限制在网络预设的色系附近（±60度）
-        let hueOffset = (index * this.GOLDEN_RATIO_CONJUGATE * 360) % 120
-        let hue = (baseHue - 60 + hueOffset + 360) % 360
+        // 2. 亮度与饱和度更大幅度的交替变化 (5个一组循环)
+        // 增加更多的变化组合，确保颜色区分度
+        const lOffsets = [0, -20, 25, -10, 15]  // 更大的亮度变化范围
+        const sOffsets = [0, -25, 15, 20, -10]  // 更大的饱和度变化范围
 
-        // 2. 亮度与饱和度大幅交替 (3个一组循环)
-        // 这样即使色调接近，亮度差异也能一眼区分
-        const lOffsets = [0, -15, 12]
-        const sOffsets = [0, -20, 10]
-
-        const lightness = this.BASE_LIGHTNESS + lOffsets[index % 3]
-        const saturation = this.BASE_SATURATION + sOffsets[index % 3]
+        const lightness = this.BASE_LIGHTNESS + lOffsets[index % 5]
+        const saturation = this.BASE_SATURATION + sOffsets[index % 5]
 
         return { h: hue, s: saturation, l: lightness }
     }
@@ -95,12 +160,22 @@ export class FrequencyColorMapper {
                 freqSet.add(frequency)
             }
 
-            // 计算样式属性
-            const { h, s, l } = this.calculateStyles(frequency, networkType)
+            let color: string
+            let strokeColor: string
 
-            // 生成填充色和边框色
-            const color = this.generateHSL(h, s, l)
-            const strokeColor = this.darkenColor(h, s, l, this.STROKE_LIGHTNESS_OFFSET)
+            // 优先检查特定频点颜色映射表
+            const freqMap = this.specificFrequencyColors.get(frequency)
+            if (freqMap && freqMap.has(networkType)) {
+                // 使用特定颜色
+                const specificColor = freqMap.get(networkType)! as { color: string; strokeColor: string }
+                color = specificColor.color
+                strokeColor = specificColor.strokeColor
+            } else {
+                // 计算样式属性，使用自动生成的颜色
+                const { h, s, l } = this.calculateStyles(frequency, networkType)
+                color = this.generateHSL(h, s, l)
+                strokeColor = this.darkenColor(h, s, l, this.STROKE_LIGHTNESS_OFFSET)
+            }
 
             const colorObj: FrequencyColor = {
                 frequency,

@@ -9,7 +9,6 @@
  * - 自动应用 WGS84 → GCJ-02 坐标纠偏（与扇区图一致）
  */
 import L from 'leaflet'
-import { GeoJSONProps } from 'leaflet'
 import { CoordinateTransformer } from '../../utils/coordinate'
 
 /**
@@ -35,6 +34,8 @@ export interface MapInfoLayerOptions {
   visible?: boolean
   /** 样式配置 */
   style?: MapInfoLayerStyle
+  /** 要素点击回调 */
+  onFeatureClick?: (properties: any, event: L.LeafletMouseEvent) => void
 }
 
 /**
@@ -170,16 +171,40 @@ export class MapInfoLayer {
   private id: string
   private name: string
   private type: LayerGeometryType
-  private dataId: string
   private geoJSONLayer: L.GeoJSON | null = null
   private style: MapInfoLayerStyle
+  private static _debugPrinted: boolean = false
+
+  // 标签相关属性
+  private labelsEnabled: boolean = false
+  private labelMarkers: Map<string, L.Marker> = new Map()
+  private labelConfig: {
+    content: string
+    color: string
+    fontSize: number
+  }
+  private currentZoom: number = 14
+  private currentMap: L.Map | null = null  // 存储当前地图实例
+  private onFeatureClickCallback?: (properties: any, event: L.LeafletMouseEvent) => void
+  private isInteractive: boolean = true // 是否允许交互 (满足需求3)
+
+  // 框选高亮配置
+  private selectionHighlightIds: Set<string> | null = null
 
   constructor(options: MapInfoLayerOptions) {
     this.id = options.id
     this.name = options.name
     this.type = options.type
-    this.dataId = options.dataId
     this.style = options.style || {}
+
+    // 初始化标签配置
+    this.labelConfig = {
+      content: 'name',
+      color: '#000000',
+      fontSize: 12
+    }
+    this.onFeatureClickCallback = options.onFeatureClick
+    this.currentMap = null
   }
 
   /**
@@ -188,6 +213,96 @@ export class MapInfoLayer {
    */
   getLeafletLayer(): L.GeoJSON | null {
     return this.geoJSONLayer
+  }
+
+  /**
+   * 获取圆圈内的要素
+   * @param center 中心点 (渲染坐标/GCJ02)
+   * @param radius 半径 (米)
+   */
+  getFeaturesInCircle(center: L.LatLng, radius: number): any[] {
+    if (!this.geoJSONLayer) {
+      console.log('[MapInfoLayer] getFeaturesInCircle: geoJSONLayer不存在', this.id)
+      return []
+    }
+    const results: any[] = []
+    let layerCount = 0
+
+    this.geoJSONLayer.eachLayer((layer: any) => {
+      layerCount++
+      if (layer.getLatLng) {
+        const latlng = layer.getLatLng()
+        const distance = center.distanceTo(latlng)
+        if (distance <= radius) {
+          results.push(layer.feature.properties)
+        }
+      } else if (layer.getBounds) {
+        // 对于线和面，如果边界中心在圆内或者边界与圆相交
+        // 简化处理：检查边界中心
+        const bounds = layer.getBounds()
+        const distance = center.distanceTo(bounds.getCenter())
+        if (distance <= radius) {
+          results.push(layer.feature.properties)
+        }
+      }
+    })
+
+    console.log('[MapInfoLayer] getFeaturesInCircle:', {
+      id: this.id,
+      name: this.name,
+      totalLayers: layerCount,
+      matchedFeatures: results.length,
+      radius
+    })
+    return results
+  }
+
+  /**
+   * 获取多边形内的要素
+   * @param polygon Leaflet 多边形对象 (坐标为渲染坐标/GCJ02)
+   */
+  getFeaturesInPolygon(polygon: L.Polygon): any[] {
+    if (!this.geoJSONLayer) return []
+    const results: any[] = []
+    const bounds = polygon.getBounds()
+    const points = (polygon.getLatLngs()[0] as L.LatLng[]).map(p => [p.lat, p.lng])
+
+    this.geoJSONLayer.eachLayer((layer: any) => {
+      if (layer.getLatLng) {
+        const latlng = layer.getLatLng()
+        if (bounds.contains(latlng)) {
+          if (this._isPointInPolygon([latlng.lat, latlng.lng], points)) {
+            results.push(layer.feature.properties)
+          }
+        }
+      } else if (layer.getBounds) {
+        // 对于线和面，检查其边界中心是否在多边形内
+        const layerBounds = layer.getBounds()
+        const center = layerBounds.getCenter()
+        if (bounds.contains(center)) {
+          if (this._isPointInPolygon([center.lat, center.lng], points)) {
+            results.push(layer.feature.properties)
+          }
+        }
+      }
+    })
+
+    return results
+  }
+
+  /**
+   * 射线法判断点是否在多边形内
+   */
+  private _isPointInPolygon(point: number[], polygon: number[][]): boolean {
+    const x = point[0], y = point[1]
+    let inside = false
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      const xi = polygon[i][0], yi = polygon[i][1]
+      const xj = polygon[j][0], yj = polygon[j][1]
+      const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)
+      if (intersect) inside = !inside
+    }
+    return inside
   }
 
   /**
@@ -205,8 +320,30 @@ export class MapInfoLayer {
     }
 
     this.geoJSONLayer.addTo(map)
+    this.currentMap = map  // 存储地图实例
+
+    // 如果标签已开启，在添加到地图时自动创建标签
+    if (this.labelsEnabled) {
+      console.log('[MapInfoLayer] Labels enabled, creating labels upon adding to map:', this.id)
+      this._createLabels(map)
+    }
+
+    // 监听缩放变化，缩放结束后重新应用高亮样式
+    map.on('zoomend', this._onZoomEnd.bind(this))
+
     console.log('[MapInfoLayer] Layer added to map:', this.id)
     return this
+  }
+
+  /**
+   * 缩放结束事件处理 - 重新应用高亮样式
+   */
+  private _onZoomEnd(): void {
+    // 如果之前设置过高亮，缩放结束后重新应用
+    if (this.selectionHighlightIds && this.selectionHighlightIds.size > 0) {
+      console.log('[MapInfoLayer] Zoom ended, re-applying highlight:', this.id)
+      this.setSelectionHighlight(this.selectionHighlightIds)
+    }
   }
 
   /**
@@ -216,11 +353,18 @@ export class MapInfoLayer {
     if (this.geoJSONLayer && map.hasLayer(this.geoJSONLayer)) {
       console.log('[MapInfoLayer] Removing layer from map:', this.id)
       map.removeLayer(this.geoJSONLayer)
+      // 移除 zoomend 事件监听器，防止事件泄漏
+      map.off('zoomend', this._onZoomEnd)
+      // 清除标签
+      this._removeLabels()
     } else {
       console.log('[MapInfoLayer] Layer not on map, skipping remove:', this.id, {
         hasGeoJSONLayer: !!this.geoJSONLayer,
         hasLayerInMap: this.geoJSONLayer ? map.hasLayer(this.geoJSONLayer) : false
       })
+    }
+    if (this.currentMap === map) {
+      this.currentMap = null
     }
     return this
   }
@@ -242,10 +386,32 @@ export class MapInfoLayer {
   }
 
   /**
+   * 检查图层是否可见
+   */
+  isVisible(): boolean {
+    if (!this.geoJSONLayer || !this.currentMap) {
+      console.log('[MapInfoLayer] isVisible: 不可见', {
+        id: this.id,
+        name: this.name,
+        hasGeoJSONLayer: !!this.geoJSONLayer,
+        hasCurrentMap: !!this.currentMap
+      })
+      return false
+    }
+    const visible = this.currentMap.hasLayer(this.geoJSONLayer)
+    console.log('[MapInfoLayer] isVisible:', {
+      id: this.id,
+      name: this.name,
+      visible
+    })
+    return visible
+  }
+
+  /**
    * 从 GeoJSON 数据创建图层
    */
   static async fromGeoJSON(options: MapInfoLayerOptions): Promise<MapInfoLayer> {
-    const layer = new MapInfoLayer(options)
+    const mapInfoLayer = new MapInfoLayer(options)
 
     // 应用坐标转换：WGS84 → GCJ-02（与扇区图使用相同的纠偏算法）
     const transformedData: GeoJSON.FeatureCollection = {
@@ -256,12 +422,12 @@ export class MapInfoLayer {
     console.log('[MapInfoLayer] Applied coordinate transformation to', transformedData.features.length, 'features')
 
     // 创建 GeoJSON 图层（使用转换后的数据）
-    layer.geoJSONLayer = L.geoJSON(transformedData, {
+    mapInfoLayer.geoJSONLayer = L.geoJSON(transformedData, {
       // 点要素样式
       pointToLayer: (feature, latLng) => {
         // 获取 feature 级别的样式（如果存在）
         const featureStyle = (feature.properties as any)?._style?.point || {}
-        const pointStyle = { ...DEFAULT_STYLES.point, ...layer.style.point, ...featureStyle }
+        const pointStyle = { ...DEFAULT_STYLES.point, ...mapInfoLayer.style.point, ...featureStyle }
 
         // 如果有符号类型，可以使用自定义图标
         if (featureStyle.markerSymbol && featureStyle.markerSymbol !== 'circle') {
@@ -288,41 +454,40 @@ export class MapInfoLayer {
 
       // 线和面要素样式
       style: (feature) => {
-        const geometry = feature.geometry?.type
+        if (!feature || !feature.geometry) return {}
+        const geometry = feature.geometry.type
         const featureStyle = (feature.properties as any)?._style || {}
 
         // 调试：打印第一个要素的样式
-        if (feature.properties && Object.keys(feature.properties).length > 0) {
-          const featureId = feature.properties?.id || feature.properties?.ID || 'unknown'
-          if (!this._debugPrinted) {
+        if (feature && feature.properties && Object.keys(feature.properties).length > 0) {
+          if (!MapInfoLayer._debugPrinted) {
             console.log('[MapInfoLayer] Feature style sample:', {
               geometry,
               featureStyle,
               properties: Object.keys(feature.properties).slice(0, 5)
             })
-            ;(this as any)._debugPrinted = true
+            MapInfoLayer._debugPrinted = true
           }
         }
 
         if (geometry === 'LineString' || geometry === 'MultiLineString') {
           // 合并样式：默认样式 -> 图层样式 -> 要素样式
-          // 注意：后端返回的样式属性名需要映射到 Leaflet 的属性名
           const mergedStyle = {
             ...DEFAULT_STYLES.line,
-            ...layer.style.line
+            ...mapInfoLayer.style.line
           }
 
-          // 映射后端样式属性到 Leaflet 属性
           if (featureStyle.strokeColor) mergedStyle.color = featureStyle.strokeColor
           if (featureStyle.strokeWidth !== undefined) mergedStyle.weight = featureStyle.strokeWidth
           if (featureStyle.strokeDasharray) mergedStyle.dashArray = featureStyle.strokeDasharray
-          if (featureStyle.opacity !== undefined) mergedStyle.opacity = featureStyle.opacity
+          if (featureStyle.strokeOpacity !== undefined) mergedStyle.opacity = featureStyle.strokeOpacity
 
-          // 只有明确设置了 dashArray 才应用虚线，否则使用实线
           const result: any = {
             color: mergedStyle.color || '#8b5cf6',
             weight: mergedStyle.weight || 3,
-            opacity: mergedStyle.opacity || 1
+            opacity: mergedStyle.opacity !== undefined ? mergedStyle.opacity : 1,
+            lineCap: 'round',
+            lineJoin: 'round'
           }
           if (mergedStyle.dashArray) {
             result.dashArray = mergedStyle.dashArray
@@ -331,10 +496,9 @@ export class MapInfoLayer {
         } else if (geometry === 'Polygon' || geometry === 'MultiPolygon') {
           const mergedStyle = {
             ...DEFAULT_STYLES.polygon,
-            ...layer.style.polygon
+            ...mapInfoLayer.style.polygon
           }
 
-          // 映射后端样式属性到 Leaflet 属性
           if (featureStyle.strokeColor) mergedStyle.color = featureStyle.strokeColor
           if (featureStyle.strokeWidth !== undefined) mergedStyle.weight = featureStyle.strokeWidth
           if (featureStyle.strokeOpacity !== undefined) mergedStyle.opacity = featureStyle.strokeOpacity
@@ -342,11 +506,10 @@ export class MapInfoLayer {
           if (featureStyle.fillColor) mergedStyle.fillColor = featureStyle.fillColor
           if (featureStyle.fillOpacity !== undefined) mergedStyle.fillOpacity = featureStyle.fillOpacity
 
-          // 只有明确设置了 dashArray 才应用虚线，否则使用实线边界
           const result: any = {
             color: mergedStyle.color || '#10b981',
             weight: mergedStyle.weight || 2,
-            opacity: mergedStyle.opacity || 1,
+            opacity: mergedStyle.opacity !== undefined ? mergedStyle.opacity : 1,
             fillColor: mergedStyle.fillColor || '#10b981',
             fillOpacity: mergedStyle.fillOpacity || 0.3
           }
@@ -356,10 +519,28 @@ export class MapInfoLayer {
           return result
         }
         return {}
+      },
+
+      // 要素交互处理
+      onEachFeature: (feature, leafletLayer) => {
+        leafletLayer.on('click', (e: L.LeafletMouseEvent) => {
+          // 阻止事件冒泡到地图
+          L.DomEvent.stopPropagation(e as any)
+
+          // 如果交互被禁用（如框选模式下），不处理点击
+          if (!mapInfoLayer.isInteractive) {
+            return
+          }
+
+          if (mapInfoLayer.onFeatureClickCallback) {
+            console.log('[MapInfoLayer] Feature clicked:', feature.properties)
+            mapInfoLayer.onFeatureClickCallback(feature.properties, e)
+          }
+        })
       }
     })
 
-    return layer
+    return mapInfoLayer
   }
 
   /**
@@ -382,6 +563,270 @@ export class MapInfoLayer {
   getType(): LayerGeometryType {
     return this.type
   }
+
+  /**
+   * 设置是否允许交互 (满足需求3)
+   */
+  setInteractive(interactive: boolean): void {
+    this.isInteractive = interactive
+  }
+
+  /**
+   * 设置框选高亮
+   * @param ids 选中的要素ID集合（通常基于某个唯一属性，如'id'或'name'），null表示清除
+   * @param idField 用于匹配的属性字段名，默认为 'id'
+   */
+  setSelectionHighlight(ids: Set<string> | null, idField: string = 'id'): void {
+    this.selectionHighlightIds = ids
+    if (!this.geoJSONLayer) return
+
+    this.geoJSONLayer.eachLayer((layer: any) => {
+      const feature = layer.feature
+      if (!feature || !feature.properties) return
+
+      // 获取标识符 - 与 selectFeaturesAtPoint 保持一致的ID获取逻辑
+      const val = feature.properties[idField] || feature.properties['id'] || feature.properties['name'] || feature.properties['小区名称'] || feature.properties['OBJECTID'] || ''
+      const isSelected = ids?.has(String(val))
+
+      // 更新样式
+      if (layer instanceof L.Path) {
+        if (isSelected) {
+          // 高亮样式
+          layer.setStyle({
+            color: '#00ffff',
+            weight: 6,
+            opacity: 1
+          })
+          if (layer.bringToFront) layer.bringToFront()
+        } else {
+          // 恢复默认样式 (重新触发 GeoJSON 的 style 函数)
+          this.geoJSONLayer?.resetStyle(layer)
+        }
+      } else if (layer instanceof L.CircleMarker) {
+        if (isSelected) {
+          layer.setStyle({
+            color: '#00ffff',
+            weight: 6,
+            opacity: 1
+          })
+          if (layer.bringToFront) layer.bringToFront()
+        } else {
+          this.geoJSONLayer?.resetStyle(layer)
+        }
+      }
+    })
+  }
+
+  /**
+   * 设置标签可见性
+   * @param visible 是否显示标签
+   */
+  setLabelVisibility(visible: boolean): void {
+    this.labelsEnabled = visible
+    console.log('[MapInfoLayer] setLabelVisibility:', this.id, visible)
+
+    if (!this.currentMap) {
+      console.warn('[MapInfoLayer] 图层未添加到地图，无法显示标签')
+      return
+    }
+
+    if (visible) {
+      this._createLabels(this.currentMap)
+    } else {
+      this._removeLabels()
+    }
+  }
+
+  /**
+   * 设置标签配置
+   * @param config 标签配置
+   */
+  setLabelConfig(config: { content: string; color: string; fontSize: number }): void {
+    // 更新配置
+    this.labelConfig = { ...this.labelConfig, ...config }
+    console.log('[MapInfoLayer] setLabelConfig:', this.id, this.labelConfig)
+
+    // 如果标签已启用且图层已添加到地图，重新创建标签以应用新配置
+    if (this.labelsEnabled && this.currentMap) {
+      console.log('[MapInfoLayer] 标签已启用，立即重新创建标签')
+      this._removeLabels()
+      this._createLabels(this.currentMap)
+    }
+  }
+
+  /**
+   * 更新缩放级别并重绘标签
+   */
+  updateZoom(zoom: number): void {
+    const oldZoom = this.currentZoom
+    this.currentZoom = zoom
+
+    // 如果缩放级别改变较大或者标签已开启，重新创建标签以应用碰撞检测
+    if (this.labelsEnabled && this.currentMap && Math.abs(oldZoom - zoom) >= 1) {
+      console.log('[MapInfoLayer] Zoom changed, re-creating labels:', this.id, zoom)
+      this._createLabels(this.currentMap)
+    }
+  }
+
+  /**
+   * 创建标签
+   */
+  private _createLabels(map: L.Map): void {
+    if (!this.geoJSONLayer) return
+
+    // 清除现有标签
+    this._removeLabels()
+
+    // 遍历GeoJSON图层的每个要素
+    // 记录已占用的标签位置，用于碰撞检测
+    const occupiedPositions: L.LatLng[] = []
+
+    // 设置标签最小间距（像素）：随缩放级别动态调整
+    // zoom <= 11: 6倍字号 (约72px)
+    // zoom 12-16: 2.5倍字号 (约30px)
+    // zoom > 16: 1.2倍字号 (约14px)
+    const minDistance = this.currentZoom <= 11 ? this.labelConfig.fontSize * 6 : this.currentZoom <= 16 ? this.labelConfig.fontSize * 2.5 : this.labelConfig.fontSize * 1.2
+
+    // 根据缩放级别限制最大可见标签数
+    const maxVisibleLabels = this.currentZoom < 12 ? 200 : this.currentZoom < 16 ? 1000 : 3000
+
+    this.geoJSONLayer.eachLayer((layer: any) => {
+      try {
+        const feature = layer.feature
+        let latLng: L.LatLng | null = null
+        const properties = feature?.properties || {}
+
+        // 获取标签显示位置
+        if (layer instanceof L.CircleMarker) {
+          latLng = layer.getLatLng()
+        } else if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
+          latLng = layer.getBounds().getCenter()
+        } else if (layer instanceof L.Polygon) {
+          latLng = layer.getBounds().getCenter()
+        }
+
+        if (!latLng) return
+
+        // 碰撞检测
+        let isOverlapping = false
+        for (const occPos of occupiedPositions) {
+          const p1 = map.latLngToContainerPoint(latLng)
+          const p2 = map.latLngToContainerPoint(occPos)
+          const dist = Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2))
+
+          if (dist < minDistance) {
+            isOverlapping = true
+            break
+          }
+        }
+
+        if (isOverlapping) return
+
+        // 获取标签内容
+        const labelContent = this._getLabelContent(properties)
+
+        if (!labelContent) return
+
+        // 创建标签图标
+        const labelIcon = L.divIcon({
+          className: 'mapinfo-label',
+          html: `<div style="
+              font-size: ${this.labelConfig.fontSize}px;
+              color: ${this.labelConfig.color};
+              font-weight: 500;
+              white-space: nowrap;
+              background-color: transparent;
+              padding: 0;
+              pointer-events: none;
+              text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+            ">${labelContent}</div>`,
+          iconSize: L.point(0, 0),
+          iconAnchor: L.point(0, -5)
+        })
+
+        const labelMarker = L.marker(latLng, {
+          icon: labelIcon,
+          interactive: false
+        } as any)
+
+        labelMarker.addTo(map)
+        const layerId = (layer as any)._leaflet_id || String(latLng.lat)
+        this.labelMarkers.set(layerId, labelMarker)
+
+        // 记录位置
+        occupiedPositions.push(latLng)
+
+        // 限制单个图层最大显示标签数，避免性能问题
+        if (this.labelMarkers.size >= maxVisibleLabels) {
+          return
+        }
+      } catch (err) {
+        console.warn('[MapInfoLayer] Failed to create label:', err)
+      }
+    })
+
+    console.log('[MapInfoLayer] Created', this.labelMarkers.size, 'labels for layer type:', this.type, 'Zoom:', this.currentZoom)
+  }
+
+  /**
+   * 移除所有标签
+   */
+  private _removeLabels(): void {
+    this.labelMarkers.forEach((marker: any) => {
+      try {
+        const map = marker._map || this.currentMap
+        if (map) {
+          map.removeLayer(marker)
+        }
+      } catch (err) {
+        console.warn('[MapInfoLayer] Failed to remove label:', err)
+      }
+    })
+    this.labelMarkers.clear()
+  }
+
+  /**
+   * 获取标签内容
+   * @param properties 要素属性
+   * @returns 标签文本
+   */
+  private _getLabelContent(properties: any): string {
+    const requestedField = this.labelConfig.content
+
+    // 1. 尝试直接获取请求的字段
+    // 预定义字段的映射
+    const fieldMapping: Record<string, string[]> = {
+      'name': ['小区名称', 'Cell Name', 'Name', 'name', 'cellName', 'NAME', 'Name', '站点名称', 'zhLabel'],
+      'siteId': ['基站ID', 'Site ID', 'eNodeB ID', 'siteId', 'enbId', 'ENBID', 'site_id'],
+      'frequency': ['下行频点', 'DL Frequency', 'Frequency', 'frequency', 'dlFreq', 'freq'],
+      'pci': ['PCI', 'physicalCellId', 'pci', 'Pci'],
+      'tac': ['TAC', 'trackingAreaCode', 'tac', 'Tac'],
+      'isShared': ['是否共享', 'Is Shared', 'Shared', 'isShared'],
+      'coverageType': ['覆盖类型', 'Coverage Type', 'coverageType']
+    }
+
+    // 查找匹配的字段
+    const possibleNames = fieldMapping[requestedField] || [requestedField]
+    for (const propName of possibleNames) {
+      // 1a. 直接在 properties 中查找
+      if (properties[propName] !== undefined && properties[propName] !== null) {
+        const val = String(properties[propName]).trim()
+        if (val) return val
+      }
+
+      // 1b. 在嵌套的 properties 中查找 (地理化数据展平前或特殊结构)
+      if (properties.properties && properties.properties[propName] !== undefined && properties.properties[propName] !== null) {
+        const val = String(properties.properties[propName]).trim()
+        if (val) return val
+      }
+    }
+
+    // 2. 只返回配置的字段，不使用智能回退
+    // 如果配置的字段没找到，返回空字符串，不显示默认标签
+    // 这样可以避免标签重复显示，只显示用户配置的标签内容
+
+    return ''
+  }
 }
 
 /**
@@ -391,7 +836,7 @@ export class MapInfoLayerManager {
   private layers: Map<string, MapInfoLayer> = new Map()
   private map: L.Map | null = null
 
-  constructor() {}
+  constructor() { }
 
   /**
    * 调试方法：打印所有图层及其在地图上的状态

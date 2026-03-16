@@ -162,8 +162,8 @@ export function getCellCoverStyle(cellCoverType?: number, networkType?: NetworkT
  * 根据缩放级别调整渲染策略：
  * - zoom < 12: 只渲染主要站点，最大500扇区
  * - zoom 12-15: 中等细节，最大2000扇区
- * - zoom 15-18: 高细节，最大10000扇区
- * - zoom > 18: 全细节，无限制
+ * - zoom 15-17: 高细节，最大5000扇区（性能优化）
+ * - zoom >= 17: 特写，最大8000扇区（激进优化，避免卡顿）
  */
 export const LOD_LEVELS: LODLevel[] = [
   {
@@ -182,15 +182,15 @@ export const LOD_LEVELS: LODLevel[] = [
   },
   {
     minZoom: 15,
-    maxZoom: 18,
-    maxSectors: 10000,
+    maxZoom: 17,
+    maxSectors: 5000,
     simplification: 0.5,
     showStroke: true
   },
   {
-    minZoom: 18,
+    minZoom: 17,
     maxZoom: 20,
-    maxSectors: Infinity,
+    maxSectors: 8000,
     simplification: 0,
     showStroke: true
   }

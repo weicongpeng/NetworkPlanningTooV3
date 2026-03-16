@@ -1,74 +1,112 @@
 # Network Planning Tool V3 - Gemini Context
 
 ## Project Overview
-This project is a comprehensive **Network Planning Tool** designed for telecommunications network management. It features PCI planning, Neighbor planning, and map visualization. The application is built as a hybrid desktop application using **Electron** for the container, **React** for the UI, and **FastAPI** (Python) for the backend logic and data processing.
 
-## Technology Stack
+**Network Planning Tool V3** is a desktop application designed for telecommunications network planning. It integrates a modern React frontend wrapped in Electron with a robust Python (FastAPI) backend for data processing and algorithmic computations.
 
-### Frontend
-*   **Framework:** React 18 + TypeScript
-*   **Build Tool:** Vite
-*   **Container:** Electron 28
-*   **Styling:** Tailwind CSS + Radix UI
-*   **Maps:** Leaflet + React-Leaflet
-*   **State Management:** Zustand
-*   **HTTP Client:** Axios
+### Key Capabilities
+- **Data Management:** Import/Export and management of Excel engineering parameters.
+- **Map Visualization:** Interactive map (Leaflet) for sectors, layers (MapInfo), and neighbor relations.
+- **Algorithms:** Intelligent PCI (Physical Cell Identity) planning and collision detection. Neighbor relation planning based on distance and azimuth.
+- **Licensing:** Built-in license activation and status management.
 
-### Backend
-*   **Framework:** FastAPI
-*   **Language:** Python 3.10+
-*   **Server:** Uvicorn
-*   **Data Processing:** Pandas, NumPy, OpenPyXL
-*   **Geospatial:** GeoPandas, Shapely, GDAL
-*   **Testing:** Pytest
+## Architecture & Technology Stack
 
-## Directory Structure
+The project follows a decoupled client-server architecture running locally.
 
-*   **`backend/`**: Python FastAPI application.
-    *   `app/`: Core application logic (algorithms, api, models, services).
-    *   `main.py`: Entry point for the backend server.
-    *   `requirements.txt`: Python dependencies.
-    *   `Dockerfile`: Backend container configuration.
-*   **`frontend/`**: React + Electron application.
-    *   `src/`: Source code (`renderer` for UI, `main` for Electron process).
-    *   `electron/`: Electron-specific source files (`main.ts`, `preload.ts`).
-    *   `package.json`: Dependencies and scripts.
-    *   `vite.config.ts`: Vite configuration.
-*   **`scripts/`**: Shell scripts for building and testing.
-*   **`start_electron_app.bat`**: Windows batch script to start the full stack development environment.
+### Frontend (`/frontend`)
+- **Core:** React 18, TypeScript, Vite
+- **Desktop Shell:** Electron 28
+- **Styling:** Tailwind CSS, Radix UI Primitives, Lucide Icons
+- **State Management:** Zustand
+- **Maps:** Leaflet, React-Leaflet
+- **Communication:** Axios (calls local backend API)
+
+### Backend (`/backend`)
+- **Core:** Python 3.10+, FastAPI, Uvicorn
+- **Data Processing:** Pandas, NumPy, OpenPyXL
+- **Geospatial:** GeoPandas, Shapely, GDAL
+- **API Documentation:** Swagger UI (`/docs`), ReDoc (`/redoc`)
+
+## Development Workflow
+
+### Prerequisites
+- **Node.js:** v18+
+- **Python:** v3.10+
+- **OS:** Windows (preferred for geospatial bin compatibility) or Linux.
+
+### Setup
+
+1.  **Backend Setup:**
+    ```bash
+    cd backend
+    # Create venv (recommended)
+    python -m venv venv
+    .\venv\Scripts\activate  # Windows
+    # source venv/bin/activate # Linux
+
+    # Install dependencies
+    pip install -r requirements.txt
+    ```
+
+2.  **Frontend Setup:**
+    ```bash
+    cd frontend
+    npm install
+    ```
+
+### Running the Application
+
+You typically need two terminals open.
+
+**Terminal 1: Backend**
+```powershell
+cd backend
+python main.py
+# Server runs at http://127.0.0.1:8000
+```
+
+**Terminal 2: Frontend**
+```powershell
+cd frontend
+npm run dev
+# Starts Vite (http://127.0.0.1:5173) and launches the Electron window.
+```
 
 ## Key Commands
 
-### Backend
-*   **Install Dependencies:** `pip install -r requirements.txt` (inside `backend/`)
-*   **Run Server:** `python main.py` (starts on `http://127.0.0.1:8000`)
-*   **Run Tests:** `pytest`
-*   **API Docs:** `http://127.0.0.1:8000/docs` (when running)
+| Category | Command | Description |
+| :--- | :--- | :--- |
+| **Frontend** | `npm run dev` | Start dev server & Electron |
+| | `npm run build` | Build React app and Electron main process |
+| | `npm run type-check` | Run TypeScript validation |
+| | `npm run lint` | Run ESLint |
+| **Backend** | `python main.py` | Start FastAPI server |
+| | `pytest` | Run backend unit tests |
+| | `black .` | Format Python code |
 
-### Frontend
-*   **Install Dependencies:** `npm install` (inside `frontend/`)
-*   **Run Web Dev Server:** `npm run dev:vite` (starts on `http://127.0.0.1:5173`)
-*   **Run Electron Dev:** `npm run dev` (starts Vite + Electron)
-*   **Build:** `npm run build` (builds both Vite and Electron)
-*   **Lint:** `npm run lint`
+## Project Structure Highlights
 
-### Full Stack (Windows)
-*   **Start All:** Run `start_electron_app.bat` in the root directory. This script:
-    1.  Compiles Electron TypeScript.
-    2.  Starts the Backend server in a new window.
-    3.  Starts the Vite dev server.
-    4.  Launches the Electron app.
+- **`backend/app/`**:
+    - `algorithms/`: Core logic for PCI and Neighbor planning.
+    - `api/`: FastAPI route definitions.
+    - `models/`: Pydantic data models.
+    - `services/`: Business logic layer.
+- **`frontend/src/`**:
+    - `renderer/`: Main React application code.
+    - `electron/`: Electron main process code.
+- **`uploads/`**: Stores uploaded Excel files (managed by backend).
+- **`data/`**: JSON indices or metadata storage.
 
-## Development Workflow & Conventions
+## Coding Conventions
 
-1.  **Environment Switching:** The `start_electron_app.bat` script may swap `package.json` with `package.json.electron` to ensure correct dependencies/scripts for the Electron environment. Be aware of this if modifying `package.json` manually.
-2.  **API Communication:** The frontend communicates with the backend via HTTP requests to `http://127.0.0.1:8000`. Ensure the backend is running before testing frontend features that require data.
-3.  **Geospatial Dependencies:** The backend relies on `GDAL`. Ensure this is correctly installed in the Python environment, as it can be tricky on Windows.
-4.  **Testing:**
-    *   Backend logic (algorithms, API) should be tested with `pytest`.
-    *   Frontend components can be tested with the configured test runner (check `package.json`).
+- **Python:** Follow PEP 8. Use type hints extensively. Handle file encodings (especially for Windows CSV/Excel) carefully.
+- **TypeScript:** Strict type checking. Use functional components and Hooks. Prefer Tailwind utility classes over custom CSS.
+- **Path Handling:** Always use `pathlib` in Python and `path` module in Node.js to ensure cross-platform compatibility, though the primary target is Windows.
+- **Async/Await:** Used extensively in both frontend (API calls) and backend (FastAPI routes).
 
-## Architecture Highlights
-*   **Hybrid App:** Combines the performance/access of a desktop app (Electron) with the flexibility of a web UI (React).
-*   **Data-Heavy:** Heavy lifting (PCI planning, file parsing) is done in Python (Backend) to leverage Pandas/NumPy, while the Frontend focuses on visualization and user interaction.
-*   **Map Visualization:** Uses Leaflet for rendering interactive maps of network sectors and neighbors.
+## Common Tasks & Troubleshooting
+
+- **Encoding Issues:** The backend `main.py` has specific overrides for `print` and `sys.stdout` to handle Windows GBK/UTF-8 encoding issues. Maintain this pattern.
+- **Geospatial Libs:** `gdal` and `fiona` can be tricky on Windows. If `pip install` fails, suggest using pre-built `.whl` files from Christoph Gohlke's library or `conda`.
+- **Port Conflicts:** Backend defaults to 8000, Frontend to 5173.

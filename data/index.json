@@ -1,0 +1,213 @@
+{
+  "0043b00d-6be9-4943-8097-602480f94933": {
+    "id": "0043b00d-6be9-4943-8097-602480f94933",
+    "name": "爱立信.xlsx",
+    "type": "excel",
+    "fileType": "geo_data",
+    "geometryType": "point",
+    "sourceType": "excel",
+    "size": 485019,
+    "uploadDate": "2026-03-06T16:01:43.107660",
+    "status": "ready",
+    "metadata": {
+      "pointCount": 2071
+    }
+  },
+  "db6a0dd4-7b7c-4989-a8e9-22c3b9e64c1e": {
+    "id": "db6a0dd4-7b7c-4989-a8e9-22c3b9e64c1e",
+    "name": "扇区.xlsx",
+    "type": "excel",
+    "fileType": "geo_data",
+    "geometryType": "sector",
+    "sourceType": "excel",
+    "size": 3909,
+    "uploadDate": "2026-03-06T16:01:57.119708",
+    "status": "ready",
+    "metadata": {
+      "pointCount": 17
+    }
+  },
+  "d0e01f30-5db2-410d-9c2e-be2d37cf042a": {
+    "id": "d0e01f30-5db2-410d-9c2e-be2d37cf042a",
+    "name": "4G_TAC.zip",
+    "type": "map",
+    "subType": "mapinfo",
+    "size": 30113,
+    "originalPath": "D:\\mycode\\NetworkPlanningTooV3\\全量工参\\4G_TAC.zip",
+    "uploadDate": "2026-03-06T16:13:36.763902",
+    "status": "ready",
+    "metadata": {
+      "fileCount": 5,
+      "layerCount": 0,
+      "layers": []
+    }
+  },
+  "708a0749-9fbf-4dfb-bf60-14eb7701e793": {
+    "id": "708a0749-9fbf-4dfb-bf60-14eb7701e793",
+    "name": "电联4GTAC划分20240829.TAB",
+    "type": "map",
+    "subType": "mapinfo",
+    "size": 392,
+    "originalPath": "D:\\8_heyuan\\4GTAC\\电联4GTAC划分20240829.TAB",
+    "uploadDate": "2026-03-06T16:50:36.872721",
+    "status": "ready",
+    "metadata": {
+      "fileCount": 1,
+      "layerCount": 1,
+      "layers": [
+        {
+          "id": "8ccdc040-61db-482a-92bd-766258db28b6",
+          "name": "电联4GTAC划分20240829",
+          "type": "polygon",
+          "feature_count": 23,
+          "metadata": {
+            "source_file": "D:\\mycode\\NetworkPlanningTooV3\\data\\708a0749-9fbf-4dfb-bf60-14eb7701e793\\电联4GTAC划分20240829.TAB",
+            "feature_count": 23,
+            "name": "电联4GTAC划分20240829",
+            "coord_sys": "unknown",
+            "fields": [
+              "WindowsSimpChinese",
+              "\\MapInfo",
+              "\\MapInfo\\TableID",
+              "b0ed1b40-1c42-4041-b406-7740fca0f3f7",
+              "\\MapInfo\\ParentTableID",
+              "c943d661-a665-42e4-9186-38a9313e1cf2",
+              "\\IsReadOnly",
+              "FALSE"
+            ],
+            "description": ""
+          }
+        }
+      ]
+    }
+  },
+  "ab4e06e1-f270-4dcd-acb7-634a084813dc": {
+    "id": "ab4e06e1-f270-4dcd-acb7-634a084813dc",
+    "name": "河源5G-TAC.TAB",
+    "type": "map",
+    "subType": "mapinfo",
+    "size": 287,
+    "originalPath": "D:\\8_heyuan\\4GTAC\\2020-9-18 5G TAC区域图层\\河源5G-TAC.TAB",
+    "uploadDate": "2026-03-06T16:51:14.343948",
+    "status": "ready",
+    "metadata": {
+      "fileCount": 1,
+      "layerCount": 1,
+      "layers": [
+        {
+          "id": "d79a97fe-5659-47e3-a656-2bdeeaf82a51",
+          "name": "河源5G-TAC",
+          "type": "polygon",
+          "feature_count": 51,
+          "metadata": {
+            "source_file": "D:\\mycode\\NetworkPlanningTooV3\\data\\ab4e06e1-f270-4dcd-acb7-634a084813dc\\河源5G-TAC.TAB",
+            "feature_count": 51,
+            "name": "河源5G-TAC",
+            "coord_sys": "unknown",
+            "fields": [
+              "WindowsSimpChinese",
+              "\\IsReadOnly",
+              "FALSE",
+              "\\MapInfo",
+              "\\MapInfo\\TableID",
+              "0208e660-cb34-4ae6-9a86-6be083ed6562"
+            ],
+            "description": ""
+          }
+        }
+      ]
+    }
+  },
+  "533cfb47-48f2-4172-a404-6955e619bebc": {
+    "id": "533cfb47-48f2-4172-a404-6955e619bebc",
+    "name": "5G TAC区域图层.zip",
+    "type": "map",
+    "subType": "mapinfo",
+    "size": 9188,
+    "originalPath": "D:\\8_heyuan\\4GTAC\\2020-9-18 5G TAC区域图层\\5G TAC区域图层.zip",
+    "uploadDate": "2026-03-06T16:53:33.657146",
+    "status": "ready",
+    "metadata": {
+      "fileCount": 4,
+      "layerCount": 0,
+      "layers": []
+    }
+  },
+  "b2519bc2-32e9-4542-9111-2932b57cc404": {
+    "id": "b2519bc2-32e9-4542-9111-2932b57cc404",
+    "name": "场景图层.tab",
+    "type": "map",
+    "subType": "mapinfo",
+    "size": 166,
+    "originalPath": "D:\\8_heyuan\\三滚\\敏捷规划20260228\\敏捷站点规划_输入_揭阳R0.2\\河源电信八期规划建议\\广东21地市无线场景边界_20220221\\场景图层.tab",
+    "uploadDate": "2026-03-06T17:09:11.075196",
+    "status": "ready",
+    "metadata": {
+      "fileCount": 1,
+      "layerCount": 1,
+      "layers": [
+        {
+          "id": "6a992366-a69e-4e11-a493-836ec7d15116",
+          "name": "场景图层",
+          "type": "polygon",
+          "feature_count": 1592,
+          "metadata": {
+            "source_file": "D:\\mycode\\NetworkPlanningTooV3\\data\\b2519bc2-32e9-4542-9111-2932b57cc404\\场景图层.tab",
+            "feature_count": 1592,
+            "name": "场景图层",
+            "coord_sys": "unknown",
+            "fields": [
+              "Neutral"
+            ],
+            "description": ""
+          }
+        }
+      ]
+    }
+  },
+  "d878c50e-317f-4ad7-a136-95105f64b20e": {
+    "id": "d878c50e-317f-4ad7-a136-95105f64b20e",
+    "name": "cell-tree-export-20250915204722.xlsx",
+    "type": "excel",
+    "fileType": "target_cells",
+    "size": 10669,
+    "originalPath": "D:\\mycode\\NetworkPlanningTooV3\\待规划小区\\cell-tree-export-20250915204722.xlsx",
+    "uploadDate": "2026-03-07T10:29:25.386497",
+    "status": "ready",
+    "metadata": {
+      "LTESiteCount": 5,
+      "LTESectorCount": 17,
+      "NRSiteCount": 1,
+      "NRSectorCount": 3
+    }
+  },
+  "f2b9c999-8139-4f4e-8952-3f6c7b18ae1f": {
+    "id": "f2b9c999-8139-4f4e-8952-3f6c7b18ae1f",
+    "name": "BaselineLab_172.16.34.163_1773649932_9977305.zip",
+    "type": "map",
+    "subType": "offline",
+    "size": 3904533,
+    "originalPath": "D:\\mycode\\NetworkPlanningTooV3\\全量工参\\BaselineLab_172.16.34.163_1773649932_9977305.zip",
+    "uploadDate": "2026-03-16T17:20:45.102461",
+    "status": "ready",
+    "metadata": {
+      "fileCount": 9
+    }
+  },
+  "fc41cdaa-c646-4eef-8cb1-f5dbb47362ee": {
+    "id": "fc41cdaa-c646-4eef-8cb1-f5dbb47362ee",
+    "name": "ProjectParameter_mongoose河源电联20260316173846.xlsx",
+    "type": "excel",
+    "fileType": "full_params",
+    "size": 6657356,
+    "originalPath": "D:\\mycode\\ProjectParameter_mongoose河源电联20260316173846.xlsx",
+    "uploadDate": "2026-03-16T18:07:17.508420",
+    "status": "ready",
+    "metadata": {
+      "LTESiteCount": 4107,
+      "LTESectorCount": 18748,
+      "NRSiteCount": 1401,
+      "NRSectorCount": 15349
+    }
+  }
+}

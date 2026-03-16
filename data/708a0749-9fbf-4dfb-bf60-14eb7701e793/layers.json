@@ -1,0 +1,25 @@
+[
+  {
+    "id": "8ccdc040-61db-482a-92bd-766258db28b6",
+    "name": "电联4GTAC划分20240829",
+    "type": "polygon",
+    "feature_count": 23,
+    "metadata": {
+      "source_file": "D:\\mycode\\NetworkPlanningTooV3\\data\\708a0749-9fbf-4dfb-bf60-14eb7701e793\\电联4GTAC划分20240829.TAB",
+      "feature_count": 23,
+      "name": "电联4GTAC划分20240829",
+      "coord_sys": "unknown",
+      "fields": [
+        "WindowsSimpChinese",
+        "\\MapInfo",
+        "\\MapInfo\\TableID",
+        "b0ed1b40-1c42-4041-b406-7740fca0f3f7",
+        "\\MapInfo\\ParentTableID",
+        "c943d661-a665-42e4-9186-38a9313e1cf2",
+        "\\IsReadOnly",
+        "FALSE"
+      ],
+      "description": ""
+    }
+  }
+]

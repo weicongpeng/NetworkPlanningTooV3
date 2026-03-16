@@ -6,9 +6,9 @@
  * - 点击地图其他地方时淡出动画隐藏
  * - 支持自定义属性字段
  */
-import { useState, useEffect, useRef } from 'react'
-import { X, Info } from 'lucide-react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { RenderSectorData } from '../../services/mapDataService'
+import L from 'leaflet'
 
 /**
  * 属性面板属性
@@ -34,46 +34,64 @@ export interface SectorInfoPanelProps {
 /**
  * 扇区属性信息面板
  */
-export function SectorInfoPanel({ sector, visible, onClose, position, onMouseEnter, onMouseLeave }: SectorInfoPanelProps) {
-  const [isAnimatingOut, setIsAnimatingOut] = useState(false)
+export function SectorInfoPanel({ sector, visible, position, onMouseEnter, onMouseLeave }: SectorInfoPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null)
 
-  // 移除复杂的动画逻辑，简化为直接显示/隐藏
-  useEffect(() => {
-    // 直接根据visible状态控制动画
-    if (!visible) {
-      setIsAnimatingOut(false)
-    }
-  }, [visible])
+  // 右键菜单状态
+  const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null)
+  // 待复制的文本内容
+  const [pendingSelectedText, setPendingSelectedText] = useState<string>('')
 
-  // 移除复杂的渲染条件，确保面板能显示
+  // 处理全局点击以关闭右键菜单
+  useEffect(() => {
+    const handleGlobalClick = () => {
+      setContextMenu(null)
+      setPendingSelectedText('')
+    }
+    if (contextMenu) {
+      window.addEventListener('click', handleGlobalClick)
+      window.addEventListener('contextmenu', handleGlobalClick)
+    }
+    return () => {
+      window.removeEventListener('click', handleGlobalClick)
+      window.removeEventListener('contextmenu', handleGlobalClick)
+    }
+  }, [contextMenu])
+
+  // 处理复制功能
+  const handleCopy = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    const textToCopy = pendingSelectedText || window.getSelection()?.toString()
+    if (textToCopy) {
+      navigator.clipboard.writeText(textToCopy)
+        .then(() => console.log('[SectorInfoPanel] 已复制到剪切板'))
+        .catch(err => console.error('[SectorInfoPanel] 复制失败:', err))
+    }
+    setContextMenu(null)
+    setPendingSelectedText('')
+  }, [pendingSelectedText])
+
+  // 如果扇区数据不存在，不渲染面板
   if (!sector) {
     return null
   }
-
-  // 调试日志：查看扇区数据结构
-  console.log('[SectorInfoPanel] 扇区数据:', sector);
-  console.log('[SectorInfoPanel] 是否共享:', sector.is_shared);
-
-  // 简化visible逻辑，始终显示
-  const isVisible = true
 
   // 计算面板位置，确保始终显示在视口内
   const calculatePosition = () => {
     const panelWidth = 280
     const viewportWidth = window.innerWidth
     const viewportHeight = window.innerHeight
-    
+
     let left = position ? position.x + 10 : 20
     let right = position ? 'auto' : 20
-    let top: number
+    let top: number | 'auto'
     let bottom: number | 'auto' = 'auto'
-    
+
     // 如果提供了点击事件，根据鼠标位置智能定位
     if (position) {
       // 计算鼠标位置到视口底部的距离
       const distanceToBottom = viewportHeight - position.y
-      
+
       // 如果鼠标靠近底部边缘，将弹窗显示在鼠标上方
       if (distanceToBottom < 300) {
         // 弹窗显示在鼠标上方，距离鼠标10px
@@ -84,7 +102,7 @@ export function SectorInfoPanel({ sector, visible, onClose, position, onMouseEnt
         top = position.y
         bottom = 'auto'
       }
-      
+
       // 如果面板超出右侧视口，调整为左侧显示
       if (left + panelWidth > viewportWidth) {
         left = position.x - panelWidth - 10
@@ -95,12 +113,12 @@ export function SectorInfoPanel({ sector, visible, onClose, position, onMouseEnt
       top = 80
       bottom = 'auto'
     }
-    
+
     return { top, left, right, bottom }
   }
-  
+
   const { top, left, right, bottom } = calculatePosition()
-  
+
   // 面板样式 - 直接设置所有颜色和样式，确保不被覆盖
   const panelStyle: React.CSSProperties = {
     position: 'fixed',
@@ -121,7 +139,7 @@ export function SectorInfoPanel({ sector, visible, onClose, position, onMouseEnt
     color: '#000000', // 直接设置字体颜色为黑色，确保不透明
     boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
     userSelect: 'text',
-    cursor: 'default',
+    cursor: 'auto',
     border: '1px solid #e2e8f0',
     borderRadius: '8px',
     padding: '8px 12px',
@@ -131,15 +149,19 @@ export function SectorInfoPanel({ sector, visible, onClose, position, onMouseEnt
   }
 
   return (
+    <>
       <div
         ref={panelRef}
         style={panelStyle}
-        className="bg-white border border-gray-300 rounded-lg shadow-lg"
+        tabIndex={0} // 使面板可以获得焦点，支持键盘事件
+        className="bg-white border border-gray-300 rounded-lg shadow-lg outline-none"
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
         onClick={(e) => {
           // 阻止事件冒泡到地图，防止点击面板时关闭面板
           e.stopPropagation()
+          // 点击时聚焦面板，确保 Ctrl+C 能够工作
+          panelRef.current?.focus()
         }}
         onMouseDown={(e) => {
           // 只阻止事件冒泡，允许文本选择的默认行为
@@ -154,109 +176,141 @@ export function SectorInfoPanel({ sector, visible, onClose, position, onMouseEnt
           e.stopPropagation()
         }}
         onContextMenu={(e) => {
-          // 阻止事件冒泡，允许右键菜单的默认行为（复制功能）
+          // 阻止默认右键菜单，显示自定义复制菜单
+          e.preventDefault()
           e.stopPropagation()
+
+          // 在右键按下瞬间捕捉选中的文本，防止后续点击菜单时由于焦点改变导致选择丢失
+          const text = window.getSelection()?.toString() || ''
+          setPendingSelectedText(text)
+          setContextMenu({ x: e.clientX, y: e.clientY })
         }}
       >
 
 
-      {/* 属性列表 */}
-      <div className="p-4 space-y-1">
-        {/* 小区名称 - 标题样式 - 确保不透明 */}
-        <div style={{ 
-          color: '#000000', 
-          fontSize: '12px', 
-          fontWeight: '600',
-          opacity: 1, 
-          textOpacity: 0, 
-          paddingBottom: '6px',
-          borderBottom: '1px solid #e2e8f0',
-          marginBottom: '6px'
-        }}>
-          {sector.name || '未命名小区'}
+        {/* 属性列表 */}
+        <div className="p-4 space-y-1">
+          {/* 小区名称 - 标题样式 - 确保不透明 */}
+          <div style={{
+            color: '#000000',
+            fontSize: '12px',
+            fontWeight: '600',
+            opacity: 1,
+            paddingBottom: '6px',
+            borderBottom: '1px solid #e2e8f0',
+            marginBottom: '6px',
+            userSelect: 'text',
+            cursor: 'text'
+          }}>
+            {sector.name || '未命名小区'}
+          </div>
+
+          {/* 属性网格 */}
+          <div className="grid grid-cols-2 gap-1 text-sm">
+            {/* 网络类型 */}
+            <AttributeLabel label="网络类型" />
+            <AttributeValue value={sector.networkType} highlight />
+
+            {/* 基站ID */}
+            <AttributeLabel label="基站ID" />
+            <AttributeValue value={sector.siteId || '-'} />
+
+            {/* 小区ID */}
+            <AttributeLabel label="小区ID" />
+            <AttributeValue value={sector.sectorId || '-'} />
+
+            {/* 覆盖类型 */}
+            {sector.cell_cover_type !== undefined && (
+              <>
+                <AttributeLabel label="覆盖类型" />
+                <AttributeValue
+                  value={sector.cell_cover_type === 1 ? '室外小区' : sector.cell_cover_type === 4 ? '室内小区' : `类型${sector.cell_cover_type}`}
+                  highlight={sector.cell_cover_type === 4}
+                />
+              </>
+            )}
+
+            {/* 下行频点（MHz） */}
+            <AttributeLabel label="下行频点（MHz）" />
+            <AttributeValue value={sector.frequency || '-'} />
+
+            {/* PCI */}
+            <AttributeLabel label="PCI" />
+            <AttributeValue value={sector.pci} highlight />
+
+            {/* TAC */}
+            <AttributeLabel label="TAC" />
+            <AttributeValue value={sector.tac || '-'} />
+
+            {/* 经度 */}
+            <AttributeLabel label="经度" />
+            <AttributeValue value={sector.longitude?.toFixed(6) || '-'} />
+
+            {/* 纬度 */}
+            <AttributeLabel label="纬度" />
+            <AttributeValue value={sector.latitude?.toFixed(6) || '-'} />
+
+            {/* 方向角 */}
+            <AttributeLabel label="方向角" />
+            <AttributeValue value={`${sector.azimuth}°`} />
+
+            {/* 天线挂高 */}
+            {sector.height !== undefined && (
+              <>
+                <AttributeLabel label="天线挂高" />
+                <AttributeValue value={`${sector.height}m`} />
+              </>
+            )}
+
+            {/* 是否共享 */}
+            <AttributeLabel label="是否共享" />
+            <AttributeValue value={sector.is_shared || '-'} />
+          </div>
+
+
         </div>
-
-        {/* 属性网格 */}
-        <div className="grid grid-cols-2 gap-1 text-sm">
-          {/* 网络类型 */}
-          <AttributeLabel label="网络类型" />
-          <AttributeValue value={sector.networkType} highlight />
-
-          {/* 基站ID */}
-          <AttributeLabel label="基站ID" />
-          <AttributeValue value={sector.siteId || '-' } />
-
-          {/* 小区ID */}
-          <AttributeLabel label="小区ID" />
-          <AttributeValue value={sector.sectorId || '-' } />
-
-          {/* 覆盖类型 */}
-          {sector.cell_cover_type !== undefined && (
-            <>
-              <AttributeLabel label="覆盖类型" />
-              <AttributeValue
-                value={sector.cell_cover_type === 1 ? '室外小区' : sector.cell_cover_type === 4 ? '室内小区' : `类型${sector.cell_cover_type}`}
-                highlight={sector.cell_cover_type === 4}
-              />
-            </>
-          )}
-
-          {/* 下行频点（MHz） */}
-          <AttributeLabel label="下行频点（MHz）" />
-          <AttributeValue value={sector.frequency || '-' } />
-
-          {/* PCI */}
-          <AttributeLabel label="PCI" />
-          <AttributeValue value={sector.pci} highlight />
-
-          {/* TAC */}
-          <AttributeLabel label="TAC" />
-          <AttributeValue value={sector.tac || '-' } />
-
-          {/* 经度 */}
-          <AttributeLabel label="经度" />
-          <AttributeValue value={sector.longitude?.toFixed(6) || '-' } />
-
-          {/* 纬度 */}
-          <AttributeLabel label="纬度" />
-          <AttributeValue value={sector.latitude?.toFixed(6) || '-' } />
-
-          {/* 方向角 */}
-          <AttributeLabel label="方向角" />
-          <AttributeValue value={`${sector.azimuth}°`} />
-
-          {/* 天线挂高 */}
-          {sector.height !== undefined && (
-            <>
-              <AttributeLabel label="天线挂高" />
-              <AttributeValue value={`${sector.height}m`} />
-            </>
-          )}
-
-          {/* 是否共享 */}
-          <AttributeLabel label="是否共享" />
-          <AttributeValue value={sector.is_shared || '-' } />
-        </div>
-
-
       </div>
-    </div>
+
+      {/* 自定义右键复制菜单 */}
+      {contextMenu && (
+        <div
+          style={{
+            position: 'fixed',
+            top: contextMenu.y,
+            left: contextMenu.x,
+            zIndex: 11000,
+            background: 'white',
+            border: '1px solid #e2e8f0',
+            borderRadius: '4px',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+            padding: '4px 0',
+            minWidth: '80px'
+          }}
+          onClick={handleCopy}
+        >
+          <div className="px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm flex items-center">
+            <span className="mr-2">复制</span>
+            <span className="text-gray-400 text-xs">Ctrl+C</span>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 
 /**
- * 属性标签组件 - 确保文本不透明（透明度0% = 完全不透明）
+ * 属性标签组件 - 确保文本不透明
  */
 function AttributeLabel({ label }: { label: string }) {
   return (
-    <div style={{ 
-      color: '#000000', 
-      fontSize: '12px', 
+    <div style={{
+      color: '#000000',
+      fontSize: '12px',
       fontWeight: '600',
       opacity: 1, // 透明度100% = 不透明
-      textOpacity: 0, // 文本透明度0% = 不透明
       marginBottom: '2px',
-      lineHeight: '1.0' // 减小行间距
+      lineHeight: '1.0', // 减小行间距
+      userSelect: 'text'
     }}>
       {label}
     </div>
@@ -264,7 +318,7 @@ function AttributeLabel({ label }: { label: string }) {
 }
 
 /**
- * 属性值组件 - 确保文本不透明（透明度0% = 完全不透明）
+ * 属性值组件 - 确保文本不透明
  */
 function AttributeValue({ value, highlight }: { value: string | number | undefined | null; highlight?: boolean }) {
   // 简化条件，确保所有值都能显示，包括0
@@ -274,13 +328,14 @@ function AttributeValue({ value, highlight }: { value: string | number | undefin
   return (
     <div
       style={{
-        color: textColor, 
-        fontSize: '12px', 
+        color: textColor,
+        fontSize: '12px',
         fontWeight: '500',
         opacity: 1, // 透明度100% = 不透明
-        textOpacity: 0, // 文本透明度0% = 不透明
         marginBottom: '2px',
-        lineHeight: '1.0' // 减小行间距
+        lineHeight: '1.0', // 减小行间距
+        userSelect: 'text',
+        cursor: 'text'
       }}
     >
       {displayValue}
@@ -295,8 +350,14 @@ export function useSectorInfoPanel() {
   const [selectedSector, setSelectedSector] = useState<RenderSectorData | null>(null)
   const [panelVisible, setPanelVisible] = useState(false)
   const [clickPosition, setClickPosition] = useState<{ x: number; y: number } | undefined>(undefined)
+  const timerRef = useRef<NodeJS.Timeout | null>(null)
 
   const showSectorInfo = (sector: RenderSectorData, event?: L.LeafletMouseEvent) => {
+    // 清除之前的定时器
+    if (timerRef.current) {
+      clearTimeout(timerRef.current)
+    }
+
     console.log('[useSectorInfoPanel] showSectorInfo called:', {
       sectorName: sector.name,
       networkType: sector.networkType,
@@ -315,9 +376,19 @@ export function useSectorInfoPanel() {
     } else {
       setClickPosition(undefined)
     }
+
+    // 25秒后自动淡出 (满足需求: 25秒)
+    timerRef.current = setTimeout(() => {
+      setPanelVisible(false)
+      timerRef.current = null
+    }, 25000)
   }
 
   const hideSectorInfo = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current)
+      timerRef.current = null
+    }
     console.log('[useSectorInfoPanel] hideSectorInfo called')
     setPanelVisible(false)
   }

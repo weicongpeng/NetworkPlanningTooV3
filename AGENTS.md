@@ -1,22 +1,25 @@
 # AGENTS.md
 
-Guidelines for agentic coding agents in this repository.
-
 ## Project Overview
 
-Desktop application for telecom network planning (map visualization, neighbor/PCI planning). Electron + React + TypeScript frontend, FastAPI + Python backend.
+Desktop application for telecom network planning (PCI/neighbor/TAC planning, map visualization).
+
+**Tech Stack:**
+- **Frontend**: React 18 + TypeScript + Vite + Electron + Tailwind CSS + Zustand + Leaflet
+- **Backend**: FastAPI 0.115.0 + Python 3.10+ + Pydantic + Pandas + GeoPandas
+- **API**: REST with unified `ApiResponse<T>` format
 
 ## Build/Lint/Test Commands
 
 ### Frontend (React + TypeScript + Electron)
+
 ```bash
 cd frontend
 
 # Development
 npm run dev              # Start Electron + Vite
-npm run dev:web         # Web-only mode
-npm run dev:vite        # Vite dev server only
-npm run dev:electron    # Electron only (requires Vite running)
+npm run dev:web         # Web-only mode (Vite only)
+npm run dev:vite        # Vite dev server only (http://localhost:5173)
 
 # Building
 npm run build           # Build Vite + Electron
@@ -24,17 +27,18 @@ npm run build:vite      # Build Vite only
 npm run build:electron  # Compile Electron TypeScript
 
 # Code Quality
-npm run lint            # ESLint
-npm run type-check      # TypeScript type check
+npm run lint            # ESLint (checks src/ directory)
+npm run type-check      # TypeScript type check (no emit)
 ```
 
 ### Backend (FastAPI + Python)
+
 ```bash
 cd backend
 
 # Setup (first time)
 python -m venv venv
-venv\Scripts\activate
+venv\Scripts\activate  # Windows
 pip install -r requirements.txt
 
 # Development
@@ -42,158 +46,92 @@ python main.py          # Start FastAPI server (http://127.0.0.1:8000)
 
 # Testing
 pytest                          # Run all tests
-pytest tests/test_pci_algorithm.py              # Single test file
-pytest tests/test_pci_algorithm.py::TestDistanceCalculator::test_haversine_distance  # Single test method
+pytest test_distance_threshold.py    # Run single test file
 pytest -v                       # Verbose output
-pytest --cov=app                # With coverage
+pytest -k "test_name"          # Run tests matching pattern
+pytest -s                      # Show print output
 ```
 
-### Quick Start
-```bash
-start_app.bat  # Windows: Start all services
-```
-
-## Code Style
+## Code Style Guidelines
 
 ### Frontend (TypeScript/React)
 
-#### Import Order
+**Import Order:**
 ```typescript
 // 1. External libraries
 import React from 'react'
-import axios from 'axios'
+import { useEffect, useState } from 'react'
+import { Shield } from 'lucide-react'
 
-// 2. Internal modules (@/ alias)
-import { dataApi } from '@/services/api'
+// 2. Internal modules (@/ alias for src/)
+import { apiClient } from '@/services/api'
 import { useDataStore } from '@/store/dataStore'
 
-// 3. Type imports (use 'type' keyword)
+// 3. Type imports (always use 'type' keyword)
 import type { ApiResponse, DataItem } from '@shared/types'
 ```
 
-#### Component Pattern
-```typescript
-interface ComponentProps {
-  title: string
-  onSubmit: (data: FormData) => void
-}
+**Component Pattern:** Use functional components with hooks, TypeScript interfaces for props.
 
-export const Component: React.FC<ComponentProps> = ({ title, onSubmit }) => {
-  const [loading, setLoading] = useState(false)
-  const { items } = useDataStore()
+**State Management (Zustand):** Use `create<DataState>((set, get) => ({ ... }))` pattern.
 
-  const handleSubmit = useCallback((data: FormData) => {
-    setLoading(true)
-    onSubmit(data)
-  }, [onSubmit])
-
-  return <div className="p-4">{/* JSX */}</div>
-}
-```
-
-#### State Management (Zustand)
-```typescript
-interface DataState {
-  items: DataItem[]
-  loading: boolean
-  error: string | null
-  fetchList: () => Promise<void>
-}
-
-export const useDataStore = create<DataState>((set, get) => ({
-  items: [],
-  loading: false,
-  error: null,
-  fetchList: async () => {
-    set({ loading: true, error: null })
-    try {
-      const response = await dataApi.list()
-      set({ items: response.data || [], loading: false })
-    } catch (error: any) {
-      set({ error: error.message, loading: false })
-    }
-  }
-}))
-```
-
-#### API Service
-```typescript
-export const dataApi = {
-  getList: async (): Promise<ApiResponse<DataItem[]>> => apiClient.get('/data/list'),
-  create: async (item: DataItem): Promise<ApiResponse<DataItem>> => apiClient.post('/data', item)
-}
-```
+**API Service:**
+- Regular requests: `apiClient.get()` / `apiClient.post()`
+- File upload: `uploadClient.post()` with `FormData`
+- File download: `apiClient.get()` with `responseType: 'blob'`, return `response.data`
 
 ### Backend (Python/FastAPI)
 
-#### Import Order
+**Import Order:**
 ```python
 # 1. Standard library
 import asyncio
-from typing import Dict, Optional, Any
+from datetime import datetime
+from typing import Dict, List, Optional, Any
+from pathlib import Path
 
 # 2. Third-party
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
+import pandas as pd
 
 # 3. Internal
-from app.models.schemas import PCIConfig, PCIResult
-from app.services.task_manager import task_manager
+from app.models.schemas import DataItem
+from app.services.data_service import data_service
 ```
 
-#### Endpoint Pattern
+**Encoding Handling (Windows GBK compatibility):**
 ```python
-router = APIRouter()
-
-@router.post("/plan")
-async def start_pci_planning(config: PCIConfig) -> Dict[str, Any]:
-    try:
-        task_id = await task_manager.create_pci_task(config)
-        return {"success": True, "data": {"taskId": task_id}}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+# Always use GBK-safe encoding for error messages
+safe_detail = str(e).encode("gbk", "replace").decode("gbk")
+raise HTTPException(status_code=400, detail=safe_detail)
 ```
 
-#### Pydantic Model
-```python
-class PCIConfig(BaseModel):
-    dataId: str = Field(..., description="数据集ID")
-    networkType: NetworkType = Field(..., description="网络类型")
-    pciRange: tuple[int, int] = Field(default=(0, 1007), description="PCI范围")
-    collisionThreshold: float = Field(default=3.0, description="冲突阈值")
-```
+**Async Patterns:**
+- I/O operations: `async/await`
+- CPU-bound pandas/geopandas: `await run_in_threadpool(func, args)`
 
-### Naming Conventions
+**Endpoint Pattern:** Use `@router.post()` decorators, return `{"success": True, "data": result}` format.
 
-#### Frontend
-- Components: PascalCase (`DataUploadForm`)
-- Functions/variables: camelCase (`fetchDataList`)
+## Naming Conventions
+
+**Frontend:**
+- Components: PascalCase (`DataUploadForm`, `MapPage`)
+- Functions/variables: camelCase (`fetchDataList`, `handleSubmit`)
 - Constants: UPPER_SNAKE_CASE (`API_BASE_URL`)
 - Files: kebab-case (`data-upload-form.tsx`)
 
-#### Backend
-- Classes: PascalCase (`TaskManager`)
-- Functions/variables: snake_case (`create_pci_task`)
+**Backend:**
+- Classes: PascalCase (`TaskManager`, `DataService`)
+- Functions/variables: snake_case (`create_task`, `get_data_by_id`)
 - Constants: UPPER_SNAKE_CASE (`MAX_RETRY_COUNT`)
-- Files: snake_case (`task_manager.py`)
+- Files: snake_case (`task_manager.py`, `data_service.py`)
 
-### Error Handling
+## Error Handling
 
-#### Frontend
-```typescript
-apiClient.interceptors.response.use(
-  (response) => response.data,
-  (error) => Promise.reject({
-    success: false,
-    message: error.response?.data?.detail || error.message,
-    code: error.response?.status
-  })
-)
-```
+**Frontend:** Use try-catch with `error.message`, set error state, console.error.
 
-#### Backend
+**Backend:**
 ```python
 try:
     result = await operation()
@@ -201,35 +139,71 @@ try:
 except ValueError as e:
     raise HTTPException(status_code=400, detail=str(e))
 except Exception as e:
-    logger.error(f"Error: {e}")
-    raise HTTPException(status_code=500, detail="内部服务器错误")
+    raise HTTPException(status_code=500, detail=str(e))
 ```
 
-## Architecture
+## Type Safety
 
-- **Frontend**: React 18 + TypeScript + Vite + Electron + Zustand
-- **Backend**: FastAPI + Pydantic + asyncio
-- **API**: REST with unified `ApiResponse<T>` format
-- **State**: Zustand (frontend), singleton services (backend)
-- **Types**: Shared in `shared/types.ts`
-- **Async**: All planning tasks are async with progress tracking
+**Frontend:** Never use `any` unless absolutely necessary. Use `interface` for props, `type` for utilities.
+
+**Backend:** Use Pydantic for all request/response models. Type hints for all functions. `Optional[T]` for nullables.
+
+## Testing Guidelines
+
+**Backend Test Structure:**
+```python
+import pytest
+from fastapi.testclient import TestClient
+from app.main import app
+
+client = TestClient(app)
+
+def test_api_endpoint():
+    response = client.get("/api/v1/data/list")
+    assert response.status_code == 200
+    assert response.json()["success"] is True
+```
+
+**Test File Naming:** `test_*.py` in `backend/` or `backend/tests/` directory.
 
 ## Key Directories
 
 - `frontend/src/renderer/` - React app source
-- `frontend/src/renderer/services/api.ts` - API client
+- `frontend/src/renderer/services/` - API services
 - `frontend/src/renderer/store/` - Zustand stores
-- `backend/app/api/v1/endpoints/` - API endpoints
-- `backend/app/services/` - Business logic
-- `backend/app/algorithms/` - Planning algorithms
+- `backend/app/api/v1/endpoints/` - API routes
+- `backend/app/services/` - Business logic services
+- `backend/app/models/` - Pydantic models
+- `backend/app/algorithms/` - Algorithm implementations
 - `shared/types.ts` - Shared TypeScript types
 
 ## Development Workflow
 
 1. Make changes
-2. Run lint/type-check: `npm run lint && npm run type-check`
-3. Run tests: `npm test` (frontend) or `pytest` (backend)
-4. Test integration with dev servers
-5. Build: `npm run build`
+2. Run type-check: `npm run type-check` (frontend)
+3. Run lint: `npm run lint` (frontend)
+4. Run tests: `pytest` (backend)
+5. Test integration: `npm run dev` (frontend) + `python main.py` (backend)
 
-Follow existing patterns and conventions!
+## Git Commit Messages
+
+**Format**: `type: subject` (max 50 chars)
+**Types**: `feat:` / `fix:` / `refactor:` / `docs:` / `test:`
+
+## Important Project-Specific Notes
+
+### Frontend
+- **Electron**: Access file paths via `window.electronAPI.getFilePath(file)` when available
+- **Colors**: HSL-based custom color variables in Tailwind config
+- **Blob downloads**: Use `responseType: 'blob'`, return `response.data` directly
+
+### Backend (CRITICAL for Windows)
+- **GBK Encoding**: All string operations must use `.encode("gbk", "replace").decode("gbk")` pattern
+- **Async**: Use `run_in_threadpool` for CPU-bound pandas/geopandas operations
+- **Paths**: Always use `pathlib.Path` for cross-platform compatibility
+- **Print Safety**: main.py wrapper handles encoding; avoid bare print() in endpoints
+
+### Data Processing
+- Use `run_in_threadpool` for CPU-intensive pandas/geopandas operations
+- Use GeoPandas for spatial operations and Leaflet visualization
+- Excel files handled via openpyxl; MapInfo files via GDAL

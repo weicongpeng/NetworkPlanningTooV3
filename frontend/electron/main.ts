@@ -1,30 +1,62 @@
-import { app, BrowserWindow, ipcMain, dialog, screen } from 'electron'
-import * as path from 'path'
-import * as fs from 'fs'
+import electron = require('electron')
+import path = require('path')
+import fs = require('fs')
 import { spawn, ChildProcess } from 'child_process'
+
+// 直接使用 electron 对象的属性，不使用解构
+const app: any = electron.app
+const BW: any = electron.BrowserWindow
+const ipcMain: any = electron.ipcMain
+const dialog: any = electron.dialog
+const screen: any = electron.screen
 
 // 在 CommonJS 模式下 __filename 和 __dirname 是全局变量
 declare const __filename: string
 declare const __dirname: string
 
-let mainWindow: BrowserWindow | null = null
+let mainWindow: electron.BrowserWindow | null = null
 let backendProcess: ChildProcess | null = null
 
-// 开发环境检测
-const isDev = process.env.NODE_ENV !== 'production'
+// 开发环境检测 - 使用更可靠的方法
+// 在生产环境中，src 目录不会被包含，所以可以通过检查它来判断
+const isDev = fs.existsSync(path.join(__dirname, '../../src/renderer')) || process.env.NODE_ENV !== 'production'
 
 console.log('Electron main process starting...')
 console.log('isDev:', isDev)
 console.log('__dirname:', __dirname)
 
+// 安全地访问 app 属性
+try {
+  console.log('app.isPackaged:', app.isPackaged)
+} catch (e) {
+  console.log('app.isPackaged: not available')
+}
+
 // 创建浏览器窗口
 function createWindow() {
   console.log('Creating browser window...')
+  try {
+    console.log('app.getAppPath():', app.getAppPath())
+  } catch (e) {
+    console.log('app.getAppPath(): not available')
+  }
+  try {
+    console.log('app.isPackaged:', app.isPackaged)
+  } catch (e) {
+    console.log('app.isPackaged: not available')
+  }
+  console.log('__dirname:', __dirname)
+  console.log('process.resourcesPath:', process.resourcesPath)
 
   const preloadPath = path.join(__dirname, 'preload.js')
   console.log('Preload path:', preloadPath)
 
-  mainWindow = new BrowserWindow({
+  // 检查 preload.js 是否存在
+  if (!fs.existsSync(preloadPath)) {
+    console.error('ERROR: preload.js not found at:', preloadPath)
+  }
+
+  mainWindow = new BW({
     width: 1400,
     height: 900,
     minWidth: 1000,
@@ -67,9 +99,42 @@ function createWindow() {
       }
     })
   } else {
-    const htmlPath = path.join(__dirname, '../dist-renderer/index.html')
-    console.log('Loading HTML file:', htmlPath)
-    mainWindow.loadFile(htmlPath)
+    // 生产环境：尝试多个可能的路径
+    let htmlPath = ''
+    const possiblePaths = [
+      // electron-packager no-asar: resources/app/dist-renderer/index.html
+      path.join(process.resourcesPath, 'app', 'dist-renderer', 'index.html'),
+      // electron-packager asar: app.asar/dist-renderer/index.html
+      path.join(process.resourcesPath, 'app.asar', 'dist-renderer', 'index.html'),
+      // 相对于 __dirname
+      path.join(__dirname, '../dist-renderer/index.html'),
+      path.join(__dirname, 'dist-renderer', 'index.html')
+    ]
+
+    console.log('Production mode - searching for HTML file...')
+    console.log('process.resourcesPath:', process.resourcesPath)
+    console.log('__dirname:', __dirname)
+
+    for (const testPath of possiblePaths) {
+      console.log('  Checking:', testPath)
+      if (fs.existsSync(testPath)) {
+        htmlPath = testPath
+        console.log('  ✓ FOUND HTML at:', htmlPath)
+        break
+      } else {
+        console.log('  ✗ Not found')
+      }
+    }
+
+    if (!htmlPath) {
+      console.error('ERROR: HTML file not found!')
+      console.error('Searched paths:', possiblePaths)
+      // 显示错误页面
+      mainWindow.loadURL('data:text/html;charset=utf-8,<h1 style="color:white;background:#333;padding:20px;">错误：找不到 HTML 文件</h1><p style="color:white;background:#333;padding:20px;">请查看控制台获取详细信息</p>')
+    } else {
+      console.log('Loading HTML file:', htmlPath)
+      mainWindow.loadFile(htmlPath)
+    }
   }
 
   mainWindow.on('closed', () => {
@@ -100,12 +165,32 @@ function startBackend() {
     return
   }
 
+  // 生产环境后端路径：优先尝试 app.asar.unpacked，然后是 app
+  let backendRelPath = 'app.asar.unpacked/backend'
+  const unpackedPath = path.join(process.resourcesPath, 'app.asar.unpacked/backend')
+  const noAsarPath = path.join(process.resourcesPath, 'app/backend')
+
+  if (!fs.existsSync(unpackedPath) && fs.existsSync(noAsarPath)) {
+    backendRelPath = 'app/backend'
+    console.log('Using no-asar backend path:', noAsarPath)
+  }
+
   const backendPath = path.join(
     process.resourcesPath,
-    isDev ? '../backend' : 'app.asar.unpacked/backend'
+    isDev ? '../backend' : backendRelPath
   )
 
-  const pythonExecutable = process.platform === 'win32' ? 'python' : 'python3'
+  // 优先使用虚拟环境中的 Python
+  let pythonExecutable = process.platform === 'win32' ? 'python' : 'python3'
+  const venvPythonPath = path.join(backendPath, 'venv', 'Scripts', 'python.exe')
+  const venvPythonExists = fs.existsSync(venvPythonPath)
+
+  if (venvPythonExists) {
+    pythonExecutable = venvPythonPath
+    console.log('使用虚拟环境 Python:', venvPythonPath)
+  } else {
+    console.log('虚拟环境未找到，使用系统 Python')
+  }
 
   backendProcess = spawn(pythonExecutable, [
     path.join(backendPath, 'main.py')
@@ -185,7 +270,7 @@ app.whenReady().then(() => {
 
   app.on('activate', () => {
     console.log('App activated')
-    if (BrowserWindow.getAllWindows().length === 0) {
+    if (BW.getAllWindows().length === 0) {
       createWindow()
     }
   })

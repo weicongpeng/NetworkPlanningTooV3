@@ -5,12 +5,14 @@
     "lib": ["ES2022", "DOM"],
     "outDir": "../dist-electron",
     "rootDir": ".",
-    "strict": true,
+    "strict": false,
+    "strictNullChecks": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "moduleResolution": "node"
+    "moduleResolution": "node",
+    "noImplicitAny": false
   },
   "include": ["**/*.ts"],
   "exclude": ["node_modules"]

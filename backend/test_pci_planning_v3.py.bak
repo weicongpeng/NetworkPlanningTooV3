@@ -1,0 +1,550 @@
+"""
+PCI规划功能测试
+"""
+
+import pytest
+import asyncio
+from typing import Any
+from app.algorithms.pci_planning_service_v3 import (
+    PlanningConfig,
+    PCIPlanningServiceV3,
+    SiteSectorInfo,
+    NetworkType,
+)
+from app.algorithms.pci_collision_detector import ConflictType
+
+
+class TestPCIPlanningV3:
+    """PCI规划V3功能测试"""
+
+    @pytest.fixture
+    def sample_sites_data(self):
+        """示例站点数据"""
+        return [
+            {
+                "id": "site1",
+                "name": "站点1",
+                "networkType": "LTE",
+                "longitude": 116.4074,
+                "latitude": 39.9042,
+                "managedElementId": "ME001",
+                "sectors": [
+                    {
+                        "id": "1",
+                        "name": "站点1_扇区1",
+                        "longitude": 116.4074,
+                        "latitude": 39.9042,
+                        "azimuth": 0,
+                        "beamwidth": 65,
+                        "height": 30,
+                        "pci": None,
+                        "earfcn": 1850.0,
+                    },
+                    {
+                        "id": "2",
+                        "name": "站点1_扇区2",
+                        "longitude": 116.4074,
+                        "latitude": 39.9042,
+                        "azimuth": 120,
+                        "beamwidth": 65,
+                        "height": 30,
+                        "pci": None,
+                        "earfcn": 1850.0,
+                    },
+                    {
+                        "id": "3",
+                        "name": "站点1_扇区3",
+                        "longitude": 116.4074,
+                        "latitude": 39.9042,
+                        "azimuth": 240,
+                        "beamwidth": 65,
+                        "height": 30,
+                        "pci": None,
+                        "earfcn": 1850.0,
+                    },
+                ],
+            },
+            {
+                "id": "site2",
+                "name": "站点2",
+                "networkType": "LTE",
+                "longitude": 116.4174,
+                "latitude": 39.9042,
+                "managedElementId": "ME002",
+                "sectors": [
+                    {
+                        "id": "1",
+                        "name": "站点2_扇区1",
+                        "longitude": 116.4174,
+                        "latitude": 39.9042,
+                        "azimuth": 0,
+                        "beamwidth": 65,
+                        "height": 30,
+                        "pci": None,
+                        "earfcn": 1850.0,
+                    },
+                    {
+                        "id": "2",
+                        "name": "站点2_扇区2",
+                        "longitude": 116.4174,
+                        "latitude": 39.9042,
+                        "azimuth": 120,
+                        "beamwidth": 65,
+                        "height": 30,
+                        "pci": None,
+                        "earfcn": 1850.0,
+                    },
+                    {
+                        "id": "3",
+                        "name": "站点2_扇区3",
+                        "longitude": 116.4174,
+                        "latitude": 39.9042,
+                        "azimuth": 240,
+                        "beamwidth": 65,
+                        "height": 30,
+                        "pci": None,
+                        "earfcn": 1850.0,
+                    },
+                ],
+            },
+        ]
+
+    @pytest.fixture
+    def background_sites_data(self):
+        """背景站点数据（全量工参）"""
+        return [
+            {
+                "id": "bg_site1",
+                "name": "背景站点1",
+                "networkType": "LTE",
+                "longitude": 116.4274,
+                "latitude": 39.9042,
+                "sectors": [
+                    {
+                        "id": "1",
+                        "name": "背景站点1_扇区1",
+                        "longitude": 116.4274,
+                        "latitude": 39.9042,
+                        "azimuth": 0,
+                        "beamwidth": 65,
+                        "height": 30,
+                        "pci": 100,
+                        "earfcn": 1850.0,
+                    }
+                ],
+            }
+        ]
+
+    @pytest.mark.asyncio
+    async def test_basic_pci_planning(self, sample_sites_data):
+        """测试基本PCI规划功能"""
+        config = PlanningConfig(
+            network_type=NetworkType.LTE,
+            distance_threshold=3.0,
+            pci_modulus=3,
+            enable_collision_check=True,
+            enable_confusion_check=True,
+            enable_mod3_check=True,
+            enable_mod6_check=False,
+            enable_mod30_check=True,
+            check_same_frequency_only=False,
+            inherit_modulus=False,
+            pci_range=None,
+            optimization_strategy="greedy",
+        )
+
+        service = PCIPlanningServiceV3(config)
+        result = await service.plan(sample_sites_data)
+
+        # 验证基本结果
+        assert result.status == "completed"
+        assert result.total_sites == 2
+        assert result.total_sectors == 6
+        assert result.progress == 100.0
+
+        # 验证每个小区都有PCI
+        for site in result.sites:
+            for sector in site.sectors:
+                assert sector.new_pci >= 0
+                assert sector.new_pci <= 503  # LTE最大PCI
+
+        # 验证同站小区使用不同模值
+        for site in result.sites:
+            mod_values = {sector.new_mod for sector in site.sectors}
+            assert len(mod_values) == len(site.sectors)  # 每个扇区模值应该不同
+
+    @pytest.mark.asyncio
+    async def test_mod3_detection(self, sample_sites_data):
+        """测试Mod3冲突检测"""
+        config = PlanningConfig(
+            network_type=NetworkType.LTE,
+            distance_threshold=1.0,  # 小阈值增加冲突概率
+            pci_modulus=3,
+            enable_collision_check=True,
+            enable_confusion_check=True,
+            enable_mod3_check=True,
+            enable_mod6_check=False,
+            enable_mod30_check=False,  # 只检测Mod3
+            check_same_frequency_only=True,
+            inherit_modulus=False,
+            pci_range=None,
+            optimization_strategy="greedy",
+        )
+
+        service = PCIPlanningServiceV3(config)
+        result = await service.plan(sample_sites_data)
+
+        # 验证Mod3冲突被正确统计
+        assert result.total_mod3_conflicts >= 0
+
+        print(f"Mod3冲突数量: {result.total_mod3_conflicts}")
+        print(f"总冲突数量: {result.total_collisions}")
+
+    @pytest.mark.asyncio
+    async def test_background_interference(
+        self, sample_sites_data, background_sites_data
+    ):
+        """测试背景干扰处理"""
+        config = PlanningConfig(
+            network_type=NetworkType.LTE,
+            distance_threshold=3.0,
+            pci_modulus=3,
+            enable_collision_check=True,
+            enable_confusion_check=True,
+            enable_mod3_check=True,
+            enable_mod6_check=False,
+            enable_mod30_check=True,
+            check_same_frequency_only=False,
+            inherit_modulus=False,
+            pci_range=None,
+            optimization_strategy="greedy",
+        )
+
+        # 确保背景站点的PCI与待规划小区可能冲突
+        background_sites_data[0]["sectors"][0]["pci"] = 0
+
+        service = PCIPlanningServiceV3(config)
+        result = await service.plan(
+            sample_sites_data, background_sites_data=background_sites_data
+        )
+
+        # 验证背景干扰被考虑
+        # 如果背景站点PCI=0，待规划小区应该避免使用PCI=0（在同频范围内）
+        for site in result.sites:
+            for sector in site.sectors:
+                if sector.new_pci == 0:
+                    # 如果分配了0，应该有充分的分配原因
+                    assert "资源耗尽" in sector.assignment_reason.lower()
+
+    @pytest.mark.asyncio
+    async def test_simulated_annealing(self, sample_sites_data):
+        """测试模拟退火优化"""
+        config = PlanningConfig(
+            network_type=NetworkType.LTE,
+            distance_threshold=3.0,
+            pci_modulus=3,
+            enable_collision_check=True,
+            enable_confusion_check=True,
+            enable_mod3_check=True,
+            enable_mod6_check=False,
+            enable_mod30_check=True,
+            check_same_frequency_only=False,
+            inherit_modulus=False,
+            pci_range=None,
+            optimization_strategy="simulated_annealing",
+        )
+
+        service = PCIPlanningServiceV3(config)
+        result = await service.plan(sample_sites_data)
+
+        # 验证优化统计
+        assert result.optimization_stats is not None
+        assert "initial_conflicts" in result.optimization_stats
+        assert "final_conflicts" in result.optimization_stats
+        assert "improvement" in result.optimization_stats
+
+        print(f"模拟退火优化结果:")
+        print(f"  初始冲突: {result.optimization_stats['initial_conflicts']}")
+        print(f"  最终冲突: {result.optimization_stats['final_conflicts']}")
+        print(f"  改进: {result.optimization_stats['improvement']}")
+        print(f"  改进率: {result.optimization_stats['improvement_rate']:.2%}")
+
+    @pytest.mark.asyncio
+    async def test_nr_pci_planning(self):
+        """测试NR网络PCI规划"""
+        nr_sites_data = [
+            {
+                "id": "nr_site1",
+                "name": "NR站点1",
+                "networkType": "NR",
+                "longitude": 116.4074,
+                "latitude": 39.9042,
+                "managedElementId": "ME_NR_001",
+                "sectors": [
+                    {
+                        "id": "1",
+                        "name": "NR站点1_扇区1",
+                        "longitude": 116.4074,
+                        "latitude": 39.9042,
+                        "azimuth": 0,
+                        "beamwidth": 90,  # NR波束更宽
+                        "height": 45,
+                        "pci": None,
+                        "earfcn": 620000.0,  # NR ARFCN
+                        "ssb_frequency": 3300.0,
+                    }
+                ],
+            },
+            {
+                "id": "nr_site2",
+                "name": "NR站点2",
+                "networkType": "NR",
+                "longitude": 116.4174,
+                "latitude": 39.9042,
+                "managedElementId": "ME_NR_002",
+                "sectors": [
+                    {
+                        "id": "1",
+                        "name": "NR站点2_扇区1",
+                        "longitude": 116.4174,
+                        "latitude": 39.9042,
+                        "azimuth": 0,
+                        "beamwidth": 90,
+                        "height": 45,
+                        "pci": None,
+                        "earfcn": 620000.0,
+                        "ssb_frequency": 3300.0,
+                    }
+                ],
+            },
+        ]
+
+        config = PlanningConfig(
+            network_type=NetworkType.NR,
+            distance_threshold=3.0,
+            pci_modulus=30,  # NR使用Mod30
+            enable_collision_check=True,
+            enable_confusion_check=True,
+            enable_mod3_check=True,  # NR也要检查Mod3
+            enable_mod6_check=False,
+            enable_mod30_check=True,
+            check_same_frequency_only=False,
+            inherit_modulus=False,
+            pci_range=None,
+            optimization_strategy="greedy",
+        )
+
+        service = PCIPlanningServiceV3(config)
+        result = await service.plan(nr_sites_data)
+
+        # 验证基本结果
+        assert result.status == "completed"
+        assert result.total_sites == 2
+        assert result.total_sectors == 2
+
+        # 验证NR PCI范围（0-1007）
+        for site in result.sites:
+            for sector in site.sectors:
+                assert sector.new_pci >= 0
+                assert sector.new_pci <= 1007
+
+    def test_same_frequency_detection(self):
+        """测试同频检测逻辑"""
+        from app.algorithms.pci_planning_service_v3 import PCIPlanningServiceV3
+
+        config = PlanningConfig(
+            network_type=NetworkType.LTE, distance_threshold=3.0, pci_modulus=3
+        )
+
+        service = PCIPlanningServiceV3(config)
+
+        # 测试同频
+        assert service._is_same_frequency(1850.0, 1850.0) == True
+        assert service._is_same_frequency(1850.0, 1850.05) == True
+        assert service._is_same_frequency(1850.0, 1860.0) == False
+
+        # 测试None值（假设同频）
+        assert service._is_same_frequency(None, None) == True
+        assert service._is_same_frequency(1850.0, None) == True
+
+    def test_custom_pci_range(self):
+        """测试自定义PCI范围"""
+        config = PlanningConfig(
+            network_type=NetworkType.LTE,
+            distance_threshold=3.0,
+            pci_modulus=3,
+            pci_range=(100, 200),  # 自定义范围
+        )
+
+        service = PCIPlanningServiceV3(config)
+
+        # 验证PCI范围被正确设置
+        assert len(service.pci_range) == 101  # 100-200 inclusive
+        assert service.pci_range[0] >= 100
+        assert service.pci_range[-1] <= 200
+
+
+class TestPCICollisionDetectorV3:
+    """PCI碰撞检测器V3功能测试"""
+
+    def test_mod3_conflict_detection(self):
+        """测试Mod3冲突检测"""
+        from app.algorithms.pci_collision_detector import (
+            PCICollisionDetector,
+            SectorInfo,
+            ConflictType,
+        )
+
+        detector = PCICollisionDetector(distance_threshold=3.0)
+
+        # 创建同频同Mod3的小区
+        sectors = [
+            SectorInfo(
+                id="sector1",
+                site_id="site1",
+                name="扇区1",
+                longitude=116.4074,
+                latitude=39.9042,
+                azimuth=0,
+                beamwidth=65,
+                pci=0,  # Mod3 = 0
+                earfcn=1850.0,
+            ),
+            SectorInfo(
+                id="sector2",
+                site_id="site2",
+                name="扇区2",
+                longitude=116.4174,
+                latitude=39.9042,
+                azimuth=0,
+                beamwidth=65,
+                pci=3,  # Mod3 = 0 (同Mod3)
+                earfcn=1850.0,
+            ),
+        ]
+
+        conflicts = detector.detect_all(
+            sectors,
+            enable_collision=False,
+            enable_confusion=False,
+            enable_mod3=True,
+            enable_mod6=False,
+            enable_mod30=False,
+            check_same_frequency_only=True,
+        )
+
+        # 验证检测到Mod3冲突
+        mod3_conflicts = [c for c in conflicts if c.type == ConflictType.MOD3_CONFLICT]
+        assert len(mod3_conflicts) > 0
+        assert mod3_conflicts[0].pci1 == 0
+        assert mod3_conflicts[0].pci2 == 3
+        assert mod3_conflicts[0].is_same_frequency == True
+
+    def test_mod30_conflict_detection(self):
+        """测试Mod30冲突检测"""
+        from app.algorithms.pci_collision_detector import (
+            PCICollisionDetector,
+            SectorInfo,
+            ConflictType,
+        )
+
+        detector = PCICollisionDetector(distance_threshold=3.0)
+
+        # 创建同频同Mod30的小区
+        sectors = [
+            SectorInfo(
+                id="sector1",
+                site_id="site1",
+                name="扇区1",
+                longitude=116.4074,
+                latitude=39.9042,
+                azimuth=0,
+                beamwidth=65,
+                pci=0,  # Mod30 = 0
+                earfcn=1850.0,
+            ),
+            SectorInfo(
+                id="sector2",
+                site_id="site2",
+                name="扇区2",
+                longitude=116.4174,
+                latitude=39.9042,
+                azimuth=0,
+                beamwidth=65,
+                pci=30,  # Mod30 = 0 (同Mod30)
+                earfcn=1850.0,
+            ),
+        ]
+
+        conflicts = detector.detect_all(
+            sectors,
+            enable_collision=False,
+            enable_confusion=False,
+            enable_mod3=False,
+            enable_mod6=False,
+            enable_mod30=True,
+            check_same_frequency_only=True,
+        )
+
+        # 验证检测到Mod30冲突
+        mod30_conflicts = [
+            c for c in conflicts if c.type == ConflictType.MOD30_CONFLICT
+        ]
+        assert len(mod30_conflicts) > 0
+        assert mod30_conflicts[0].pci1 == 0
+        assert mod30_conflicts[0].pci2 == 30
+        assert mod30_conflicts[0].is_same_frequency == True
+
+    def test_inter_frequency_no_conflict(self):
+        """测试异频小区不检测冲突"""
+        from app.algorithms.pci_collision_detector import (
+            PCICollisionDetector,
+            SectorInfo,
+            ConflictType,
+        )
+
+        detector = PCICollisionDetector(distance_threshold=3.0)
+
+        # 创建异频同Mod3的小区
+        sectors = [
+            SectorInfo(
+                id="sector1",
+                site_id="site1",
+                name="扇区1",
+                longitude=116.4074,
+                latitude=39.9042,
+                azimuth=0,
+                beamwidth=65,
+                pci=0,
+                earfcn=1850.0,
+            ),
+            SectorInfo(
+                id="sector2",
+                site_id="site2",
+                name="扇区2",
+                longitude=116.4174,
+                latitude=39.9042,
+                azimuth=0,
+                beamwidth=65,
+                pci=3,
+                earfcn=1860.0,  # 不同频点
+            ),
+        ]
+
+        conflicts = detector.detect_all(
+            sectors,
+            enable_collision=False,
+            enable_confusion=False,
+            enable_mod3=True,
+            enable_mod6=False,
+            enable_mod30=False,
+            check_same_frequency_only=True,  # 只检测同频
+        )
+
+        # 验证异频小区不检测Mod3冲突
+        mod3_conflicts = [c for c in conflicts if c.type == ConflictType.MOD3_CONFLICT]
+        assert len(mod3_conflicts) == 0
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v", "-s"])

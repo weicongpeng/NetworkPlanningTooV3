@@ -7,11 +7,16 @@
  * - 坐标系转换 (WGS84 → GCJ02)
  * - 按网络类型分类 (LTE/NR)
  * - 应用LOD策略筛选数据
+ * - 使用 IndexedDB 持久化缓存
  */
 
 import { mapApi } from './api'
 import { CoordinateTransformer } from '../utils/coordinate'
 import { SECTOR_VALIDATION, getLODLevel } from '../config/sector-config'
+import { indexedDBService } from './indexedDBService'
+
+const CACHE_KEY = 'map_data_cache'
+const CACHE_TTL = 10 * 60 * 1000 // 10分钟缓存
 
 /**
  * 扇区数据接口
@@ -384,15 +389,34 @@ export class MapDataService {
 
   /**
    * 获取地图数据（带缓存）
+   * 优先从 IndexedDB 读取，未命中则从后端获取
    */
   async getMapData(zoom?: number, forceRefresh = false): Promise<MapDataResponse> {
-    // 检查缓存
+    // 检查内存缓存
     if (!forceRefresh && this.cachedData && Date.now() < this.cacheExpiry) {
+      console.log('[MapDataService] 使用内存缓存')
       return this.cachedData
+    }
+
+    // 尝试从 IndexedDB 读取
+    if (!forceRefresh) {
+      try {
+        const cachedData = await indexedDBService.get<MapDataResponse>(CACHE_KEY)
+        if (cachedData) {
+          console.log('[MapDataService] 使用 IndexedDB 缓存')
+          // 同步到内存缓存
+          this.cachedData = cachedData
+          this.cacheExpiry = Date.now() + this.CACHE_DURATION
+          return cachedData
+        }
+      } catch (error) {
+        console.warn('[MapDataService] 读取 IndexedDB 缓存失败:', error)
+      }
     }
 
     try {
       // 从后端获取数据
+      console.log('[MapDataService] 从后端获取地图数据')
       const response = await mapApi.getData()
       const rawSites = response.data?.sites || []
 
@@ -424,9 +448,16 @@ export class MapDataService {
         bounds
       }
 
-      // 缓存结果
+      // 缓存到内存
       this.cachedData = result
       this.cacheExpiry = Date.now() + this.CACHE_DURATION
+
+      // 缓存到 IndexedDB
+      try {
+        await indexedDBService.set(CACHE_KEY, result, CACHE_TTL)
+      } catch (error) {
+        console.warn('[MapDataService] 写入 IndexedDB 缓存失败:', error)
+      }
 
       return result
     } catch (error) {
@@ -450,9 +481,15 @@ export class MapDataService {
   /**
    * 刷新缓存
    */
-  clearCache(): void {
+  async clearCache(): Promise<void> {
     this.cachedData = null
     this.cacheExpiry = 0
+    try {
+      await indexedDBService.delete(CACHE_KEY)
+      console.log('[MapDataService] 缓存已清除')
+    } catch (error) {
+      console.warn('[MapDataService] 清除 IndexedDB 缓存失败:', error)
+    }
   }
 
   /**

@@ -57,13 +57,16 @@ from app.api import create_app
 app = create_app()
 
 if __name__ == '__main__':
+    # 从配置读取服务器参数
+    from app.core.config import settings
+
     # 开发服务器配置
     # 注意：reload 模式下需要在启动命令中设置 PYTHONIOENCODING=utf-8
     # 或者在 uvicorn 配置中设置环境变量
     uvicorn.run(
         'main:app',
-        host='127.0.0.1',
-        port=8000,
+        host=settings.HOST,
+        port=settings.PORT,
         reload=True,
         log_level='warning',  # 降低日志级别
         access_log=False,    # 禁用访问日志避免编码问题

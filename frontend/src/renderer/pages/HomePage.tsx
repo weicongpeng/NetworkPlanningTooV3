@@ -1,3 +1,14 @@
+import {
+  Database,
+  Settings,
+  Network,
+  Layers,
+  MapPin,
+  Map,
+  Shield,
+  LucideIcon
+} from 'lucide-react'
+
 export function HomePage() {
   return (
     <div className="p-8">
@@ -8,32 +19,51 @@ export function HomePage() {
         <FeatureCard
           title="数据管理"
           description="导入和管理工参数据"
-          icon="📊"
+          icon={Database}
           link="/data"
+          iconColor="text-blue-500"
         />
         <FeatureCard
           title="PCI规划"
           description="LTE和NR的PCI自动规划"
-          icon="🔧"
+          icon={Settings}
           link="/pci"
+          iconColor="text-purple-500"
         />
         <FeatureCard
           title="邻区规划"
           description="自动生成邻区关系"
-          icon="🔗"
+          icon={Network}
           link="/neighbor"
+          iconColor="text-green-500"
         />
         <FeatureCard
-          title="地图浏览"
+          title="TAC核查"
+          description="对比图层TAC与现网TAC，统计一致性"
+          icon={Layers}
+          link="/tac"
+          iconColor="text-orange-500"
+        />
+        <FeatureCard
+          title="TAC规划"
+          description="数据驱动的新站小区TAC分配"
+          icon={MapPin}
+          link="/tac-planning"
+          iconColor="text-red-500"
+        />
+        <FeatureCard
+          title="地图工具"
           description="查看基站分布和覆盖"
-          icon="🗺️"
+          icon={Map}
           link="/map"
+          iconColor="text-cyan-500"
         />
         <FeatureCard
-          title="许可证管理"
-          description="管理软件许可证"
-          icon="🔑"
+          title="配置管理"
+          description="管理系统配置"
+          icon={Shield}
           link="/license"
+          iconColor="text-slate-500"
         />
       </div>
 
@@ -53,21 +83,25 @@ export function HomePage() {
 function FeatureCard({
   title,
   description,
-  icon,
-  link
+  icon: Icon,
+  link,
+  iconColor
 }: {
   title: string
   description: string
-  icon: string
+  icon: LucideIcon
   link: string
+  iconColor?: string
 }) {
   return (
     <a
       href={link}
-      className="block p-6 bg-card rounded-lg border border-border hover:border-primary transition-colors"
+      className="block p-6 bg-card rounded-lg border border-border hover:border-primary transition-all duration-300 hover:shadow-md group"
     >
-      <div className="text-4xl mb-4">{icon}</div>
-      <h3 className="text-lg font-semibold mb-2">{title}</h3>
+      <div className={`mb-4 p-3 rounded-lg bg-muted w-fit group-hover:scale-110 transition-transform ${iconColor}`}>
+        <Icon size={32} />
+      </div>
+      <h3 className="text-lg font-semibold mb-2 group-hover:text-primary transition-colors">{title}</h3>
       <p className="text-muted-foreground text-sm">{description}</p>
     </a>
   )

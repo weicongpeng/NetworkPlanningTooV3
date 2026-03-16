@@ -5,9 +5,9 @@ import {
   Settings,
   Map,
   Network,
-  Shield,
-  Menu,
-  X
+  Layers,
+  MapPin,
+  Shield
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -16,8 +16,10 @@ const navigation = [
   { name: '数据管理', href: '/data', icon: Database },
   { name: 'PCI规划', href: '/pci', icon: Settings },
   { name: '邻区规划', href: '/neighbor', icon: Network },
-  { name: '地图浏览', href: '/map', icon: Map },
-  { name: '许可证管理', href: '/license', icon: Shield }
+  { name: 'TAC核查', href: '/tac', icon: Layers },
+  { name: 'TAC规划', href: '/tac-planning', icon: MapPin },
+  { name: '地图工具', href: '/map', icon: Map },
+  { name: '配置管理', href: '/license', icon: Shield }
 ]
 
 export function MainLayout({ children }: { children: React.ReactNode }) {
@@ -28,22 +30,22 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen bg-background">
       {/* 侧边栏 */}
       <aside
-        className={`${
-          sidebarOpen ? 'w-44' : 'w-16'
-        } bg-secondary border-r border-border transition-all duration-300 flex flex-col`}
+        className={`${sidebarOpen ? 'w-44' : 'w-16'
+          } bg-secondary border-r border-border transition-all duration-300 flex flex-col relative`}
       >
-        {/* 头部 */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-border">
-          {sidebarOpen && (
-            <h1 className="text-lg font-bold text-primary">网络规划</h1>
-          )}
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 rounded-md hover:bg-muted transition-colors"
-          >
-            <Menu size={20} />
-          </button>
-        </div>
+        {/* 侧边栏边缘把手 - 右边缘中部，轻微凸出 */}
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/3 w-4 h-16 bg-secondary border border-border rounded-r-md hover:bg-muted transition-all duration-200 flex items-center justify-center group shadow-sm hover:shadow-md z-10"
+          title={sidebarOpen ? '收起侧边栏' : '展开侧边栏'}
+        >
+          {/* 把手纹理 - 横向线条 */}
+          <div className="flex flex-col gap-1.5">
+            <div className="w-2 h-0.5 bg-muted-foreground/50 rounded-full group-hover:bg-muted-foreground/70 transition-colors"></div>
+            <div className="w-2 h-0.5 bg-muted-foreground/50 rounded-full group-hover:bg-muted-foreground/70 transition-colors"></div>
+            <div className="w-2 h-0.5 bg-muted-foreground/50 rounded-full group-hover:bg-muted-foreground/70 transition-colors"></div>
+          </div>
+        </button>
 
         {/* 导航菜单 */}
         <nav className={`flex-1 overflow-y-auto ${sidebarOpen ? 'p-4 space-y-2' : 'p-2 space-y-2'}`}>
@@ -55,11 +57,10 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.name}
                 to={item.href}
-                className={`${
-                  isActive
-                    ? 'bg-primary text-primary-foreground'
+                className={`${isActive
+                    ? 'bg-blue-400 text-white hover:bg-blue-500'
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                } flex items-center ${sidebarOpen ? 'justify-start px-4' : 'justify-center px-2'} gap-3 py-3 rounded-lg transition-colors`}
+                  } flex items-center ${sidebarOpen ? 'justify-start px-4' : 'justify-center px-2'} gap-3 py-3 rounded-lg transition-colors`}
               >
                 <Icon size={20} />
                 {sidebarOpen && <span>{item.name}</span>}

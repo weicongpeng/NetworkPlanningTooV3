@@ -1,0 +1,14 @@
+- [ ] Windows 应用图标文件 (build/icon.ico) 存在且格式正确
+- [ ] macOS 应用图标文件 (build/icon.icns) 存在且格式正确
+- [ ] Linux 应用图标目录 (build/icons/) 存在且包含正确的图标文件
+- [ ] package.json 包含正确的打包脚本 (pack, dist, build:check)
+- [ ] electron-builder.json 配置正确，extraResources 包含后端代码和虚拟环境
+- [ ] NSIS 安装程序配置为中文界面，支持自定义安装路径
+- [ ] 打包前检查脚本能够正确检测所有依赖
+- [ ] PACKAGING.md 文档清晰说明打包流程和步骤
+- [ ] Windows 安装包可以正常生成
+- [ ] Windows 便携版可以正常生成
+- [ ] 安装后的应用可以正常启动
+- [ ] 应用启动后后端服务自动运行
+- [ ] 前端界面可以正常连接后端 API
+- [ ] 应用关闭时后端服务自动停止

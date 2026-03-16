@@ -7,10 +7,28 @@
  * - 在线地图子项：平面地图/卫星地图切换
  * - 工参扇区图: LTE/NR子图层
  * - 图层文件: 外部导入的MapInfo文件
+ * - 右键菜单支持标签设置
  */
-import { useState, useEffect, useRef } from 'react'
-import { ChevronDown, ChevronRight, Map, Folder, File, Globe, X, Satellite, Signal, Zap } from 'lucide-react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { ChevronDown, ChevronRight, Map, Folder, File, X, Satellite } from 'lucide-react'
 import { NetworkType } from '../../config/sector-config'
+import { LabelSettingsModal, LabelSettings, FieldOption } from './LabelSettingsModal'
+import { layerApi } from '../../services/api'
+import { useMapStore } from '../../store/mapStore'
+
+/**
+ * 预定义的标签字段列表
+ * 用于扇区标签设置的下拉选项
+ */
+const PREDEFINED_LABEL_FIELDS: FieldOption[] = [
+  { value: 'name', label: '小区名称' },
+  { value: 'siteId', label: '基站ID' },
+  { value: 'frequency', label: '下行频点' },
+  { value: 'pci', label: 'PCI' },
+  { value: 'tac', label: 'TAC' },
+  { value: 'isShared', label: '是否共享' },
+  { value: 'coverageType', label: '覆盖类型' }
+]
 
 /**
  * 扇形图标组件
@@ -20,10 +38,9 @@ const SectorIcon = ({ color }: { color: string }) => (
     <path
       d="M7 12L2 5.5C3.5 3.5 10.5 3.5 12 5.5L7 12Z"
       stroke={color}
-      strokeWidth="1.5"
+      strokeWidth="0.5"
       strokeLinejoin="round"
-      fill={color}
-      fillOpacity="0.2"
+      fill="transparent"
     />
   </svg>
 )
@@ -31,7 +48,7 @@ const SectorIcon = ({ color }: { color: string }) => (
 /**
  * 树节点类型
  */
-type TreeNodeType = 'root' | 'sector-group' | 'layer-files' | 'sector-layer' | 'sector-label' | 'layer-file' | 'map-type' | 'frequency' | 'custom-group' | 'custom-layer' | 'point-file-label'
+type TreeNodeType = 'root' | 'sector-group' | 'layer-files' | 'sector-layer' | 'sector-label' | 'layer-file' | 'layer-file-label' | 'map-type' | 'frequency' | 'custom-group' | 'custom-layer'
 
 /**
  * 扇区图层选项
@@ -51,10 +68,11 @@ export interface SectorLayerOption {
 export interface LayerFileOption {
   id: string
   name: string
-  type: 'point' | 'line' | 'polygon'
+  type: 'point' | 'line' | 'polygon' | 'sector'
   visible: boolean
   dataId: string
   sourceType?: 'mapinfo' | 'excel'
+  geometryType?: 'point' | 'sector'
 }
 
 /**
@@ -85,6 +103,7 @@ export interface FrequencyOption {
   strokeColor: string
   visible: boolean
   networkType: NetworkType
+  count?: number // 小区数量
 }
 
 /**
@@ -110,6 +129,11 @@ export interface TreeNode {
   }
   // 图层文件专用
   layerFile?: LayerFileOption
+  // 图层文件标签专用
+  layerFileLabel?: {
+    fileId: string
+    visible: boolean
+  }
   // 地图类型专用
   mapType?: MapTypeOption
   // 频点专用
@@ -130,6 +154,8 @@ export interface LayerControlProps {
   layerFiles?: LayerFileOption[]
   /** 点图层文件 (Excel) */
   pointFiles?: LayerFileOption[]
+  /** 点文件数据映射（用于动态提取列名） */
+  pointFileData?: Record<string, any[]>
   /** 图层可见性变化回调 */
   onSectorToggle?: (layerId: string, visible: boolean) => void
   /** 扇区标签可见性变化回调 */
@@ -144,8 +170,12 @@ export interface LayerControlProps {
   sectorLabelVisibility?: Record<string, boolean>
   /** 当前点文件标签可见性 */
   pointFileLabelVisibility?: Record<string, boolean>
+  /** 当前图层文件标签可见性 */
+  layerFileLabelVisibility?: Record<string, boolean>
   /** 点文件标签可见性变化回调 */
   onPointFileLabelToggle?: (fileId: string, visible: boolean) => void
+  /** 图层文件标签可见性变化回调 */
+  onLayerFileLabelToggle?: (fileId: string, visible: boolean) => void
   /** 频点列表（按网络类型分组） */
   frequencies?: { lte: FrequencyOption[]; nr: FrequencyOption[] }
   /** 频点可见性变化回调 */
@@ -158,6 +188,10 @@ export interface LayerControlProps {
   onLayerFileRemove?: (fileId: string) => void
   /** 移除自定义图层回调 */
   onCustomLayerRemove?: (layerId: string) => void
+  /** 标签设置变化回调 */
+  onLabelSettingsChange?: (node: TreeNode, settings: LabelSettings) => void
+  /** 标签设置映射 */
+  labelSettingsMap?: Record<string, LabelSettings>
 }
 
 /**
@@ -167,6 +201,7 @@ export function LayerControl({
   sectors = [],
   layerFiles = [],
   pointFiles = [],
+  pointFileData = {},
   onSectorToggle,
   onSectorLabelToggle,
   onLayerFileToggle,
@@ -174,16 +209,224 @@ export function LayerControl({
   mapType = 'roadmap',
   sectorLabelVisibility = {},
   pointFileLabelVisibility = {},
+  layerFileLabelVisibility = {},
   onPointFileLabelToggle,
+  onLayerFileLabelToggle,
   frequencies = { lte: [], nr: [] },
   onFrequencyToggle,
   customLayers = [],
   onCustomLayerToggle,
   onLayerFileRemove,
-  onCustomLayerRemove
+  onCustomLayerRemove,
+  onLabelSettingsChange
 }: LayerControlProps) {
+  // 从持久化 store 获取标签设置
+  const { labelSettingsMap: persistedLabelSettings, setLabelSettings } = useMapStore()
+
   // 用户手动切换的展开节点ID集合
   const [expandedNodeIds, setExpandedNodeIds] = useState<Set<string>>(new Set(['root', 'sector-group', 'custom-group']))
+
+  // 标签设置弹窗状态
+  const [showLabelSettingsModal, setShowLabelSettingsModal] = useState(false)
+  const [currentSettingsNode, setCurrentSettingsNode] = useState<TreeNode | null>(null)
+  const [currentLabelSettings, setCurrentLabelSettings] = useState<LabelSettings>({
+    content: 'name',
+    color: '#000000',
+    fontSize: 12
+  })
+
+  // 字段选项状态 - 初始化为预定义字段，避免右键时为空
+  const [fieldOptions, setFieldOptions] = useState<FieldOption[]>(PREDEFINED_LABEL_FIELDS)
+  const [loadingFields, setLoadingFields] = useState(false)
+
+  // 字段选项缓存 - 避免重复请求同一图层（使用简单的对象存储）
+  const fieldOptionsCacheRef = useRef<Record<string, FieldOption[]>>({})
+
+  // 获取缓存实例
+  const getCache = useCallback((): Record<string, FieldOption[]> => {
+    if (!fieldOptionsCacheRef.current) {
+      fieldOptionsCacheRef.current = {}
+    }
+    return fieldOptionsCacheRef.current
+  }, [])
+
+  /**
+   * 获取LTE/NR扇区的字段选项
+   */
+  const fetchSectorFieldOptions = useCallback(async (networkType: 'LTE' | 'NR') => {
+    setLoadingFields(true)
+    try {
+      // 直接使用预定义的字段列表，不进行过滤
+      // 字段映射会在实际渲染标签时处理，这里只提供选项
+      console.log(`[LayerControl] 使用预定义字段列表 (${networkType})`)
+
+      setFieldOptions(PREDEFINED_LABEL_FIELDS)
+      console.log(`[LayerControl] ${networkType}可用字段:`, PREDEFINED_LABEL_FIELDS.map(f => f.label))
+    } catch (error) {
+      console.error('[LayerControl] 获取扇区字段失败:', error)
+      // 出错时使用预定义字段作为后备
+      setFieldOptions(PREDEFINED_LABEL_FIELDS)
+    } finally {
+      setLoadingFields(false)
+    }
+  }, [])
+
+  /**
+   * 获取图层文件的字段选项（带缓存）
+   */
+  const fetchLayerFileFieldOptions = useCallback(async (dataId: string, layerId: string) => {
+    // 生成缓存键
+    const cacheKey = `${dataId}-${layerId}`
+    const cache = getCache()
+
+    // 检查缓存
+    if (cacheKey in cache) {
+      console.log('[LayerControl] 使用缓存的字段选项:', cacheKey)
+      const cachedOptions = cache[cacheKey]
+      setFieldOptions(cachedOptions)
+      return
+    }
+
+    setLoadingFields(true)
+    try {
+      const response = await layerApi.getLayerColumns(dataId, layerId)
+      if (response.success && response.data) {
+        const fields = response.data.fields || []
+        const options: FieldOption[] = fields.map((field: string) => ({
+          value: field,
+          label: field
+        }))
+
+        // 存入缓存
+        cache[cacheKey] = options
+        setFieldOptions(options)
+        console.log('[LayerControl] 获取到图层数据字段:', options.length, '已缓存')
+      } else {
+        setFieldOptions([])
+      }
+    } catch (error) {
+      console.error('[LayerControl] 获取图层数据字段失败:', error)
+      setFieldOptions([])
+    } finally {
+      setLoadingFields(false)
+    }
+  }, [getCache])
+
+  /**
+   * 从 API 获取地理化数据并提取列名
+   */
+  const fetchLayerFileDataFromAPI = async (dataId: string, layerId: string) => {
+    setLoadingFields(true)
+    try {
+      console.log('[LayerControl] 从 API 获取数据:', dataId, 'layerId:', layerId)
+
+      const response = await layerApi.getLayerData(dataId, layerId)
+      if (response.success && response.data) {
+        const rawData = response.data
+
+        // ✅ 改进：处理多种数据格式 (GeoJSON 或 普通列表)
+        const allColumns = new Set<string>()
+
+        // 如果是 GeoJSON 格式 (包含 features 数组)
+        const features = rawData.features || (Array.isArray(rawData) ? rawData : [])
+
+        for (const item of features) {
+          // 1. 只有当 props 是要素根级时，才排除内部字段
+          const isGeoJSONRoot = !!item.properties
+          const props = item.properties || item
+
+          // 收集当前对象的所有字段
+          for (const key of Object.keys(props)) {
+            // 排除 GeoJSON 结构性字段和核心坐标字段
+            if (key === 'attributes' || key === 'properties' ||
+              key === 'longitude' || key === 'latitude' ||
+              key === 'displayLng' || key === 'displayLat' ||
+              key === 'type' || key === 'geometry') {
+              continue
+            }
+
+            // 只有当它不是嵌套的 properties 时，才排除内部预定义名 (防止在根级出现 name/azimuth)
+            // 如果是在 properties 内部，我们应该保留原始列名，即使它叫 name
+            if (!isGeoJSONRoot && (key === 'name' || key === 'azimuth')) {
+              continue
+            }
+
+            allColumns.add(key)
+          }
+
+          // 2. 如果有嵌套的 properties 或 attributes，深入一层收集（不排除任何原始字段）
+          const nested = props.properties || props.attributes
+          if (nested && typeof nested === 'object') {
+            for (const key of Object.keys(nested)) {
+              allColumns.add(key)
+            }
+          }
+        }
+
+        // 转换为数组并排序
+        const columns = Array.from(allColumns).sort()
+
+        console.log('[LayerControl] 从 API 提取到的列名:', columns)
+        console.log('[LayerControl] 列名数量:', columns.length)
+
+        // 生成字段选项（直接使用原始列名）
+        const fieldOptions: FieldOption[] = columns.map(col => ({
+          value: col,
+          label: col
+        }))
+
+        console.log('[LayerControl] 生成的字段选项数量:', fieldOptions.length)
+        setFieldOptions(fieldOptions)
+      } else {
+        console.warn('[LayerControl] API 获取数据失败')
+        setFieldOptions([])
+      }
+    } catch (error) {
+      console.error('[LayerControl] 从 API 获取数据失败:', error)
+      setFieldOptions([])
+    } finally {
+      setLoadingFields(false)
+    }
+  }
+
+  /**
+   * 预取图层文件字段选项（不阻塞UI）
+   * 当图层文件列表更新时，提前缓存字段信息
+   */
+  useEffect(() => {
+    const cache = getCache()
+
+    // 只预取前3个图层文件，避免过多并发请求
+    const layersToPrefetch = layerFiles.slice(0, 3)
+
+    layersToPrefetch.forEach((layerFile) => {
+      const cacheKey = `${layerFile.dataId}-${layerFile.id}`
+
+      // 如果已经缓存过，跳过
+      if (cacheKey in cache) {
+        return
+      }
+
+      // 异步预取，不阻塞UI
+      layerApi.getLayerColumns(layerFile.dataId, layerFile.id)
+        .then(response => {
+          if (response.success && response.data) {
+            const fields = response.data.fields || []
+            const options: FieldOption[] = fields.map((field: string) => ({
+              value: field,
+              label: field
+            }))
+
+            // 存入缓存
+            cache[cacheKey] = options
+            console.log('[LayerControl] 预取字段成功:', layerFile.name, options.length, '个字段')
+          }
+        })
+        .catch(error => {
+          console.warn('[LayerControl] 预取字段失败:', layerFile.name, error)
+        })
+    })
+  }, [layerFiles, getCache])
 
   // 构建树形结构
   const buildTree = (): TreeNode[] => {
@@ -198,31 +441,32 @@ export function LayerControl({
         label: '图层控制',
         expanded: isExpanded('root', true),
         children: [
-          // 工参扇区图分组
+          // 基站分组
           {
             id: 'sector-group',
             type: 'sector-group',
-            label: '工参扇区图',
+            label: '基站',
             expanded: isExpanded('sector-group', true),
             children: sectors.map(sector => {
               // 获取该网络类型的频点列表
               const freqList = sector.type === 'LTE' ? frequencies.lte : frequencies.nr
+              const networkType = sector.type === 'LTE' ? 'LTE' : 'NR' as NetworkType
 
               return {
                 id: sector.id,
                 type: 'sector-layer' as TreeNodeType,
-                label: sector.label,
+                label: sector.type === 'LTE' ? 'LTE' : 'NR',
                 sectorLayer: sector,
                 expanded: isExpanded(sector.id, false),
                 sectorLabel: {
                   layerId: sector.id,
                   visible: sectorLabelVisibility[sector.id] || false
                 },
-                // 添加频点子节点
+                // 添加频点子节点，每个频点包含显示控制
                 children: freqList.map(freq => ({
                   id: `${sector.id}-freq-${freq.frequency}`,
                   type: 'frequency' as TreeNodeType,
-                  label: `${freq.frequency}`, // 删除 MHz 单位
+                  label: `${freq.frequency}${freq.count ? ` (${freq.count})` : ''}`,
                   frequency: freq
                 }))
               }
@@ -239,35 +483,43 @@ export function LayerControl({
                 id: file.id,
                 type: 'layer-file' as TreeNodeType,
                 label: file.name,
-                layerFile: file
+                layerFile: file,
+                // 为每个图层文件添加独立的标签控件
+                layerFileLabel: {
+                  fileId: file.id,
+                  visible: layerFileLabelVisibility[file.id] || false
+                }
               }))
             }
           ] : []),
-          // 创建点图文件分组 (Excel)
+          // 地理化数据分组 (Excel)
           {
             id: 'custom-group',
             type: 'custom-group' as TreeNodeType,
-            label: '创建点图文件',
+            label: '地理化数据',
             expanded: isExpanded('custom-group', true),
             children: [
               // 优先显示 pointFiles，为每个文件添加标签子项
-              ...pointFiles.map(file => ({
-                id: file.id,
-                type: 'layer-file' as TreeNodeType,
-                label: file.name,
-                layerFile: file,
-                children: [
-                  {
-                    id: `${file.id}-label`,
-                    type: 'point-file-label' as TreeNodeType,
-                    label: '属性标签',
-                    pointFileLabel: {
-                      fileId: file.id,
-                      visible: pointFileLabelVisibility[file.id] || false
-                    }
-                  }
-                ]
-              })),
+              ...pointFiles.map(file => {
+                console.log('[LayerControl] 处理点文件:', {
+                  id: file.id,
+                  name: file.name,
+                  type: file.type,
+                  sourceType: file.sourceType,
+                  geometryType: file.geometryType,
+                  visible: file.visible
+                })
+
+                // 所有点文件（包括地理化数据和 MapInfo 图层）都不展开
+                // 标签开关直接显示在文件复选框右边
+                return {
+                  id: file.id,
+                  type: 'layer-file' as TreeNodeType,
+                  label: file.name,
+                  layerFile: file
+                  // 不添加 children，标签开关直接在主节点渲染
+                }
+              }),
               // 兼容旧的 customLayers (如果有)
               ...customLayers.map(layer => ({
                 id: layer.id,
@@ -287,7 +539,7 @@ export function LayerControl({
   // 当外部数据变化时更新树
   useEffect(() => {
     setTree(buildTree())
-  }, [sectors, layerFiles, pointFiles, mapType, sectorLabelVisibility, pointFileLabelVisibility, frequencies, customLayers])
+  }, [sectors, layerFiles, pointFiles, mapType, sectorLabelVisibility, layerFileLabelVisibility, pointFileLabelVisibility, frequencies, customLayers])
 
   /**
    * 切换节点展开状态
@@ -345,7 +597,7 @@ export function LayerControl({
   const panelRef = useRef<HTMLDivElement>(null)
 
   // 面板宽度状态
-  const [panelWidth, setPanelWidth] = useState(220)
+  const [panelWidth, setPanelWidth] = useState(240)
   const isResizing = useRef(false)
   const startX = useRef(0)
   const startWidth = useRef(0)
@@ -358,7 +610,7 @@ export function LayerControl({
     isResizing.current = true
     startX.current = e.clientX
     startWidth.current = panelWidth
-    
+
     document.addEventListener('mousemove', doResize)
     document.addEventListener('mouseup', stopResize)
     document.body.style.userSelect = 'none' // 防止拖动时选中文本
@@ -386,10 +638,122 @@ export function LayerControl({
 
   // 处理右键点击
   const handleContextMenu = (e: React.MouseEvent, node: TreeNode) => {
-    // 只有图层文件和自定义图层支持右键卸载
-    if (node.type === 'layer-file' || node.type === 'custom-layer') {
-      e.preventDefault()
-      e.stopPropagation()
+    e.preventDefault()
+    e.stopPropagation()
+
+    // 支持 sector-layer 和 layer-file 的标签设置
+    if (node.type === 'sector-layer' || node.type === 'layer-file') {
+      // 先立即显示对话框
+      setShowLabelSettingsModal(true)
+      setCurrentSettingsNode(node)
+
+      // 获取图层ID用于加载已保存的设置
+      let layerId = ''
+      if (node.type === 'sector-layer' && node.sectorLayer) {
+        layerId = node.sectorLayer.id
+      } else if (node.type === 'layer-file' && node.layerFile) {
+        layerId = node.layerFile.id
+      }
+
+      // 从持久化 store 获取已保存的设置
+      const savedSettings = persistedLabelSettings[layerId]
+
+      // 设置当前配置（先显示默认或已保存的配置）
+      setCurrentLabelSettings(savedSettings || {
+        color: '#000000',
+        fontSize: 12
+      })
+
+      // 异步加载字段选项（不阻塞对话框显示）
+      if (node.type === 'sector-layer' && node.sectorLayer) {
+        // LTE/NR扇区：从预定义字段列表加载（同步）
+        setFieldOptions(PREDEFINED_LABEL_FIELDS)
+        fetchSectorFieldOptions(node.sectorLayer.type)
+      } else if (node.type === 'layer-file' && node.layerFile) {
+        // 图层文件：检查是否为 Excel 点文件（地理化数据）
+        if (node.layerFile.sourceType === 'excel') {
+          // ✅ Excel 点文件：不要使用预定义字段，从实际数据中动态提取列名
+          console.log('[LayerControl] 检测到 Excel 点文件，从数据中提取列名:', node.layerFile.id)
+          console.log('[LayerControl] 当前 pointFileData:', Object.keys(pointFileData))
+
+          const fileData = pointFileData[node.layerFile.id]
+          const features = (fileData as any)?.features || (Array.isArray(fileData) ? fileData : [])
+
+          if (features && features.length > 0) {
+            console.log('[LayerControl] 数据记录数量:', features.length)
+
+            // ✅ 改进：遍历所有记录，收集所有可能的字段
+            const allColumns = new Set<string>()
+
+            for (const item of features) {
+              // 1. 只有当 props 是要素根级时，才排除内部字段
+              const isGeoJSONRoot = !!item.properties
+              const props = item.properties || item
+
+              // 收集当前对象的所有字段
+              for (const key of Object.keys(props)) {
+                // 排除 GeoJSON 结构性字段和核心坐标字段
+                if (key === 'attributes' || key === 'properties' ||
+                  key === 'longitude' || key === 'latitude' ||
+                  key === 'displayLng' || key === 'displayLat' ||
+                  key === 'type' || key === 'geometry') {
+                  continue
+                }
+
+                // 只有当它不是嵌套的 properties 时，才排除内部预定义名 (防止在根级出现 name/azimuth)
+                // 如果是在 properties 内部，我们应该保留原始列名，即使它叫 name
+                if (!isGeoJSONRoot && (key === 'name' || key === 'azimuth')) {
+                  continue
+                }
+
+                allColumns.add(key)
+              }
+
+              // 2. 如果有嵌套的 properties 或 attributes，深入一层收集（不排除任何原始字段）
+              const nested = props.properties || props.attributes
+              if (nested && typeof nested === 'object') {
+                for (const key of Object.keys(nested)) {
+                  allColumns.add(key)
+                }
+              }
+            }
+
+            // 转换为数组并排序
+            const columns = Array.from(allColumns).sort()
+
+            console.log('[LayerControl] 从所有记录提取到的列名:', columns)
+            console.log('[LayerControl] 列名数量:', columns.length)
+
+            // 生成字段选项（直接使用原始列名）
+            const excelFieldOptions: FieldOption[] = columns.map(col => ({
+              value: col,
+              label: col  // 直接使用原始列名
+            }))
+
+            console.log('[LayerControl] 生成的字段选项数量:', excelFieldOptions.length)
+            setFieldOptions(excelFieldOptions)
+          } else {
+            console.warn('[LayerControl] 未找到文件数据，数据ID:', node.layerFile.dataId)
+            console.warn('[LayerControl] 可用的数据文件ID:', Object.keys(pointFileData))
+
+            // ✅ 如果内存中没有数据，先显示空字段列表并启动加载状态
+            setFieldOptions([])
+            setLoadingFields(true)
+
+            // 尝试从 API 获取
+            if (node.layerFile.dataId) {
+              console.log('[LayerControl] 尝试从 API 获取数据...')
+              fetchLayerFileDataFromAPI(node.layerFile.dataId, node.layerFile.id)
+            }
+          }
+        } else {
+          // MapInfo 图层文件：先显示预定义字段，然后异步获取实际字段
+          setFieldOptions(PREDEFINED_LABEL_FIELDS)
+          fetchLayerFileFieldOptions(node.layerFile.dataId, node.layerFile.id)
+        }
+      }
+    } else if (node.type === 'custom-layer') {
+      // 自定义图层支持卸载
       setContextMenu({
         x: e.clientX,
         y: e.clientY,
@@ -408,16 +772,58 @@ export function LayerControl({
     return () => window.removeEventListener('click', handleGlobalClick)
   }, [contextMenu])
 
+  /**
+   * 保存标签设置
+   */
+  const handleSaveLabelSettings = (settings: LabelSettings) => {
+    const node = currentSettingsNode
+    if (!node) return
+
+    // 获取图层ID
+    let layerId = ''
+    if (node.type === 'sector-layer' && node.sectorLayer) {
+      layerId = node.sectorLayer.id
+    } else if (node.type === 'layer-file' && node.layerFile) {
+      layerId = node.layerFile.id
+    }
+
+    if (layerId) {
+      // 保存到持久化 store
+      setLabelSettings(layerId, settings)
+    }
+
+    // 通知父组件更新标签配置
+    // MapPage中的onLabelSettingsChange会自动处理：更新配置状态 + 设置可见性为true + 立即应用到地图
+    onLabelSettingsChange?.(node, settings)
+
+    // 更新本地状态
+    setCurrentLabelSettings(settings)
+    setShowLabelSettingsModal(false)
+  }
+
   return (
     <>
       <style>{`
-        /* 隐藏面板滚动条 */
+        /* 自定义面板滚动条 - 美化样式 */
         .layer-control::-webkit-scrollbar {
-          display: none; /* Chrome/Safari/Opera */
+          width: 6px;
         }
+        .layer-control::-webkit-scrollbar-track {
+          background: rgba(0, 0, 0, 0.03);
+          border-radius: 3px;
+        }
+        .layer-control::-webkit-scrollbar-thumb {
+          background: rgba(0, 0, 0, 0.15);
+          border-radius: 3px;
+          transition: background 0.2s ease;
+        }
+        .layer-control::-webkit-scrollbar-thumb:hover {
+          background: rgba(0, 0, 0, 0.25);
+        }
+        /* Firefox 滚动条样式 */
         .layer-control {
-          -ms-overflow-style: none; /* IE/Edge */
-          scrollbar-width: none; /* Firefox */
+          scrollbar-width: thin;
+          scrollbar-color: rgba(0, 0, 0, 0.15) rgba(0, 0, 0, 0.03);
         }
         /* 隐藏地图容器滚动条 */
         .map-container::-webkit-scrollbar {
@@ -428,62 +834,115 @@ export function LayerControl({
           scrollbar-width: none;
           overflow: hidden !important;
         }
+        /* 自定义复选框样式 */
+        .custom-checkbox {
+          position: relative;
+          display: inline-block;
+          width: 18px;
+          height: 18px;
+        }
+        .custom-checkbox input {
+          opacity: 0;
+          width: 0;
+          height: 0;
+        }
+        .custom-checkbox .checkmark {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 18px;
+          height: 18px;
+          background-color: #f3f4f6;
+          border: 2px solid #d1d5db;
+          border-radius: 5px;
+          transition: all 0.2s ease;
+        }
+        .custom-checkbox:hover input ~ .checkmark {
+          background-color: #e5e7eb;
+          border-color: #9ca3af;
+        }
+        .custom-checkbox input:checked ~ .checkmark {
+          background-color: #3b82f6;
+          border-color: #3b82f6;
+        }
+        .custom-checkbox .checkmark:after {
+          content: "";
+          position: absolute;
+          display: none;
+          left: 5px;
+          top: 2px;
+          width: 5px;
+          height: 10px;
+          border: solid white;
+          border-width: 0 2px 2px 0;
+          transform: rotate(45deg);
+        }
+        .custom-checkbox input:checked ~ .checkmark:after {
+          display: block;
+        }
       `}</style>
-      {/* 显示/隐藏控件 - 融合在面板左侧边缘中部，始终可见 */}
+      {/* 显示/隐藏控件 - 贴合面板边缘 */}
       <div
         onClick={() => setIsVisible(!isVisible)}
         onMouseEnter={() => setIsControlHovered(true)}
         onMouseLeave={() => setIsControlHovered(false)}
         style={{
           position: 'absolute',
-          top: '50%', // 使用 50% 定位到面板垂直中心
-          transform: isControlHovered ? 'translateY(-50%) scale(1.15)' : 'translateY(-50%)', // 悬停时放大
+          top: '50%',
+          transform: isControlHovered ? 'translateY(-50%) scale(1.2)' : 'translateY(-50%)',
           right: controlRight,
           zIndex: 1001,
-          backgroundColor: isControlHovered ? 'rgba(59, 130, 246, 0.95)' : 'rgba(245, 245, 245, 0.95)', // 悬停时变蓝色
-          backdropFilter: 'blur(8px)',
-          borderRadius: '6px',
-          boxShadow: isControlHovered ? '0 4px 12px rgba(59, 130, 246, 0.4)' : '0 2px 8px rgba(0, 0, 0, 0.15)', // 悬停时阴影变强
-          width: '28px',
-          height: '28px',
+          backgroundColor: isControlHovered ? '#3b82f6' : 'rgba(255, 255, 255, 0.95)',
+          backdropFilter: 'blur(12px)',
+          borderRadius: '8px',
+          boxShadow: isControlHovered
+            ? '0 6px 20px rgba(59, 130, 246, 0.4)'
+            : '0 4px 12px rgba(0, 0, 0, 0.15)',
+          width: '32px',
+          height: '32px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'pointer',
-          fontSize: '14px',
-          color: isControlHovered ? '#ffffff' : '#3b82f6', // 悬停时文字变白色
+          fontSize: '16px',
+          color: isControlHovered ? '#ffffff' : '#3b82f6',
           fontWeight: 'bold',
-          border: isControlHovered ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid rgba(0, 0, 0, 0.1)',
-          transition: isResizing.current ? 'none' : 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)', // 使用缓动函数
+          border: '1px solid rgba(0, 0, 0, 0.1)',
+          transition: isResizing.current ? 'none' : 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         }}
       >
-        ⇋
+        {isVisible ? '‹' : '›'}
       </div>
 
-      {/* 图层控制面板 - 顶部拉伸至窗口顶部 */}
+      {/* 图层控制面板 - 直角设计 */}
       <div
         ref={panelRef}
         className="layer-control"
         style={{
           position: 'absolute',
-          top: '0px', // 拉伸至窗口顶部
+          top: '0px',
           right: isVisible ? '0px' : `-${panelWidth}px`,
           zIndex: 1000,
-          backgroundColor: 'rgba(245, 245, 245, 0.95)', // 偏灰色的背景
-          backdropFilter: 'blur(8px)',
-          borderRadius: '0 0 0 16px',
-          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.8)',
+          backgroundColor: 'rgba(255, 255, 255, 0.98)',
+          backdropFilter: 'blur(12px)',
+          borderRadius: '0',
+          boxShadow: '-4px 0 20px rgba(0, 0, 0, 0.15)',
           width: `${panelWidth}px`,
-          minWidth: '200px',
-          height: '100vh', // 纵向布满整个窗口高度
-          overflowY: 'auto', // 启用纵向滚动
+          minWidth: '240px',
+          height: '100vh',
+          maxHeight: '100vh',
+          overflowY: 'auto',
           overflowX: 'hidden',
-          fontSize: '13px',
+          fontSize: '14px',
           border: '1px solid rgba(0, 0, 0, 0.1)',
           borderRight: 'none',
           borderTop: 'none',
-          padding: '4px',
-          transition: isResizing.current ? 'none' : 'all 0.3s ease',
+          paddingTop: '8px',
+          paddingLeft: '8px',
+          paddingRight: '8px',
+          paddingBottom: '24px', // 增加底部内边距，确保最后的内容可见
+          transition: isResizing.current ? 'none' : 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          boxSizing: 'border-box', // 确保 padding 包含在高度计算内
         }}
       >
         {/* 拖动调整手柄 */}
@@ -494,13 +953,15 @@ export function LayerControl({
             left: 0,
             top: 0,
             bottom: 0,
-            width: '6px',
+            width: '8px',
             cursor: 'ew-resize',
             zIndex: 10,
             backgroundColor: 'transparent',
           }}
           title="拖动调整宽度"
         />
+
+        {/* 面板标题 - 已删除，与外层重复 */}
 
         {/* 渲染树 */}
         {tree.map(rootNode => (
@@ -518,8 +979,11 @@ export function LayerControl({
             onLayerFileRemove={onLayerFileRemove}
             onCustomLayerRemove={onCustomLayerRemove}
             onPointFileLabelToggle={onPointFileLabelToggle}
+            onLayerFileLabelToggle={onLayerFileLabelToggle}
             onContextMenu={handleContextMenu}
             mapType={mapType}
+            pointFileLabelVisibility={pointFileLabelVisibility}
+            layerFileLabelVisibility={layerFileLabelVisibility}
           />
         ))}
       </div>
@@ -572,6 +1036,17 @@ export function LayerControl({
           </button>
         </div>
       )}
+
+      {/* 标签设置弹窗 */}
+      <LabelSettingsModal
+        isOpen={showLabelSettingsModal}
+        onClose={() => setShowLabelSettingsModal(false)}
+        onSave={handleSaveLabelSettings}
+        title={currentSettingsNode?.type === 'sector-layer' ? '扇区标签设置' : '图层文件标签设置'}
+        currentSettings={currentLabelSettings}
+        fieldOptions={fieldOptions}
+        loadingFields={loadingFields}
+      />
     </>
   )
 }
@@ -588,12 +1063,16 @@ interface TreeNodeComponentProps {
   onLayerFileToggle: (fileId: string, visible: boolean) => void;
   onMapTypeChange: (type: 'roadmap' | 'satellite') => void;
   onFrequencyToggle?: (networkType: NetworkType, frequency: number, visible: boolean) => void;
+  onFrequencyLabelToggle?: (networkType: NetworkType, frequency: number, visible: boolean) => void;
   onCustomLayerToggle?: (layerId: string, visible: boolean) => void;
   onLayerFileRemove?: (fileId: string) => void;
   onCustomLayerRemove?: (layerId: string) => void;
   onPointFileLabelToggle?: (fileId: string, visible: boolean) => void;
+  onLayerFileLabelToggle?: (fileId: string, visible: boolean) => void;
   onContextMenu: (e: React.MouseEvent, node: TreeNode) => void;
   mapType: 'roadmap' | 'satellite';
+  pointFileLabelVisibility: Record<string, boolean>;
+  layerFileLabelVisibility: Record<string, boolean>;
 }
 
 /**
@@ -612,8 +1091,11 @@ function TreeNodeComponent({
   onLayerFileRemove,
   onCustomLayerRemove,
   onPointFileLabelToggle,
+  onLayerFileLabelToggle,
   onContextMenu,
-  mapType
+  mapType,
+  pointFileLabelVisibility,
+  layerFileLabelVisibility
 }: TreeNodeComponentProps) {
   const getIndent = () => {
     // 根据层级添加缩进：每级 16px
@@ -681,23 +1163,21 @@ function TreeNodeComponent({
         if (node.mapType?.id === 'satellite') return <Satellite size={14} color="#666" />
         return null
       case 'sector-layer':
-        if (node.sectorLayer?.type === 'LTE') return <SectorIcon color="#3b82f6" />
-        if (node.sectorLayer?.type === 'NR') return <SectorIcon color="#10b981" />
         return <SectorIcon color="#666" />
       case 'sector-group':
         return <Map size={14} color="#666" />
       case 'layer-files':
-        return <Folder size={14} color="#999" />
+        return <Folder size={14} color="#666" />
       case 'sector-label':
         return <span style={{ fontSize: '14px' }}>📝</span>
-      case 'point-file-label':
+      case 'layer-file-label':
         return <span style={{ fontSize: '14px' }}>🏷️</span>
       case 'layer-file':
-        return <File size={12} color="#999" />
+        return <File size={12} color="#666" />
       case 'custom-group':
-        return <Folder size={14} color="#3b82f6" />
+        return <Folder size={14} color="#666" />
       case 'custom-layer':
-        return <File size={12} color="#3b82f6" />
+        return <File size={12} color="#666" />
       default:
         return null
     }
@@ -720,29 +1200,31 @@ function TreeNodeComponent({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'flex-start',
-          padding: '8px 10px',
+          padding: node.type === 'frequency' ? '4px 8px' : '8px 12px',
           cursor: node.type === 'root' ? 'default' : (isExpandable ? 'pointer' : 'default'),
           userSelect: 'none',
-          borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
-          backgroundColor: node.type === 'root' ? 'rgba(0, 0, 0, 0.08)' : 'transparent',
-          borderRadius: '0',
+          borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+          backgroundColor: node.type === 'root' ? 'transparent' : 'transparent',
+          borderRadius: '8px',
           border: 'none',
           boxShadow: 'none',
-          gap: node.type === 'frequency' ? '4px' : '6px', // 频点项间距更小
-          height: node.type === 'frequency' ? '24px' : '32px', // 频点项行高更小
-          lineHeight: node.type === 'frequency' ? '24px' : '32px',
+          gap: node.type === 'frequency' ? '4px' : '8px',
+          height: 'auto',
+          minHeight: node.type === 'frequency' ? '18px' : '36px',
+          lineHeight: '1.2',
           position: 'relative',
+          transition: 'all 0.2s ease',
           ...getIndent()
         }}
         onClick={node.type === 'root' ? undefined : handleClick}
         onContextMenu={(e) => onContextMenu(e, node)}
         onMouseEnter={(e) => {
-          if (node.type !== 'root' && isExpandable) {
-            e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)'
+          if (node.type !== 'root') {
+            e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.05)'
           }
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = node.type === 'root' ? 'rgba(0, 0, 0, 0.08)' : 'transparent'
+          e.currentTarget.style.backgroundColor = 'transparent'
         }}
       >
         {/* 树形连线 */}
@@ -795,14 +1277,9 @@ function TreeNodeComponent({
                 return node.customLayer.visible ? 600 : 400
               }
 
-              // 频点
+              // 频点 - 不加粗,使用正常字重
               if (node.type === 'frequency' && node.frequency) {
-                return node.frequency.visible ? 600 : 400
-              }
-
-              // 点文件标签
-              if (node.type === 'point-file-label' && node.pointFileLabel) {
-                return node.pointFileLabel.visible ? 600 : 400
+                return 400
               }
 
               // 其他类型保持正常
@@ -814,14 +1291,33 @@ function TreeNodeComponent({
             textOverflow: 'ellipsis'
           }}
         >
-          {node.label}
+          {/* 频点标签 - 分为频点数值和小区数量两部分 */}
+          {node.type === 'frequency' && node.frequency ? (
+            <>
+              <span style={{ fontSize: 'inherit' }}>
+                {node.frequency.frequency}
+              </span>
+              {node.frequency.count && (
+                <span style={{
+                  fontSize: '10px',
+                  color: '#94a3b8',
+                  marginLeft: '2px',
+                  fontWeight: 400
+                }}>
+                  ({node.frequency.count})
+                </span>
+              )}
+            </>
+          ) : (
+            node.label
+          )}
         </span>
 
         {/* 地图类型子节点已隐藏，改用按钮组切换 */}
-        {node.type === 'map-type' && false && node.mapType && (
+        {false && node.type === 'map-type' && node.mapType && (
           <MapTypeRadio
             option={node.mapType}
-            onToggle={() => onMapTypeChange(node.mapType!.id)}
+            onToggle={() => onMapTypeChange(node.mapType.id)}
           />
         )}
 
@@ -910,14 +1406,14 @@ function TreeNodeComponent({
           />
         )}
 
-        {/* 点文件标签 - 标签图标样式控件 */}
-        {node.type === 'point-file-label' && node.pointFileLabel && (
+        {/* 点文件标签 - 标签图标样式控件（地理化数据） */}
+        {node.type === 'layer-file' && node.layerFile && node.layerFile.sourceType === 'excel' && (
           <div
             onClick={(e) => {
               e.stopPropagation()
-              const currentVisible = node.pointFileLabel?.visible ?? false
+              const fileId = node.layerFile!.id
+              const currentVisible = pointFileLabelVisibility[fileId] || false
               const newVisible = !currentVisible
-              const fileId = node.pointFileLabel?.fileId ?? ''
               console.log('[LayerControl] Point file label toggle:', fileId, newVisible)
               onPointFileLabelToggle?.(fileId, newVisible)
             }}
@@ -941,8 +1437,8 @@ function TreeNodeComponent({
               {/* 标签形状 */}
               <path
                 d="M10 3L17 5V15L10 17L3 15V5L10 3Z"
-                fill={node.pointFileLabel.visible ? '#3b82f6' : '#e0e0e0'}
-                stroke={node.pointFileLabel.visible ? '#2563eb' : '#bdbdbd'}
+                fill={pointFileLabelVisibility[node.layerFile!.id] ? '#3b82f6' : '#e0e0e0'}
+                stroke={pointFileLabelVisibility[node.layerFile!.id] ? '#2563eb' : '#bdbdbd'}
                 strokeWidth="1.5"
               />
               {/* 标签孔 */}
@@ -950,8 +1446,8 @@ function TreeNodeComponent({
                 cx="10"
                 cy="4.5"
                 r="1.5"
-                fill={node.pointFileLabel.visible ? '#ffffff' : '#f5f5f5'}
-                stroke={node.pointFileLabel.visible ? '#2563eb' : '#bdbdbd'}
+                fill={pointFileLabelVisibility[node.layerFile!.id] ? '#ffffff' : '#f5f5f5'}
+                stroke={pointFileLabelVisibility[node.layerFile!.id] ? '#2563eb' : '#bdbdbd'}
                 strokeWidth="1.5"
               />
               {/* 标签上的线条 */}
@@ -960,7 +1456,7 @@ function TreeNodeComponent({
                 y1="9"
                 x2="13"
                 y2="9"
-                stroke={node.pointFileLabel.visible ? '#ffffff' : '#bdbdbd'}
+                stroke={pointFileLabelVisibility[node.layerFile!.id] ? '#ffffff' : '#bdbdbd'}
                 strokeWidth="2"
                 strokeLinecap="round"
               />
@@ -969,7 +1465,74 @@ function TreeNodeComponent({
                 y1="12"
                 x2="13"
                 y2="12"
-                stroke={node.pointFileLabel.visible ? '#ffffff' : '#bdbdbd'}
+                stroke={pointFileLabelVisibility[node.layerFile!.id] ? '#ffffff' : '#bdbdbd'}
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
+        )}
+
+        {/* 图层文件标签 - 标签图标样式控件（MapInfo 图层，非 Excel） */}
+        {node.type === 'layer-file' && node.layerFile && node.layerFile.sourceType !== 'excel' && (
+          <div
+            onClick={(e) => {
+              e.stopPropagation()
+              const fileId = node.layerFile!.id
+              const currentVisible = layerFileLabelVisibility[fileId] || false
+              const newVisible = !currentVisible
+              console.log('[LayerControl] MapInfo layer file label toggle:', fileId, newVisible)
+              onLayerFileLabelToggle?.(fileId, newVisible)
+            }}
+            style={{
+              width: '20px',
+              height: '20px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            {/* 标签图标 */}
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 20 20"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              {/* 标签形状 */}
+              <path
+                d="M10 3L17 5V15L10 17L3 15V5L10 3Z"
+                fill={layerFileLabelVisibility[node.layerFile!.id] ? '#3b82f6' : '#e0e0e0'}
+                stroke={layerFileLabelVisibility[node.layerFile!.id] ? '#2563eb' : '#bdbdbd'}
+                strokeWidth="1.5"
+              />
+              {/* 标签孔 */}
+              <circle
+                cx="10"
+                cy="4.5"
+                r="1.5"
+                fill={layerFileLabelVisibility[node.layerFile!.id] ? '#ffffff' : '#f5f5f5'}
+                stroke={layerFileLabelVisibility[node.layerFile!.id] ? '#2563eb' : '#bdbdbd'}
+                strokeWidth="1.5"
+              />
+              {/* 标签上的线条 */}
+              <line
+                x1="7"
+                y1="9"
+                x2="13"
+                y2="9"
+                stroke={layerFileLabelVisibility[node.layerFile!.id] ? '#ffffff' : '#bdbdbd'}
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+              <line
+                x1="7"
+                y1="12"
+                x2="13"
+                y2="12"
+                stroke={layerFileLabelVisibility[node.layerFile!.id] ? '#ffffff' : '#bdbdbd'}
                 strokeWidth="2"
                 strokeLinecap="round"
               />
@@ -986,6 +1549,7 @@ function TreeNodeComponent({
               node.frequency!.frequency,
               visible
             )}
+            networkType={node.frequency!.networkType}
           />
         )}
 
@@ -1016,8 +1580,11 @@ function TreeNodeComponent({
               onLayerFileRemove={onLayerFileRemove}
               onCustomLayerRemove={onCustomLayerRemove}
               onPointFileLabelToggle={onPointFileLabelToggle}
+              onLayerFileLabelToggle={onLayerFileLabelToggle}
               onContextMenu={onContextMenu}
               mapType={mapType}
+              pointFileLabelVisibility={pointFileLabelVisibility}
+              layerFileLabelVisibility={layerFileLabelVisibility}
             />
           ))}
         </div>
@@ -1087,48 +1654,22 @@ function SectorLayerCheckbox({ layer, onToggle, isChecked: externalChecked }: Se
     setIsChecked(externalChecked ?? layer.visible);
   }, [layer.visible, externalChecked]);
 
-  const handleToggle = (e: React.MouseEvent) => {
+  const handleToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
     e.stopPropagation();
-    const newValue = !isChecked;
+    const newValue = e.target.checked;
     setIsChecked(newValue);
     onToggle(newValue);
   };
 
   return (
-    <div
-      onClick={handleToggle}
-      style={{
-        width: '16px',
-        height: '16px',
-        marginLeft: '8px',
-        border: isChecked ? `${layer.color} solid 2px` : 'rgba(0, 0, 0, 0.2) solid 2px',
-        borderRadius: '5px',
-        backgroundColor: isChecked ? layer.color : 'transparent',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        cursor: 'pointer',
-        transition: 'all 0.2s ease'
-      }}
-    >
-      {isChecked && (
-        <svg
-          width="10"
-          height="10"
-          viewBox="0 0 10 10"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M1 4L3.5 6.5L9 1"
-            stroke="white"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      )}
-    </div>
+    <label className="custom-checkbox">
+      <input
+        type="checkbox"
+        checked={isChecked}
+        onChange={handleToggle}
+      />
+      <span className="checkmark"></span>
+    </label>
   );
 }
 
@@ -1150,58 +1691,22 @@ function LayerFileCheckbox({ file, onToggle }: LayerFileCheckboxProps) {
     setIsChecked(file.visible);
   }, [file.visible]);
 
-  const handleToggle = (e: React.MouseEvent) => {
+  const handleToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
     e.stopPropagation();
-    const newValue = !isChecked;
+    const newValue = e.target.checked;
     setIsChecked(newValue);
     onToggle(newValue);
   };
 
-  const getFileColor = () => {
-    switch (file.type) {
-      case 'point': return '#f59e0b';
-      case 'line': return '#8b5cf6';
-      case 'polygon': return '#10b981';
-      default: return '#6b7280';
-    }
-  };
-
-  const color = getFileColor();
-
   return (
-    <div
-      onClick={handleToggle}
-      style={{
-        width: '16px',
-        height: '16px',
-        border: isChecked ? `${color} solid 2px` : 'rgba(0, 0, 0, 0.2) solid 2px',
-        borderRadius: '5px',
-        backgroundColor: isChecked ? color : 'transparent',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        cursor: 'pointer',
-        transition: 'all 0.2s ease'
-      }}
-    >
-      {isChecked && (
-        <svg
-          width="10"
-          height="10"
-          viewBox="0 0 10 10"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M1 4L3.5 6.5L9 1"
-            stroke="white"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      )}
-    </div>
+    <label className="custom-checkbox">
+      <input
+        type="checkbox"
+        checked={isChecked}
+        onChange={handleToggle}
+      />
+      <span className="checkmark"></span>
+    </label>
   );
 }
 
@@ -1211,73 +1716,50 @@ function LayerFileCheckbox({ file, onToggle }: LayerFileCheckboxProps) {
 interface FrequencyCheckboxProps {
   frequency: FrequencyOption;
   onToggle: (visible: boolean) => void;
+  networkType: NetworkType;
 }
 
 /**
  * 频点复选框组件
  * 显示频点颜色方块和复选框
  */
-function FrequencyCheckbox({ frequency, onToggle }: FrequencyCheckboxProps) {
+function FrequencyCheckbox({ frequency, onToggle, networkType }: FrequencyCheckboxProps) {
   const [isChecked, setIsChecked] = useState(frequency.visible);
 
   useEffect(() => {
     setIsChecked(frequency.visible);
   }, [frequency.visible]);
 
-  const handleToggle = (e: React.MouseEvent) => {
+  const handleToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
     e.stopPropagation();
-    const newValue = !isChecked;
+    const newValue = e.target.checked;
     setIsChecked(newValue);
     onToggle(newValue);
   };
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-      {/* 颜色方块 */}
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      {/* 颜色方块 - 优化样式 */}
       <div
         style={{
-          width: '12px',
-          height: '12px',
+          width: '14px',
+          height: '14px',
           backgroundColor: frequency.color,
           border: `1px solid ${frequency.strokeColor}`,
-          borderRadius: '2px'
+          borderRadius: '4px',
+          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)'
         }}
       />
 
-      {/* 复选框 */}
-      <div
-        onClick={handleToggle}
-        style={{
-          width: '16px',
-          height: '16px',
-          border: isChecked ? `${frequency.color} solid 2px` : 'rgba(0, 0, 0, 0.2) solid 2px',
-          borderRadius: '5px',
-          backgroundColor: isChecked ? frequency.color : 'transparent',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          transition: 'all 0.2s ease'
-        }}
-      >
-        {isChecked && (
-          <svg
-            width="10"
-            height="10"
-            viewBox="0 0 10 10"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              d="M1 4L3.5 6.5L9 1"
-              stroke="white"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        )}
-      </div>
+      {/* 现代化复选框 */}
+      <label className="custom-checkbox">
+        <input
+          type="checkbox"
+          checked={isChecked}
+          onChange={handleToggle}
+        />
+        <span className="checkmark"></span>
+      </label>
     </div>
   );
 }
@@ -1328,45 +1810,21 @@ function CustomLayerCheckbox({ layer, onToggle }: { layer: CustomLayerOption; on
     setIsChecked(layer.visible);
   }, [layer.visible]);
 
-  const handleToggle = (e: React.MouseEvent) => {
+  const handleToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
     e.stopPropagation();
-    const newValue = !isChecked;
+    const newValue = e.target.checked;
     setIsChecked(newValue);
     onToggle(newValue);
   };
 
-  const getColor = () => {
-    switch (layer.type) {
-      case 'point': return '#ef4444';
-      case 'line': return '#3b82f6';
-      case 'polygon': return '#10b981';
-      default: return '#6b7280';
-    }
-  };
-
-  const color = getColor();
-
   return (
-    <div
-      onClick={handleToggle}
-      style={{
-        width: '16px',
-        height: '16px',
-        border: isChecked ? `${color} solid 2px` : 'rgba(0, 0, 0, 0.2) solid 2px',
-        borderRadius: '5px',
-        backgroundColor: isChecked ? color : 'transparent',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        cursor: 'pointer',
-        transition: 'all 0.2s ease'
-      }}
-    >
-      {isChecked && (
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      )}
-    </div>
+    <label className="custom-checkbox">
+      <input
+        type="checkbox"
+        checked={isChecked}
+        onChange={handleToggle}
+      />
+      <span className="checkmark"></span>
+    </label>
   );
 }

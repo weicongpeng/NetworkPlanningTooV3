@@ -99,14 +99,11 @@ class MapInfoParser:
                     parsed_style = MapInfoParser._parse_style_value(str(col), value)
                     if parsed_style:
                         style.update(parsed_style)
-                        print(f"[MapInfoParser] 从列 '{col}' 提取样式: {parsed_style}")
 
         # 如果没有找到样式，尝试从属性中推断样式
         # 例如：道路类型、区域类型等
         if not style:
             style = MapInfoParser._infer_style_from_properties(row, geom_type)
-            if style:
-                print(f"[MapInfoParser] 从属性推断样式: {style}")
 
         return style if style else None
 
@@ -202,7 +199,8 @@ class MapInfoParser:
                 result['font'] = value_str
 
         except Exception as e:
-            print(f"[MapInfoParser] 解析样式失败: {style_type}={value}, 错误: {e}")
+            # 解析失败时返回 None
+            pass
 
         return result if result else None
 
@@ -432,13 +430,11 @@ class MapInfoParser:
                     with open(tab_file, 'r', encoding=encoding, errors='ignore') as f:
                         content = f.read()
                     used_encoding = encoding
-                    print(f"[MapInfoParser] 使用 {encoding} 编码成功读取 TAB 文件")
                     break
                 except Exception as e:
                     continue
 
             if not content:
-                print(f"[MapInfoParser] 所有编码尝试失败，使用默认内容")
                 try:
                     with open(tab_file, 'rb') as f:
                         content = f.read().decode('utf-8', errors='ignore')
@@ -447,16 +443,14 @@ class MapInfoParser:
                     pass
 
             if not content:
-                print(f"[MapInfoParser] 无法读取 TAB 文件: {tab_file}")
                 return metadata
 
             # 解析 TAB 文件内容
             lines = content.split('\n')
 
             # 打印前几行用于调试
-            print(f"[MapInfoParser] TAB 文件前 5 行内容 (编码: {used_encoding}):")
             for i, line in enumerate(lines[:5]):
-                print(f"[MapInfoParser]   {i+1}: {line[:100]}")
+                pass  # 已移除调试日志
 
             # 查找图层名称
             found_name = False
@@ -473,11 +467,13 @@ class MapInfoParser:
                         if quoted_names:
                             metadata['name'] = quoted_names[0].strip()
                             found_name = True
-                            print(f"[MapInfoParser] 从引号中提取图层名称: {metadata['name']}")
                             break
 
             if not found_name:
-                print(f"[MapInfoParser] 未找到明确的图层名称定义，使用文件名: {metadata['name']}")
+                # 尝试从文件名提取
+                if 'file' in metadata:
+                    import os
+                    metadata['name'] = os.path.basename(metadata.get('file', ''))
 
             # 查找坐标系定义
             for line in lines:
@@ -504,10 +500,10 @@ class MapInfoParser:
                             if match.upper() not in ['CHAR', 'INTEGER', 'DECIMAL', 'DATE', 'LOGICAL']:
                                 metadata['fields'].append(match)
 
-            print(f"[MapInfoParser] 读取TAB元数据: 名称={metadata['name']}, 字段数={len(metadata['fields'])}")
 
         except Exception as e:
-            print(f"[MapInfoParser] 读取TAB元数据失败: {e}")
+            # 解析失败时返回空元数据
+            pass
 
         return metadata
 
@@ -527,7 +523,6 @@ class MapInfoParser:
         name_lower = layer_name.lower()
 
         # 先打印调试信息
-        print(f"[MapInfoParser] 样式推断: 图层名称='{layer_name}' (小写='{name_lower}'), 几何类型={geom_type.value}")
 
         style = None
 
@@ -539,14 +534,12 @@ class MapInfoParser:
                     'strokeWidth': 2,
                     'opacity': 0.9
                 }
-                print(f"[MapInfoParser] 匹配到道路样式")
             elif any(kw in name_lower for kw in ['river', '水系', '河流', '溪', 'stream', 'stream_', 'water_']):
                 style = {
                     'strokeColor': '#4dabf7',  # 蓝色河流
                     'strokeWidth': 2,
                     'opacity': 0.8
                 }
-                print(f"[MapInfoParser] 匹配到河流样式")
             elif any(kw in name_lower for kw in ['boundary', 'border', '边界', 'border_', '区界', 'bound_', 'bdry']):
                 style = {
                     'strokeColor': '#868e96',  # 灰色边界
@@ -554,7 +547,6 @@ class MapInfoParser:
                     'opacity': 0.7,
                     'strokeDasharray': '5,5'  # 边界使用虚线
                 }
-                print(f"[MapInfoParser] 匹配到边界样式")
             elif any(kw in name_lower for kw in ['railway', 'rail', '铁路', '轨道', 'rail_']):
                 style = {
                     'strokeColor': '#495057',  # 深灰色铁路
@@ -562,7 +554,6 @@ class MapInfoParser:
                     'opacity': 0.9,
                     'strokeDasharray': '10,10'  # 铁路使用虚线
                 }
-                print(f"[MapInfoParser] 匹配到铁路样式")
 
         elif geom_type == GeometryType.POLYGON:
             # 面状图层样式推断
@@ -573,7 +564,6 @@ class MapInfoParser:
                     'strokeWidth': 1,
                     'fillOpacity': 0.5
                 }
-                print(f"[MapInfoParser] 匹配到水域样式")
             elif any(kw in name_lower for kw in ['green', 'park', 'forest', '绿地', '公园', '森林', '植被', 'grass', 'greenbelt', 'green_']):
                 style = {
                     'fillColor': '#51cf66',  # 绿色植被
@@ -581,7 +571,6 @@ class MapInfoParser:
                     'strokeWidth': 1,
                     'fillOpacity': 0.4
                 }
-                print(f"[MapInfoParser] 匹配到绿地样式")
             elif any(kw in name_lower for kw in ['building', '建筑', '楼', 'house', 'construct', 'build_', 'bldg']):
                 style = {
                     'fillColor': '#adb5bd',  # 灰色建筑
@@ -589,7 +578,6 @@ class MapInfoParser:
                     'strokeWidth': 1,
                     'fillOpacity': 0.6
                 }
-                print(f"[MapInfoParser] 匹配到建筑样式")
             elif any(kw in name_lower for kw in ['region', 'area', 'district', '区', '区域', 'zone', 'polygon', 'poly_']):
                 style = {
                     'fillColor': '#f8f9fa',  # 浅灰色区域
@@ -597,7 +585,6 @@ class MapInfoParser:
                     'strokeWidth': 2,
                     'fillOpacity': 0.3
                 }
-                print(f"[MapInfoParser] 匹配到区域样式")
 
         elif geom_type == GeometryType.POINT:
             # 点状图层样式推断
@@ -606,10 +593,15 @@ class MapInfoParser:
                     'markerColor': '#ff6b6b',
                     'markerSize': 8
                 }
-                print(f"[MapInfoParser] 匹配到POI样式")
 
         if not style:
-            print(f"[MapInfoParser] 未匹配到任何样式模式")
+            # 根据几何类型返回默认样式
+            if geom_type == GeometryType.POINT:
+                style = {'type': 'circle', 'color': '#3b82f6', 'radius': 6}
+            elif geom_type == GeometryType.LINE:
+                style = {'type': 'polyline', 'color': '#10b981', 'weight': 2}
+            elif geom_type == GeometryType.POLYGON:
+                style = {'type': 'polygon', 'color': '#f59e0b', 'fillColor': '#f59e0b', 'fillOpacity': 0.3}
 
         return style
 
@@ -625,7 +617,6 @@ class MapInfoParser:
         try:
             # 确保路径为字符串
             path_str = str(file_path)
-            print(f"[MapInfoParser] 正在解析文件: {path_str}")
 
             if not file_path.exists():
                 raise FileNotFoundError(f"文件不存在: {path_str}")
@@ -634,24 +625,20 @@ class MapInfoParser:
             tab_file = file_path if file_path.suffix.lower() == '.tab' else file_path.with_suffix('.tab')
             tab_metadata = MapInfoParser._read_tab_metadata(tab_file) if tab_file.exists() else {}
             layer_name = tab_metadata.get('name', file_path.stem)
-            print(f"[MapInfoParser] 图层名称: {layer_name}")
 
             # 使用 Geopandas 读取文件
             try:
                 gdf = gpd.read_file(path_str, encoding='gbk')
             except Exception as e1:
-                print(f"[MapInfoParser] GBK编码解析失败: {e1}，尝试默认编码")
                 try:
                     gdf = gpd.read_file(path_str)
                 except Exception as e2:
-                    print(f"[MapInfoParser] 默认编码解析失败: {e2}")
                     raise e2
 
             features = []
             layer_type = GeometryType.UNKNOWN
 
             if gdf.empty:
-                print(f"[MapInfoParser] 文件解析成功但没有数据: {path_str}")
                 return MapInfoLayer(
                     id=str(uuid.uuid4()),
                     name=layer_name,
@@ -669,17 +656,11 @@ class MapInfoParser:
             elif isinstance(first_geom, (Polygon, MultiPolygon)):
                 layer_type = GeometryType.POLYGON
 
-            print(f"[MapInfoParser] 检测到几何类型: {layer_type.value}, 要素数量: {len(gdf)}")
 
             # 获取图层级别的默认样式
             layer_default_style = MapInfoParser._get_layer_default_style(layer_name, layer_type)
-            if layer_default_style:
-                print(f"[MapInfoParser] 应用图层默认样式: {layer_default_style}")
-            else:
-                print(f"[MapInfoParser] 未匹配到图层默认样式 (name={layer_name}, type={layer_type.value})")
 
             # 调试：输出所有列名
-            print(f"[MapInfoParser] 文件包含的列: {list(gdf.columns)}")
 
             # 遍历要素
             for idx, row in gdf.iterrows():
@@ -757,7 +738,6 @@ class MapInfoParser:
             )
 
         except Exception as e:
-            print(f"[MapInfoParser] 解析发生严重错误: {e}")
             import traceback
             traceback.print_exc()
             raise ValueError(f"Geopandas 解析失败: {e}")
@@ -775,7 +755,6 @@ class MapInfoParser:
                 layer = MapInfoParser._parse_mif(mif_file)
                 layers.append(layer)
             except Exception as e:
-                print(f"[MapInfoParser] 解析失败 {mif_file.name}: {e}")
                 continue
 
         # 查找所有 TAB 文件（如果找不到对应的 MIF）
@@ -789,7 +768,6 @@ class MapInfoParser:
                 layer = MapInfoParser._parse_tab(tab_file)
                 layers.append(layer)
             except Exception as e:
-                print(f"[MapInfoParser] 解析失败 {tab_file.name}: {e}")
                 continue
 
         return layers

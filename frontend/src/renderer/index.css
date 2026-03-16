@@ -7,6 +7,8 @@
 
 @layer base {
   :root {
+    /* Default theme variables (dark mode with blue primary) */
+    /* These are dynamically updated by themeStore.ts based on user selection */
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
 
@@ -71,18 +73,54 @@
   background: #1e293b;
 }
 
-.leaflet-popup-content-wrapper {
+/* 定位标记弹窗样式 - 必须在通用样式之前定义 */
+.leaflet-popup.location-popup .leaflet-popup-content-wrapper {
+  padding: 0 !important;
+  border-radius: 4px !important;
+  background: rgb(100, 100, 100) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3) !important;
+}
+
+.leaflet-popup.location-popup .leaflet-popup-tip {
+  background: rgb(100, 100, 100) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+.leaflet-popup.location-popup .leaflet-popup-content {
+  margin: 0 !important;
+  padding: 3px 8px !important;
+  min-width: unset !important;
+  line-height: 1.3 !important;
+  color: #ffffff !important;
+}
+
+.leaflet-popup.location-popup .leaflet-popup-content h3 {
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  margin: 0 !important;
+  font-size: 12px !important;
+}
+
+.leaflet-popup.location-popup .leaflet-popup-content p {
+  color: rgba(255, 255, 255, 0.8) !important;
+  margin: 2px 0 0 0 !important;
+  font-size: 10px !important;
+}
+
+/* 通用弹窗样式（非定位标记） */
+.leaflet-popup-content-wrapper:not(.location-popup) {
   background: rgba(30, 41, 59, 0.95);
   backdrop-filter: blur(8px);
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius);
 }
 
-.leaflet-popup-tip {
+.leaflet-popup-tip:not(.location-popup) {
   background: rgba(30, 41, 59, 0.95);
 }
 
-.leaflet-popup-content {
+.leaflet-popup-content-wrapper:not(.location-popup) .leaflet-popup-content {
   margin: 12px;
   color: hsl(var(--foreground));
 }
@@ -102,3 +140,151 @@
   color: hsl(var(--muted-foreground));
 }
 
+
+/* 动画效果 */
+@keyframes bounce-subtle {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.bounce-subtle {
+  display: inline-block;
+  animation: bounce-subtle 1.5s ease-in-out infinite;
+}
+
+.group:hover .group-hover\:bounce-subtle {
+  animation: bounce-subtle 1s ease-in-out infinite;
+}
+
+/* 扇区鼠标悬停提示框样式 - 紧凑灰色框 */
+.leaflet-tooltip.sector-tooltip {
+  background: rgba(100, 100, 100, 0.95);
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  padding: 2px 6px;
+  color: white;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+  opacity: 1;
+  transform: none;
+  transition: none;
+}
+
+.leaflet-tooltip.sector-tooltip:before {
+  border-top-color: rgba(100, 100, 100, 0.95);
+}
+
+.leaflet-tooltip-top.sector-tooltip {
+  margin-bottom: 10px;
+}
+
+/* tooltip 内容 */
+.sector-tooltip-content {
+  display: block;
+}
+
+/* 测距模式下的扇区样式 - 禁用交互，保持十字光标 */
+.sector-polygon-measure,
+.sector-marker-measure {
+  pointer-events: none !important;
+  cursor: crosshair !important;
+}
+
+.sector-polygon-measure:hover,
+.sector-marker-measure:hover {
+  cursor: crosshair !important;
+}
+
+/* 框选模式全局样式 */
+/* 框选模式下鼠标样式由 OnlineMap.tsx 控制，不再使用 CSS 强制设置 */
+
+/* 当鼠标悬停在捕捉点附近时，允许显示手型 (光标效果) */
+.selection-active.snap-point-active {
+  cursor: pointer !important;
+}
+
+/* 网络状态指示器 - 雷达扫描动画 */
+@keyframes radar-sweep {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* 网络状态指示器 - 脉冲动画 */
+@keyframes status-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(0.95);
+  }
+}
+
+/* 网络离线状态的闪烁警告 */
+@keyframes offline-blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* 表格列宽拖拽手柄样式 */
+.table-resize-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background-color 0.15s ease;
+}
+
+.table-resize-handle:hover {
+  background: hsl(var(--primary) / 0.5);
+}
+
+.table-resize-handle:active,
+.table-resize-handle.resizing {
+  background: hsl(var(--primary));
+}
+
+/* 防止文本选择在拖拽时发生 */
+.table-resize-handle * {
+  user-select: none;
+}
+
+/* 拖拽时的全局样式 */
+body.resizing-column {
+  cursor: col-resize !important;
+  user-select: none;
+}
+
+body.resizing-column * {
+  cursor: col-resize !important;
+}

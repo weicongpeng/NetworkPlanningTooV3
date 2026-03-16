@@ -1,0 +1,10 @@
+!table
+!version 300
+!charset Neutral
+
+Definition Table
+  Type NATIVE Charset "Neutral"
+  Fields 3
+    city Char (80) ;
+    NAME Char (80) ;
+    area Decimal (11,3) ;

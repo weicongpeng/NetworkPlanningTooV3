@@ -1,6 +1,7 @@
 """
 API路由创建和注册
 """
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -12,8 +13,7 @@ from app.api.v1 import api_router
 
 # 配置日志
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -29,6 +29,7 @@ async def lifespan(app: FastAPI):
     settings.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     settings.LICENSE_DIR.mkdir(parents=True, exist_ok=True)
     settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
+    settings.TEMPLATE_DIR.mkdir(parents=True, exist_ok=True)
 
     logger.info("应用启动完成")
     yield
@@ -56,7 +57,7 @@ def create_app() -> FastAPI:
                 ensure_ascii=False,
                 allow_nan=False,
                 indent=None,
-                separators=(",", ":")
+                separators=(",", ":"),
             ).encode("utf-8")
 
     app = FastAPI(
@@ -64,7 +65,7 @@ def create_app() -> FastAPI:
         version=settings.VERSION,
         description="网络规划工具API",
         lifespan=lifespan,
-        default_response_class=UTF8JSONResponse  # 设置默认响应类为UTF-8 JSON响应
+        default_response_class=UTF8JSONResponse,  # 设置默认响应类为UTF-8 JSON响应
     )
 
     # 配置CORS
@@ -74,12 +75,15 @@ def create_app() -> FastAPI:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["Content-Disposition", "Content-Length", "Content-Type"],
     )
 
     # 注册路由
     app.include_router(api_router, prefix=settings.API_V1_STR)
 
     # 静态文件服务（用于导出文件下载）
+    # 在挂载静态文件之前确保目录存在
+    settings.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     app.mount("/static", StaticFiles(directory=str(settings.OUTPUT_DIR)), name="static")
 
     @app.get("/")
@@ -87,7 +91,7 @@ def create_app() -> FastAPI:
         return {
             "message": "网络规划工具API",
             "version": settings.VERSION,
-            "status": "running"
+            "status": "running",
         }
 
     @app.get("/health")

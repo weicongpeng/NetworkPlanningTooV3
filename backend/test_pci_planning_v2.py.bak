@@ -1,0 +1,351 @@
+"""
+PCI规划V2功能修复测试
+测试频点过滤和分配原因逻辑
+"""
+
+import pytest
+import asyncio
+from typing import List
+from app.algorithms.pci_planning_service_v2 import (
+    PlanningConfig,
+    PCIPlanningService,
+    SiteSectorInfo,
+    NetworkType,
+)
+
+
+class TestPCIPlanningV2_FrequencyFilter:
+    """测试频点过滤逻辑"""
+
+    def test_is_same_frequency_both_have_values(self):
+        """测试两者都有值时的频点判断"""
+        config = PlanningConfig(
+            network_type=NetworkType.LTE,
+            distance_threshold=3.0,
+            pci_modulus=3,
+        )
+
+        service = PCIPlanningService(config)
+
+        # 测试相同频点
+        assert service._is_same_frequency(1850.0, 1850.0) == True
+        # 测试频点差值 <= 0.1（视为同频）
+        assert service._is_same_frequency(1850.0, 1850.05) == True
+        # 测试不同频点
+        assert service._is_same_frequency(1850.0, 1860.0) == False
+        assert service._is_same_frequency(1850.0, 2140.0) == False
+
+    def test_is_same_frequency_both_none(self):
+        """测试两者都为None时的频点判断"""
+        config = PlanningConfig(
+            network_type=NetworkType.LTE,
+            distance_threshold=3.0,
+            pci_modulus=3,
+        )
+
+        service = PCIPlanningService(config)
+
+        # 两者都为None，应视为同频（向后兼容）
+        assert service._is_same_frequency(None, None) == True
+
+    def test_is_same_frequency_one_none(self):
+        """测试一个有值一个为None时的频点判断"""
+        config = PlanningConfig(
+            network_type=NetworkType.LTE,
+            distance_threshold=3.0,
+            pci_modulus=3,
+        )
+
+        service = PCIPlanningService(config)
+
+        # 一个有值一个为None，应视为不同频
+        assert service._is_same_frequency(1850.0, None) == False
+        assert service._is_same_frequency(None, 1850.0) == False
+
+    def test_different_frequency_should_not_calculate_distance(self):
+        """测试不同频点的小区不应计算复用距离"""
+        config = PlanningConfig(
+            network_type=NetworkType.LTE,
+            distance_threshold=3.0,
+            pci_modulus=3,
+        )
+
+        service = PCIPlanningService(config)
+
+        # 模拟两个不同频点的小区
+        sector1 = SiteSectorInfo(
+            id="sector1",
+            site_id="site1",
+            name="扇区1",
+            longitude=116.4074,
+            latitude=39.9042,
+            azimuth=0,
+            beamwidth=65,
+            pci=100,
+            earfcn=1850.0,  # LTE频点1
+        )
+
+        sector2 = SiteSectorInfo(
+            id="sector2",
+            site_id="site2",
+            name="扇区2",
+            longitude=116.4174,
+            latitude=39.9042,
+            azimuth=0,
+            beamwidth=65,
+            pci=100,  # 相同PCI
+            earfcn=2140.0,  # LTE频点2（不同）
+        )
+
+        # 添加到已分配列表
+        service.assigned_pcis = [
+            (100, sector2.latitude, sector2.longitude, sector2.earfcn)
+        ]
+
+        # 计算复用距离
+        is_valid, min_distance = service.validate_pci_reuse_distance(
+            candidate_pci=100,
+            target_lat=sector1.latitude,
+            target_lon=sector1.longitude,
+            target_earfcn=sector1.earfcn,
+            exclude_sector_id="sector1",
+            all_sectors=[sector1, sector2],
+        )
+
+        # 断言：不同频点不应被计算，应返回无穷大
+        assert min_distance == float("inf"), "不同频点的小区不应计算复用距离"
+
+    def test_same_frequency_should_calculate_distance(self):
+        """测试同频点的小区应正确计算复用距离"""
+        config = PlanningConfig(
+            network_type=NetworkType.LTE,
+            distance_threshold=3.0,
+            pci_modulus=3,
+        )
+
+        service = PCIPlanningService(config)
+
+        # 模拟两个同频点的小区
+        sector1 = SiteSectorInfo(
+            id="sector1",
+            site_id="site1",
+            name="扇区1",
+            longitude=116.4074,
+            latitude=39.9042,
+            azimuth=0,
+            beamwidth=65,
+            pci=100,
+            earfcn=1850.0,
+        )
+
+        sector2 = SiteSectorInfo(
+            id="sector2",
+            site_id="site2",
+            name="扇区2",
+            longitude=116.4174,
+            latitude=39.9042,
+            azimuth=0,
+            beamwidth=65,
+            pci=100,
+            earfcn=1850.0,  # 相同频点
+        )
+
+        # 添加到已分配列表
+        service.assigned_pcis = [
+            (100, sector2.latitude, sector2.longitude, sector2.earfcn)
+        ]
+
+        # 计算复用距离
+        is_valid, min_distance = service.validate_pci_reuse_distance(
+            candidate_pci=100,
+            target_lat=sector1.latitude,
+            target_lon=sector1.longitude,
+            target_earfcn=sector1.earfcn,
+            exclude_sector_id="sector1",
+            all_sectors=[sector1, sector2],
+        )
+
+        # 断言：应计算出实际距离
+        assert min_distance > 0, "同频点的小区应正确计算复用距离"
+        assert min_distance < 10, "两个相邻小区的距离应该在合理范围内"
+
+
+class TestPCIPlanningV2_AssignmentReason:
+    """测试分配原因逻辑"""
+
+    def test_is_distance_constraint_satisfied(self):
+        """测试距离约束判断方法"""
+        config = PlanningConfig(
+            network_type=NetworkType.LTE,
+            distance_threshold=3.0,
+            pci_modulus=3,
+        )
+
+        service = PCIPlanningService(config)
+
+        # 测试满足约束
+        is_satisfied, reason = service.is_distance_constraint_satisfied(5.0, 3.0)
+        assert is_satisfied == True
+        assert "满足" in reason
+        assert "✅" in reason
+        assert "5.00km" in reason
+        assert "3.0km" in reason
+
+        # 测试不满足约束
+        is_satisfied, reason = service.is_distance_constraint_satisfied(2.5, 3.0)
+        assert is_satisfied == False
+        assert "不满足" in reason
+        assert "❌" in reason
+        assert "2.50km" in reason
+        assert "3.0km" in reason
+
+    @pytest.mark.asyncio
+    async def test_assignment_reason_contains_satisfied_keyword(self):
+        """测试分配原因应明确说明是否满足约束"""
+        # 创建测试数据：包含不同频点的小区
+        sites_data = [
+            {
+                "id": "site1",
+                "name": "站点1",
+                "networkType": "LTE",
+                "longitude": 116.4074,
+                "latitude": 39.9042,
+                "sectors": [
+                    {
+                        "id": "1",
+                        "name": "站点1_扇区1",
+                        "longitude": 116.4074,
+                        "latitude": 39.9042,
+                        "earfcn": 1850.0,  # 频点1
+                        "pci": None,
+                    },
+                ],
+            },
+            {
+                "id": "site2",
+                "name": "站点2",
+                "networkType": "LTE",
+                "longitude": 116.5174,  # 距离较远
+                "latitude": 39.9042,
+                "sectors": [
+                    {
+                        "id": "1",
+                        "name": "站点2_扇区1",
+                        "longitude": 116.5174,
+                        "latitude": 39.9042,
+                        "earfcn": 2140.0,  # 频点2（不同）
+                        "pci": 100,  # 已有PCI
+                    },
+                ],
+            },
+        ]
+
+        config = PlanningConfig(
+            network_type=NetworkType.LTE,
+            distance_threshold=3.0,
+            pci_modulus=3,
+        )
+
+        service = PCIPlanningService(config)
+        result = await service.plan(sites_data)
+
+        # 获取规划结果
+        site1_result = next(s for s in result.sites if s.site_id == "site1")
+        sector_result = site1_result.sectors[0]
+
+        # 验证：分配原因应包含最终核查的结果
+        reason = sector_result.assignment_reason
+        distance = sector_result.min_reuse_distance
+
+        # 分配原因应该包含最终核查的结果
+        # 由于不同频点，最小距离应该是无穷大或非常大
+        print(f"分配原因: {reason}")
+        print(f"最小复用距离: {distance}")
+
+        # 分配原因应包含分配时的标记
+        assert (
+            "[分配时]" in reason
+            or "最终核查" in reason
+            or "❌" in reason
+            or "✅" in reason
+        )
+
+
+class TestPCIPlanningV2_EndToEnd:
+    """端到端测试：验证完整的规划流程"""
+
+    @pytest.mark.asyncio
+    async def test_different_frequencies_not_calculated(self):
+        """测试不同频点小区不会相互计算复用距离"""
+        # 创建待规划数据（只有一个站点）
+        sites_data = [
+            {
+                "id": "site1",
+                "name": "站点1",
+                "networkType": "LTE",
+                "longitude": 116.4074,
+                "latitude": 39.9042,
+                "sectors": [
+                    {
+                        "id": "1",
+                        "name": "站点1_扇区1",
+                        "longitude": 116.4074,
+                        "latitude": 39.9042,
+                        "earfcn": 1850.0,  # 频点N78
+                        "pci": None,
+                    },
+                ],
+            },
+        ]
+
+        # 创建背景数据（包含不同频点的站点，已分配PCI=0）
+        background_sites_data = [
+            {
+                "id": "site2",
+                "name": "站点2",
+                "networkType": "LTE",
+                "longitude": 116.4174,
+                "latitude": 39.9042,
+                "sectors": [
+                    {
+                        "id": "1",
+                        "name": "站点2_扇区1",
+                        "longitude": 116.4174,
+                        "latitude": 39.9042,
+                        "earfcn": 2140.0,  # 频点N5（不同）
+                        "pci": 0,  # 已有PCI
+                    },
+                ],
+            },
+        ]
+
+        config = PlanningConfig(
+            network_type=NetworkType.LTE,
+            distance_threshold=1.0,  # 设置较小的阈值
+            pci_modulus=3,
+        )
+
+        service = PCIPlanningService(config)
+        result = await service.plan(
+            sites_data, background_sites_data=background_sites_data
+        )
+
+        # 验证：站点1的扇区1可以分配PCI=0
+        # 因为背景中的站点2的扇区1虽然使用PCI=0，但频点不同
+        site1_result = next(s for s in result.sites if s.site_id == "site1")
+        sector_result = site1_result.sectors[0]
+
+        # 分配的PCI应该是0（因为频点不同，不会冲突）
+        assert sector_result.new_pci == 0
+
+        # 分配原因应说明满足约束（因为不同频点不计算距离）
+        reason = sector_result.assignment_reason
+        print(f"分配原因: {reason}")
+        print(f"最小复用距离: {sector_result.min_reuse_distance}")
+
+        # 最小复用距离应该非常大（因为不同频点不计算）
+        assert sector_result.min_reuse_distance > 10.0
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v", "-s"])

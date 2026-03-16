@@ -1,0 +1,17 @@
+[     185ms] [WARNING] ⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition. @ http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=b2e68fb4:4412
+[     185ms] [WARNING] ⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath. @ http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=b2e68fb4:4412
+[    7031ms] [WARNING] [MapInfoLayer] 图层未添加到地图，无法显示标签 @ http://localhost:5173/src/renderer/components/Map/MapInfoLayer.tsx?t=1771720742442:414
+[    7191ms] [WARNING] [MapInfoLayer] 图层未添加到地图，无法显示标签 @ http://localhost:5173/src/renderer/components/Map/MapInfoLayer.tsx?t=1771720742442:414
+[    7233ms] [WARNING] [MapInfoLayer] 图层未添加到地图，无法显示标签 @ http://localhost:5173/src/renderer/components/Map/MapInfoLayer.tsx?t=1771720742442:414
+[    7303ms] [WARNING] [MapInfoLayer] 图层未添加到地图，无法显示标签 @ http://localhost:5173/src/renderer/components/Map/MapInfoLayer.tsx?t=1771720742442:414
+[    7333ms] [WARNING] [MapInfoLayer] 图层未添加到地图，无法显示标签 @ http://localhost:5173/src/renderer/components/Map/MapInfoLayer.tsx?t=1771720742442:414
+[    7382ms] [WARNING] [MapInfoLayer] 图层未添加到地图，无法显示标签 @ http://localhost:5173/src/renderer/components/Map/MapInfoLayer.tsx?t=1771720742442:414
+[  160267ms] TypeError: Cannot read properties of undefined (reading 'visible')
+    at http://localhost:5173/src/renderer/components/Map/OnlineMap.tsx?t=1771721408041:1074:22
+    at Map.forEach (<anonymous>)
+    at http://localhost:5173/src/renderer/components/Map/OnlineMap.tsx?t=1771721408041:1073:33
+    at NewClass.handleMouseDown (http://localhost:5173/src/renderer/components/Map/OnlineMap.tsx?t=1771721408041:1187:9)
+    at NewClass.fire (http://localhost:5173/node_modules/.vite/deps/chunk-NB5MQSEJ.js?v=b2e68fb4:387:20)
+    at NewClass._fireDOMEvent (http://localhost:5173/node_modules/.vite/deps/chunk-NB5MQSEJ.js?v=b2e68fb4:2959:24)
+    at NewClass._handleDOMEvent (http://localhost:5173/node_modules/.vite/deps/chunk-NB5MQSEJ.js?v=b2e68fb4:2923:16)
+    at HTMLDivElement.handler (http://localhost:5173/node_modules/.vite/deps/chunk-NB5MQSEJ.js?v=b2e68fb4:1733:21)

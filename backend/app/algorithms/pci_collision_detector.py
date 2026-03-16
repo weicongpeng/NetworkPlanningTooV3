@@ -1,31 +1,43 @@
 """
 PCI冲突检测器
 """
-from typing import List, Dict, Tuple, Set
+
+from typing import List, Dict, Tuple, Set, Optional
 from dataclasses import dataclass
 from enum import Enum
 
 
 class ConflictType(str, Enum):
     """冲突类型"""
+
     COLLISION = "collision"  # PCI冲突（相同PCI）
     CONFUSION = "confusion"  # PCI混淆（PCI模3/模30相同）
+    MOD3_CONFLICT = "mod3_conflict"  # Mod3冲突（下行RS碰撞，2端口MIMO）
+    MOD6_CONFLICT = "mod6_conflict"  # Mod6冲突（下行RS碰撞，单端口）
+    MOD30_CONFLICT = "mod30_conflict"  # Mod30冲突（上行RS碰撞）
 
 
 @dataclass
 class PCIConflict:
     """PCI冲突信息"""
+
     type: ConflictType
     sector1: str  # 小区ID
     sector2: str  # 小区ID
     pci: int
+    pci1: int  # 第一个小区的PCI
+    pci2: int  # 第二个小区的PCI
     distance: float  # 距离，单位：公里
     reason: str
+    frequency1: Optional[float] = None  # 第一个小区的频点
+    frequency2: Optional[float] = None  # 第二个小区的频点
+    is_same_frequency: bool = False  # 是否同频
 
 
 @dataclass
 class SectorInfo:
     """小区信息"""
+
     id: str
     site_id: str
     name: str
@@ -34,6 +46,7 @@ class SectorInfo:
     azimuth: float
     beamwidth: float
     pci: int
+    earfcn: Optional[float] = None  # 频点，用于判断同频
 
 
 class PCICollisionDetector:
@@ -52,7 +65,11 @@ class PCICollisionDetector:
         self,
         sectors: List[SectorInfo],
         enable_collision: bool = True,
-        enable_confusion: bool = True
+        enable_confusion: bool = True,
+        enable_mod3: bool = True,
+        enable_mod6: bool = False,
+        enable_mod30: bool = True,
+        check_same_frequency_only: bool = False,
     ) -> List[PCIConflict]:
         """
         检测所有PCI冲突
@@ -61,6 +78,10 @@ class PCICollisionDetector:
             sectors: 小区列表
             enable_collision: 是否检测PCI冲突
             enable_confusion: 是否检测PCI混淆
+            enable_mod3: 是否检测Mod3冲突（默认True，2端口MIMO）
+            enable_mod6: 是否检测Mod6冲突（单端口系统）
+            enable_mod30: 是否检测Mod30冲突（上行RS）
+            check_same_frequency_only: 是否只检测同频小区冲突
 
         Returns:
             冲突列表
@@ -74,37 +95,103 @@ class PCICollisionDetector:
 
                 # 计算距离
                 from app.algorithms.distance_calculator import DistanceCalculator, Point
+
                 distance = DistanceCalculator.calculate_distance(
-                    sector1.longitude, sector1.latitude,
-                    sector2.longitude, sector2.latitude
+                    sector1.longitude,
+                    sector1.latitude,
+                    sector2.longitude,
+                    sector2.latitude,
                 )
 
                 # 只检查距离阈值内的小区
                 if distance > self.distance_threshold:
                     continue
 
+                # 判断是否同频（如果频点信息存在）
+                is_same_frequency = True
+                if hasattr(sector1, "earfcn") and hasattr(sector2, "earfcn"):
+                    if sector1.earfcn is not None and sector2.earfcn is not None:
+                        if abs(sector1.earfcn - sector2.earfcn) >= 0.1:
+                            is_same_frequency = False
+
+                # 如果只检查同频，且是异频，则跳过
+                if check_same_frequency_only and not is_same_frequency:
+                    continue
+
                 # 检测PCI冲突
                 if enable_collision and sector1.pci == sector2.pci:
-                    conflicts.append(PCIConflict(
-                        type=ConflictType.COLLISION,
-                        sector1=sector1.id,
-                        sector2=sector2.id,
-                        pci=sector1.pci,
-                        distance=distance,
-                        reason=f"小区{sector1.name}和{sector2.name}使用相同PCI={sector1.pci}"
-                    ))
-
-                # 检测PCI混淆（模3）
-                if enable_confusion:
-                    if sector1.pci % 3 == sector2.pci % 3:
-                        conflicts.append(PCIConflict(
-                            type=ConflictType.CONFUSION,
+                    conflicts.append(
+                        PCIConflict(
+                            type=ConflictType.COLLISION,
                             sector1=sector1.id,
                             sector2=sector2.id,
+                            pci1=sector1.pci,
+                            pci2=sector2.pci,
                             pci=sector1.pci,
                             distance=distance,
-                            reason=f"小区{sector1.name}和{sector2.name}的PCI模3相同({sector1.pci % 3})"
-                        ))
+                            frequency1=getattr(sector1, "earfcn", None),
+                            frequency2=getattr(sector2, "earfcn", None),
+                            is_same_frequency=is_same_frequency,
+                            reason=f"小区{sector1.name}和{sector2.name}使用相同PCI={sector1.pci}",
+                        )
+                    )
+
+                # 检测Mod3冲突（下行RS碰撞，2端口MIMO）
+                if enable_mod3 and is_same_frequency:
+                    if sector1.pci % 3 == sector2.pci % 3:
+                        conflicts.append(
+                            PCIConflict(
+                                type=ConflictType.MOD3_CONFLICT,
+                                sector1=sector1.id,
+                                sector2=sector2.id,
+                                pci1=sector1.pci,
+                                pci2=sector2.pci,
+                                pci=sector1.pci,
+                                distance=distance,
+                                frequency1=getattr(sector1, "earfcn", None),
+                                frequency2=getattr(sector2, "earfcn", None),
+                                is_same_frequency=is_same_frequency,
+                                reason=f"小区{sector1.name}和{sector2.name}的PCI模3相同({sector1.pci % 3}) - 下行RS碰撞（2端口MIMO）",
+                            )
+                        )
+
+                # 检测Mod6冲突（下行RS碰撞，单端口）
+                if enable_mod6 and is_same_frequency:
+                    if sector1.pci % 6 == sector2.pci % 6:
+                        conflicts.append(
+                            PCIConflict(
+                                type=ConflictType.MOD6_CONFLICT,
+                                sector1=sector1.id,
+                                sector2=sector2.id,
+                                pci1=sector1.pci,
+                                pci2=sector2.pci,
+                                pci=sector1.pci,
+                                distance=distance,
+                                frequency1=getattr(sector1, "earfcn", None),
+                                frequency2=getattr(sector2, "earfcn", None),
+                                is_same_frequency=is_same_frequency,
+                                reason=f"小区{sector1.name}和{sector2.name}的PCI模6相同({sector1.pci % 6}) - 下行RS碰撞（单端口）",
+                            )
+                        )
+
+                # 检测Mod30冲突（上行RS碰撞）
+                if enable_mod30 and is_same_frequency:
+                    if sector1.pci % 30 == sector2.pci % 30:
+                        conflicts.append(
+                            PCIConflict(
+                                type=ConflictType.MOD30_CONFLICT,
+                                sector1=sector1.id,
+                                sector2=sector2.id,
+                                pci1=sector1.pci,
+                                pci2=sector2.pci,
+                                pci=sector1.pci,
+                                distance=distance,
+                                frequency1=getattr(sector1, "earfcn", None),
+                                frequency2=getattr(sector2, "earfcn", None),
+                                is_same_frequency=is_same_frequency,
+                                reason=f"小区{sector1.name}和{sector2.name}的PCI模30相同({sector1.pci % 30}) - 上行RS碰撞",
+                            )
+                        )
 
         return conflicts
 
@@ -125,7 +212,9 @@ class PCICollisionDetector:
                 conflicts.append(sector.id)
         return conflicts
 
-    def detect_confusion(self, sectors: List[SectorInfo], pci: int, modulus: int = 3) -> List[str]:
+    def detect_confusion(
+        self, sectors: List[SectorInfo], pci: int, modulus: int = 3
+    ) -> List[str]:
         """
         检测哪些小区与指定PCI混淆
 
@@ -150,7 +239,7 @@ class PCICollisionDetector:
         exclude_sector_id: str = None,
         modulus: int = 3,
         target_longitude: float = None,
-        target_latitude: float = None
+        target_latitude: float = None,
     ) -> Tuple[bool, List[str]]:
         """
         检查PCI是否可用
@@ -174,11 +263,12 @@ class PCICollisionDetector:
         for sector in check_sectors:
             # 计算距离
             from app.algorithms.distance_calculator import DistanceCalculator
+
             distance = DistanceCalculator.calculate_distance(
                 target_longitude if target_longitude is not None else sector.longitude,
                 target_latitude if target_latitude is not None else sector.latitude,
                 sector.longitude,
-                sector.latitude
+                sector.latitude,
             )
 
             # 超过距离阈值的不检查
@@ -203,7 +293,7 @@ class PCICollisionDetector:
         max_pci: int = 503,
         modulus: int = 3,
         target_longitude: float = None,
-        target_latitude: float = None
+        target_latitude: float = None,
     ) -> List[int]:
         """
         获取可用的PCI列表
@@ -234,12 +324,19 @@ class PCICollisionDetector:
                 for sector in sectors:
                     if sector.pci % modulus == pci % modulus:
                         # 需要检查距离（只检查同模数的）
-                        from app.algorithms.distance_calculator import DistanceCalculator
+                        from app.algorithms.distance_calculator import (
+                            DistanceCalculator,
+                        )
+
                         distance = DistanceCalculator.calculate_distance(
-                            target_longitude if target_longitude is not None else sector.longitude,
-                            target_latitude if target_latitude is not None else sector.latitude,
+                            target_longitude
+                            if target_longitude is not None
+                            else sector.longitude,
+                            target_latitude
+                            if target_latitude is not None
+                            else sector.latitude,
                             sector.longitude,
-                            sector.latitude
+                            sector.latitude,
                         )
                         if distance <= self.distance_threshold:
                             has_conflict = True
@@ -254,7 +351,11 @@ class PCICollisionDetector:
         self,
         sectors: List[SectorInfo],
         enable_collision: bool = True,
-        enable_confusion: bool = True
+        enable_confusion: bool = True,
+        enable_mod3: bool = True,
+        enable_mod6: bool = False,
+        enable_mod30: bool = True,
+        check_same_frequency_only: bool = False,
     ) -> Dict[str, int]:
         """
         统计冲突数量
@@ -263,17 +364,35 @@ class PCICollisionDetector:
             sectors: 小区列表
             enable_collision: 是否统计PCI冲突
             enable_confusion: 是否统计PCI混淆
+            enable_mod3: 是否统计Mod3冲突
+            enable_mod6: 是否统计Mod6冲突
+            enable_mod30: 是否统计Mod30冲突
+            check_same_frequency_only: 是否只统计同频冲突
 
         Returns:
             统计结果字典
         """
-        conflicts = self.detect_all(sectors, enable_collision, enable_confusion)
+        conflicts = self.detect_all(
+            sectors,
+            enable_collision,
+            enable_confusion,
+            enable_mod3,
+            enable_mod6,
+            enable_mod30,
+            check_same_frequency_only,
+        )
 
         collision_count = sum(1 for c in conflicts if c.type == ConflictType.COLLISION)
         confusion_count = sum(1 for c in conflicts if c.type == ConflictType.CONFUSION)
+        mod3_count = sum(1 for c in conflicts if c.type == ConflictType.MOD3_CONFLICT)
+        mod6_count = sum(1 for c in conflicts if c.type == ConflictType.MOD6_CONFLICT)
+        mod30_count = sum(1 for c in conflicts if c.type == ConflictType.MOD30_CONFLICT)
 
         return {
             "total": len(conflicts),
             "collisions": collision_count,
-            "confusions": confusion_count
+            "confusions": confusion_count,
+            "mod3_conflicts": mod3_count,
+            "mod6_conflicts": mod6_count,
+            "mod30_conflicts": mod30_count,
         }

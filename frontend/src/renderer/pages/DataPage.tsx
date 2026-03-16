@@ -1,80 +1,169 @@
 import { useState, useEffect } from 'react'
-import { Upload, FileSpreadsheet, Trash2, Download, Loader2, AlertCircle, RefreshCw, CheckCircle2 } from 'lucide-react'
+import { Upload, FileSpreadsheet, Trash2, Download, Loader2, AlertCircle, RefreshCw, CheckCircle2, Layers, FileDown, MapPin, Navigation } from 'lucide-react'
 import { useDataStore } from '../store/dataStore'
-import { useTaskStore } from '../store/taskStore'
 import type { DataItem } from '@shared/types'
 
 export function DataPage() {
-  const [previewData, setPreviewData] = useState<any>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   // 工参更新相关状态
   const [selectedFullParamId, setSelectedFullParamId] = useState<string>('')
   const [selectedCurrentParamId, setSelectedCurrentParamId] = useState<string>('')
   const [updateSuccess, setUpdateSuccess] = useState<string | null>(null)
-  // 全局任务状态 - 用于持久化显示运行中的任务
-  const [globalTaskRunning, setGlobalTaskRunning] = useState(false)
+
+  // 上传成功消息
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null)
+
+  // 各上传项的状态
+  const [uploadStatus, setUploadStatus] = useState<Record<string, 'idle' | 'success' | 'error'>>({
+    full_params: 'idle',
+    target_cells: 'idle',
+    current_params: 'idle',
+    map_layer: 'idle',
+    geo_data: 'idle',
+  })
 
   const {
     items,
     loading,
     uploadingType,
+    isUpdating,
     error,
     fetchList,
     uploadExcel,
     uploadMap,
+    uploadGeoData,
     deleteItem,
     updateParameters,
-    getUpdateTaskStatus
   } = useDataStore()
 
   useEffect(() => {
-    fetchList()
+    fetchList(1, 50)
   }, [fetchList])
 
-  // 检查全局任务状态，确保切换页面后仍能显示运行中的任务
-  useEffect(() => {
-    const checkTaskStatus = () => {
-      const status = getUpdateTaskStatus()
-      const isRunning = status === 'running'
-      setGlobalTaskRunning(isRunning)
+  const isDesktop = !!(window as any).electronAPI
+
+  const handleDownloadTemplate = async (templateType: 'full_params' | 'target_cells') => {
+    try {
+      // 确定下载文件名
+      const filename = templateType === 'full_params' ? 'ProjectParameter_mongoose.xlsx' : 'cell-tree-export.xlsx'
+      const url = `/api/v1/data/template/${templateType}`
+
+      console.log('[Template Download] Requesting:', templateType, 'as', filename)
+
+      // 强制使用 Fetch + Blob 模式，这种方式在 Electron 和浏览器中最稳定
+      const response = await fetch(url)
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
+
+      const blob = await response.blob()
+      if (blob.size === 0) throw new Error('文件内容为空')
+
+      console.log('[Template Download] Blob size:', blob.size)
+
+      const blobUrl = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = blobUrl
+      link.setAttribute('download', filename) // 显式设置文件名
+      document.body.appendChild(link)
+      link.click()
+
+      // 清理
+      setTimeout(() => {
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(blobUrl)
+      }, 100)
+
+      console.log('[Template Download] Success:', filename)
+    } catch (err: any) {
+      console.error('[Template Download] Failed:', err)
+      alert(`下载模板失败: ${err.message || '未知错误'}`)
     }
-
-    // 初始检查
-    checkTaskStatus()
-
-    // 定期检查任务状态（每秒）
-    const interval = setInterval(checkTaskStatus, 1000)
-
-    return () => clearInterval(interval)
-  }, [getUpdateTaskStatus])
-
-  const isDesktop = !!(window as any).electronAPI;
+  }
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, type: 'excel' | 'map', context: string) => {
-    const file = event.target.files?.[0]
-    if (!file) return
+    const files = Array.from(event.target.files || [])
+    if (files.length === 0) return
 
     // 详尽日志
-    console.log('[Upload] Starting upload process');
-    console.log('[Upload] Mode:', isDesktop ? 'Desktop' : 'Web Browser');
-    
-    let filePath = (file as any).path;
-    
-    if (!filePath && (window as any).electronAPI?.getFilePath) {
-        try {
-            filePath = (window as any).electronAPI.getFilePath(file);
-        } catch (e) {
-            console.error('[Upload] Error getting path:', e);
-        }
-    }
-    
-    console.log('[Upload] Path Captured:', filePath || 'NULL (Browser Restriction)');
+    console.log('[Upload] Starting upload process')
+    console.log('[Upload] Mode:', isDesktop ? 'Desktop' : 'Web Browser')
+    console.log('[Upload] Files:', files.map(f => f.name).join(', '))
+    console.log('[Upload] Type:', type, 'Context:', context)
 
-    const uploadFn = type === 'excel' ? uploadExcel : uploadMap
-    const success = await uploadFn(file, context)
-    if (success) {
-      event.target.value = ''
+    // 根据类型选择上传函数
+    let uploadFn
+    if (context === 'geo_data') {
+      uploadFn = uploadGeoData
+    } else {
+      uploadFn = type === 'excel' ? uploadExcel : uploadMap
+    }
+
+    // 设置上传状态为进行中
+    setUploadStatus(prev => ({ ...prev, [context]: 'idle' }))
+
+    // 多选文件上传逻辑（仅用于图层文件）
+    if (files.length > 1) {
+      console.log('[Upload] Multiple files detected, processing sequentially')
+      let allSuccess = true
+
+      for (const file of files) {
+        let filePath = (file as any).path
+
+        if (!filePath && (window as any).electronAPI?.getFilePath) {
+          try {
+            filePath = await (window as any).electronAPI.getFilePath(file)
+          } catch (e) {
+            console.error('[Upload] Error getting path:', e)
+          }
+        }
+
+        console.log('[Upload] Path Captured:', filePath || 'NULL (Browser Restriction)')
+
+        const success = await uploadFn(file, filePath || undefined)
+        if (!success) {
+          allSuccess = false
+        }
+      }
+
+      if (allSuccess) {
+        event.target.value = ''
+        setUploadStatus(prev => ({ ...prev, [context]: 'success' }))
+        setTimeout(() => setUploadStatus(prev => ({ ...prev, [context]: 'idle' })), 3000)
+      } else {
+        setUploadStatus(prev => ({ ...prev, [context]: 'error' }))
+        setTimeout(() => setUploadStatus(prev => ({ ...prev, [context]: 'idle' })), 3000)
+      }
+    } else {
+      // 单文件上传
+      const file = files[0]
+
+      let filePath = (file as any).path
+
+      if (!filePath && (window as any).electronAPI?.getFilePath) {
+        try {
+          filePath = await (window as any).electronAPI.getFilePath(file)
+        } catch (e) {
+          console.error('[Upload] Error getting path:', e)
+        }
+      }
+
+      console.log('[Upload] Path Captured:', filePath || 'NULL (Browser Restriction)')
+
+      const success = await uploadFn(file, filePath || undefined)
+      if (success) {
+        event.target.value = ''
+        setUploadStatus(prev => ({ ...prev, [context]: 'success' }))
+        setTimeout(() => setUploadStatus(prev => ({ ...prev, [context]: 'idle' })), 3000)
+
+        // 地理化数据上传成功提示
+        if (context === 'geo_data') {
+          setUploadSuccess(`✅ 地理化数据「${file.name}」上传成功！已导入 ${items.filter(i => i.fileType === 'geo_data').length + 1} 个数据文件`)
+          setTimeout(() => setUploadSuccess(null), 3000)
+        }
+      } else {
+        setUploadStatus(prev => ({ ...prev, [context]: 'error' }))
+        setTimeout(() => setUploadStatus(prev => ({ ...prev, [context]: 'idle' })), 3000)
+      }
     }
   }
 
@@ -118,7 +207,7 @@ export function DataPage() {
          const result = await updateParameters(selectedFullParamId, selectedCurrentParamId)
          console.log('Update parameters result:', result);
          if (result?.success) {
-             await fetchList();
+            await fetchList(1, 50);
              
              // 使用后端返回的新文件名
              const newFileName = result?.data?.newFileName;
@@ -170,7 +259,7 @@ export function DataPage() {
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3 text-red-700">
           <AlertCircle size={20} />
           <span>{error}</span>
-          <button onClick={() => fetchList()} className="ml-auto text-sm underline">重试</button>
+          <button onClick={() => fetchList(1, 50)} className="ml-auto text-sm underline">重试</button>
         </div>
       )}
       
@@ -179,9 +268,24 @@ export function DataPage() {
         <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3 text-green-700 whitespace-pre-wrap">
           <CheckCircle2 size={20} className="shrink-0" />
           <span className="flex-grow">{updateSuccess}</span>
-          <button 
+          <button
             onClick={() => setUpdateSuccess(null)}
             className="text-green-700 hover:text-green-900 transition-colors duration-200 p-1 hover:bg-green-100 rounded-full"
+            aria-label="关闭"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* 上传成功提示 */}
+      {uploadSuccess && (
+        <div className="mb-6 p-4 bg-purple-50 border border-purple-200 rounded-lg flex items-center gap-3 text-purple-700">
+          <CheckCircle2 size={20} className="shrink-0" />
+          <span className="flex-grow">{uploadSuccess}</span>
+          <button
+            onClick={() => setUploadSuccess(null)}
+            className="text-purple-700 hover:text-purple-900 transition-colors duration-200 p-1 hover:bg-purple-100 rounded-full"
             aria-label="关闭"
           >
             ✕
@@ -198,37 +302,113 @@ export function DataPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="space-y-8">
             {/* 文件上传 */}
-            <div className="bg-card p-6 rounded-lg border border-border">
-            <h2 className="text-xl font-semibold mb-4">导入数据</h2>
+            <div className="bg-card p-3 rounded-lg border border-border">
+            <h2 className="text-xl font-semibold mb-2">导入数据</h2>
 
-            <div className="space-y-4">
-                <UploadArea
-                title="全量工参"
-                accept=".xlsx,.xls"
-                onUpload={(e) => handleFileUpload(e, 'excel', 'full_params')}
-                loading={loading && uploadingType === 'full_params'}
-                icon={<FileSpreadsheet size={32} />}
-                />
-                <UploadArea
-                title="待规划小区"
-                accept=".xlsx,.xls"
-                onUpload={(e) => handleFileUpload(e, 'excel', 'target_cells')}
-                loading={loading && uploadingType === 'target_cells'}
-                icon={<FileSpreadsheet size={32} />}
-                />
-                <UploadArea
-                title="现网工参"
-                accept=".zip"
-                onUpload={(e) => handleFileUpload(e, 'map', 'current_params')}
-                loading={loading && uploadingType === 'current_params'}
-                icon={<Upload size={32} />}
-                />
+             <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                        <UploadArea
+                            title="全量工参"
+                            accept=".xlsx,.xls"
+                            onUpload={(e) => handleFileUpload(e, 'excel', 'full_params')}
+                            loading={loading && uploadingType === 'full_params'}
+                            icon={<FileSpreadsheet size={20} />}
+                            inline={true}
+                            status={uploadStatus.full_params}
+                        />
+                    </div>
+                    <div className="w-24">
+                        <button
+                            onClick={() => handleDownloadTemplate('full_params')}
+                            className="w-full px-2 py-1.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                            title="下载全量工参模板"
+                        >
+                            <FileDown size={12} />
+                            <span>模板</span>
+                        </button>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                        <UploadArea
+                            title="待规划小区"
+                            accept=".xlsx,.xls"
+                            onUpload={(e) => handleFileUpload(e, 'excel', 'target_cells')}
+                            loading={loading && uploadingType === 'target_cells'}
+                            icon={<FileSpreadsheet size={20} />}
+                            inline={true}
+                            status={uploadStatus.target_cells}
+                        />
+                    </div>
+                    <div className="w-24">
+                        <button
+                            onClick={() => handleDownloadTemplate('target_cells')}
+                            className="w-full px-2 py-1.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                            title="下载待规划小区模板"
+                        >
+                            <FileDown size={12} />
+                            <span>模板</span>
+                        </button>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                        <UploadArea
+                            title="现网工参"
+                            accept=".zip"
+                            onUpload={(e) => handleFileUpload(e, 'map', 'current_params')}
+                            loading={loading && uploadingType === 'current_params'}
+                            icon={<Upload size={20} />}
+                            inline={true}
+                            description="中兴网管300脚本导出数据"
+                            status={uploadStatus.current_params}
+                        />
+                    </div>
+                    <div className="w-24">
+                        {/* 现网工参不需要模板下载 */}
+                    </div>
+                </div>
+                <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                        <UploadArea
+                            title="图层文件"
+                            accept=".zip,.tab,.mif"
+                            onUpload={(e) => handleFileUpload(e, 'map', 'map_layer')}
+                            loading={loading && uploadingType === 'map_layer'}
+                            icon={<Layers size={20} />}
+                            multiple={true}
+                            inline={true}
+                            status={uploadStatus.map_layer}
+                        />
+                    </div>
+                    <div className="w-24">
+                        {/* 图层文件不需要模板下载 */}
+                    </div>
+                </div>
+                <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                        <UploadArea
+                            title="地理化数据"
+                            accept=".xlsx,.xls,.csv,.txt"
+                            onUpload={(e) => handleFileUpload(e, 'excel', 'geo_data')}
+                            loading={loading && uploadingType === 'geo_data'}
+                            icon={<MapPin size={20} className="text-purple-600" />}
+                            description="自动识别点状/扇区"
+                            inline={true}
+                            status={uploadStatus.geo_data}
+                        />
+                    </div>
+                    <div className="w-24">
+                        {/* 地理化数据不需要模板下载 */}
+                    </div>
+                </div>
             </div>
             </div>
 
             {/* 工参更新 */}
-            <div className="bg-card p-6 rounded-lg border border-border">
-                <h2 className="text-xl font-semibold mb-4">工参更新</h2>
+            <div className="bg-card p-3 rounded-lg border border-border -mt-6">
+                <h2 className="text-xl font-semibold mb-2">工参更新</h2>
                 <div className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium mb-1">选择全量工参</label>
@@ -244,7 +424,6 @@ export function DataPage() {
                                 </option>
                             ))}
                         </select>
-                        <p className="text-[10px] text-muted-foreground mt-1">注：只有带 ✓ 的文件更新后才能自动保存到原目录</p>
                     </div>
                     <div>
                         <label className="block text-sm font-medium mb-1">选择现网工参 (ZIP)</label>
@@ -261,11 +440,11 @@ export function DataPage() {
                     </div>
                     <button
                         onClick={handleUpdateParameters}
-                        disabled={(loading && !uploadingType) || globalTaskRunning || !selectedFullParamId || !selectedCurrentParamId}
-                        className="w-full py-2 px-4 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        disabled={isUpdating || !selectedFullParamId || !selectedCurrentParamId}
+                        className="w-full py-2 px-4 bg-blue-400 text-white rounded-md hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
-                        {(loading && !uploadingType) || globalTaskRunning ? <Loader2 className="animate-spin" size={16} /> : <RefreshCw size={16} />}
-                        {(loading && !uploadingType) || globalTaskRunning ? '更新中...' : '开始更新'}
+                        {isUpdating ? <Loader2 className="animate-spin" size={16} /> : <RefreshCw size={16} />}
+                        {isUpdating ? '更新中...' : '开始更新'}
                     </button>
                 </div>
             </div>
@@ -276,7 +455,7 @@ export function DataPage() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold">已导入数据</h2>
             <button
-              onClick={fetchList}
+              onClick={() => fetchList(1, 50, true)}
               className="text-sm text-primary hover:underline"
             >
               刷新
@@ -301,34 +480,97 @@ export function DataPage() {
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      {item.type === 'excel' ? (
-                        <FileSpreadsheet size={16} className="text-green-600" />
-                      ) : (
-                        <Upload size={16} className="text-blue-600" />
-                      )}
+                      {/* 文件类型图标 */}
+                      <div className={`p-1.5 rounded-md ${
+                        item.fileType === 'geo_data' ? 'bg-purple-100' :
+                        item.fileType === 'full_params' ? 'bg-blue-100' :
+                        item.fileType === 'target_cells' ? 'bg-orange-100' :
+                        item.type === 'excel' ? 'bg-green-100' :
+                        item.type === 'map' ? 'bg-cyan-100' :
+                        'bg-gray-100'
+                      }`}>
+                        {item.fileType === 'geo_data' ? (
+                          item.geometryType === 'sector'
+                            ? <Navigation size={16} className="text-purple-600" />
+                            : <MapPin size={16} className="text-purple-600" />
+                        ) : item.fileType === 'full_params' ? (
+                          <FileSpreadsheet size={16} className="text-blue-600" />
+                        ) : item.fileType === 'target_cells' ? (
+                          <FileSpreadsheet size={16} className="text-orange-600" />
+                        ) : item.type === 'excel' ? (
+                          <FileSpreadsheet size={16} className="text-green-600" />
+                        ) : item.subType === 'mapinfo' ? (
+                          <Layers size={16} className="text-cyan-600" />
+                        ) : (
+                          <Upload size={16} className="text-gray-600" />
+                        )}
+                      </div>
                       <span className="truncate font-medium">{item.name}</span>
+                      {/* 文件类型标签 */}
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                        item.fileType === 'geo_data'
+                          ? 'bg-purple-100 text-purple-700'
+                          : item.fileType === 'full_params'
+                          ? 'bg-blue-100 text-blue-700'
+                          : item.fileType === 'target_cells'
+                          ? 'bg-orange-100 text-orange-700'
+                          : item.fileType === 'current_params'
+                          ? 'bg-indigo-100 text-indigo-700'
+                          : item.subType === 'mapinfo'
+                          ? 'bg-cyan-100 text-cyan-700'
+                          : 'bg-gray-100 text-gray-700'
+                      }`}>
+                        {item.fileType === 'geo_data'
+                          ? (item.geometryType === 'sector' ? '扇区数据' : '地理化')
+                          : item.fileType === 'full_params'
+                          ? '全量工参'
+                          : item.fileType === 'target_cells'
+                          ? '待规划'
+                          : item.fileType === 'current_params'
+                          ? '现网工参'
+                          : item.subType === 'mapinfo'
+                          ? 'MapInfo'
+                          : item.type === 'excel'
+                          ? 'Excel'
+                          : 'ZIP'}
+                      </span>
+                      {/* 路径记录状态 */}
+                      {item.originalPath && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700 flex items-center gap-0.5">
+                          <CheckCircle2 size={10} />
+                          已记录
+                        </span>
+                      )}
                     </div>
-                    <div className="text-xs text-muted-foreground mt-1 flex justify-between pr-4">
+                    <div className="text-xs text-muted-foreground mt-1.5 flex items-center gap-3">
                       <span>
-                        {item.type === 'excel' ? (
+                        {item.fileType === 'geo_data' ? (
+                          <>
+                            {item.geometryType === 'sector'
+                              ? `${item.metadata?.pointCount || 0} 个扇区`
+                              : `${item.metadata?.pointCount || 0} 个点`}
+                          </>
+                        ) : item.type === 'excel' ? (
                             item.metadata?.LTESiteCount
-                                ? `LTE: ${item.metadata.LTESiteCount}站/${item.metadata.LTESectorCount}小区 | NR: ${item.metadata.NRSiteCount}站/${item.metadata.NRSectorCount}小区`
+                                ? `LTE ${item.metadata.LTESiteCount}站/${item.metadata.LTESectorCount}小区 · NR ${item.metadata.NRSiteCount}站/${item.metadata.NRSectorCount}小区`
                                 : (item.fileType === 'full_params'
-                                    ? '全量工参'
+                                    ? '全量工参数据'
                                     : (item.fileType === 'target_cells'
-                                        ? '待规划小区'
+                                        ? '待规划小区数据'
                                         : (item.fileType === 'default' && item.metadata?.siteCount
-                                            ? `${item.metadata.siteCount}个基站`
-                                            : 'Excel文件')))
+                                            ? `${item.metadata.siteCount} 个基站`
+                                            : 'Excel 数据')))
                         ) : (
                             item.type === 'map'
                                 ? (item.subType === 'mapinfo'
-                                    ? `MapInfo图层 (${item.metadata?.layerCount || 0}个图层)`
-                                    : 'ZIP文件')
+                                    ? `${item.metadata?.layerCount || 0} 个图层`
+                                    : '压缩文件')
                                 : '未知类型'
                         )}
                       </span>
-                      {item.originalPath && <span className="text-[10px] text-blue-500">已记录路径</span>}
+                      <span className="text-[10px] opacity-60">
+                        {new Date(item.uploadDate).toLocaleDateString('zh-CN')}
+                      </span>
                     </div>
                   </div>
                   <div className="flex gap-1">
@@ -481,38 +723,117 @@ function UploadArea({
   accept,
   onUpload,
   icon,
-  loading = false
+  loading = false,
+  multiple = false,
+  description,
+  inline = false,
+  status = 'idle'
 }: {
   title: string
   accept: string
   onUpload: (e: React.ChangeEvent<HTMLInputElement>) => void
   icon: React.ReactNode
   loading?: boolean
+  multiple?: boolean
+  description?: string
+  inline?: boolean
+  status?: 'idle' | 'success' | 'error'
 }) {
+  // 根据状态获取边框颜色
+  const getBorderClass = () => {
+    if (loading) return 'border-muted bg-muted/50 cursor-not-allowed'
+    if (status === 'success') return 'border-green-500 bg-green-50 hover:bg-green-100'
+    if (status === 'error') return 'border-red-500 bg-red-50 hover:bg-red-100'
+    return 'border-border hover:border-primary hover:bg-primary/5'
+  }
+
+  if (inline) {
+    // 行内布局：标签和上传框在同一行
+    return (
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-medium whitespace-nowrap w-20 text-right">{title}：</span>
+        <label className={`flex-1 flex items-center justify-center h-8 border-2 border-dashed rounded cursor-pointer transition-all duration-200 ${getBorderClass()}`}>
+          <div className="flex items-center gap-2 px-3 text-muted-foreground">
+            {loading ? (
+              <>
+                <Loader2 className="animate-spin text-primary" size={14} />
+                <p className="text-xs text-primary font-medium whitespace-nowrap">解析中...</p>
+              </>
+            ) : status === 'success' ? (
+              <>
+                <CheckCircle2 className="text-green-500" size={14} />
+                <p className="text-xs text-green-600 font-medium whitespace-nowrap">上传成功</p>
+              </>
+            ) : status === 'error' ? (
+              <>
+                <AlertCircle className="text-red-500" size={14} />
+                <p className="text-xs text-red-600 font-medium whitespace-nowrap">上传失败</p>
+              </>
+            ) : (
+              <>
+                <span className="flex-shrink-0">{icon}</span>
+                <p className="text-xs whitespace-nowrap">
+                  点击上传 {accept}
+                </p>
+                {description && (
+                  <span className="text-[10px] text-muted-foreground ml-1 whitespace-nowrap hidden sm:inline">· {description}</span>
+                )}
+              </>
+            )}
+          </div>
+          <input
+            type="file"
+            className="hidden"
+            accept={accept}
+            onChange={onUpload}
+            disabled={loading}
+            multiple={multiple}
+          />
+        </label>
+      </div>
+    )
+  }
+
+  // 默认布局（垂直布局）
   return (
     <div>
-      <label className="block text-sm font-medium mb-1">{title}</label>
-      <label className={`flex flex-col items-center justify-center w-full h-16 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
-        loading
-          ? 'border-muted bg-muted/50 cursor-not-allowed'
-          : 'border-border hover:border-primary'
-      }`}>
-        <div className="flex flex-row items-center justify-center gap-3 w-full px-3 text-muted-foreground">
+      <label className="block text-xs font-medium mb-0.5">{title}</label>
+      <label className={`flex flex-col items-start justify-center w-full h-10 border-2 border-dashed rounded cursor-pointer transition-all duration-200 ${getBorderClass()}`}>
+        <div className="flex flex-row items-center gap-3 w-full px-3 text-muted-foreground">
           {loading ? (
-            <Loader2 className="animate-spin" size={16} />
+            <>
+              <Loader2 className="animate-spin text-primary" size={16} />
+              <p className="text-xs text-primary font-medium">解析中...</p>
+            </>
+          ) : status === 'success' ? (
+            <>
+              <CheckCircle2 className="text-green-500" size={16} />
+              <p className="text-xs text-green-600 font-medium">上传成功</p>
+            </>
+          ) : status === 'error' ? (
+            <>
+              <AlertCircle className="text-red-500" size={16} />
+              <p className="text-xs text-red-600 font-medium">上传失败</p>
+            </>
           ) : (
-            <span className="flex-shrink-0">{icon}</span>
+            <>
+              <span className="flex-shrink-0 transition-transform duration-200 group-hover:scale-110">{icon}</span>
+              <p className="text-xs flex-1 text-center">
+                点击上传 {accept}
+              </p>
+            </>
           )}
-          <p className="text-xs flex-1 text-center">
-            {loading ? '上传中...' : `点击上传 ${accept}`}
-          </p>
         </div>
+        {description && !loading && status === 'idle' && (
+          <p className="text-[10px] text-muted-foreground mt-1 px-2">{description}</p>
+        )}
         <input
           type="file"
           className="hidden"
           accept={accept}
           onChange={onUpload}
           disabled={loading}
+          multiple={multiple}
         />
       </label>
     </div>
