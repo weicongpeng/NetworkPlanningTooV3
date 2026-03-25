@@ -262,7 +262,7 @@ export function DataPage() {
             alert(`${t('data.forceDeleteFailed') || '强制删除失败。请尝试：'}\n1. ${t('data.forceDeleteCloseExcel') || '关闭所有 Excel 文件'}\n2. ${t('data.forceDeleteRestartApp') || '重启应用后再试'}\n3. ${t('data.forceDeleteManually') || '手动删除 data 目录下的对应文件夹'}`)
           }
         } else {
-          alert('删除已取消。')
+          alert(t('data.deleteCancelled') || '删除已取消。')
         }
       } else {
         await fetchList(1, 50, true)
