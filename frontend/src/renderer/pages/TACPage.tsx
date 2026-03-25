@@ -909,11 +909,11 @@ export function TACPage() {
                                     cellContent = cell.existingTac && cell.existingTac !== '-' ? (
                                       cell.isSingularity ? (
                                         <span className="px-2 py-1 bg-purple-500/10 text-purple-600 rounded">
-                                          是
+                                          {t('tac.yes') || '是'}
                                         </span>
                                       ) : (
                                         <span className="px-2 py-1 bg-muted/50 text-muted-foreground rounded">
-                                          否
+                                          {t('tac.no') || '否'}
                                         </span>
                                       )
                                     ) : (
