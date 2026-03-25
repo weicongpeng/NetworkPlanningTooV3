@@ -1558,13 +1558,13 @@ export function PCIPage() {
                 <div className="mb-3 p-2 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg text-xs text-blue-700 dark:text-blue-300 flex items-center justify-between">
                   <span className="flex items-center gap-2">
                     <Search size={14} />
-                    已添加 {searchMarkers.length} 个搜索标记
+                    {t('pci.searchMarkersAdded') || `已添加 ${searchMarkers.length} 个搜索标记`}
                   </span>
                   <button
                     onClick={handleClearMarkers}
                     className="text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-100 font-medium"
                   >
-                    清除全部
+                    {t('pci.clearAll') || '清除全部'}
                   </button>
                 </div>
               )}
