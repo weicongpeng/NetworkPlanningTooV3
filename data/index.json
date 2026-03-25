@@ -179,22 +179,6 @@
       "pointCount": 287
     }
   },
-  "f90a2f23-3530-4ae2-ac90-d7404b42453a": {
-    "id": "f90a2f23-3530-4ae2-ac90-d7404b42453a",
-    "name": "cell-tree-export.xlsx",
-    "type": "excel",
-    "fileType": "target_cells",
-    "size": 11370,
-    "originalPath": "D:\\mycode\\NetworkPlanningTooV3\\待规划小区\\cell-tree-export.xlsx",
-    "uploadDate": "2026-03-24T16:29:42.722903",
-    "status": "ready",
-    "metadata": {
-      "LTESiteCount": 38,
-      "LTESectorCount": 44,
-      "NRSiteCount": 1,
-      "NRSectorCount": 3
-    }
-  },
   "c80ca37b-700b-45e4-b95c-9dc8ef03af2b": {
     "id": "c80ca37b-700b-45e4-b95c-9dc8ef03af2b",
     "name": "BaselineLab_172.16.34.163_1774253196_5705060.zip",
@@ -234,20 +218,36 @@
       ]
     }
   },
-  "2d5f6f22-5f56-4bad-a836-e6a69e0c11fb": {
-    "id": "2d5f6f22-5f56-4bad-a836-e6a69e0c11fb",
+  "41f566f1-f066-4e33-acd8-66fffd12e28f": {
+    "id": "41f566f1-f066-4e33-acd8-66fffd12e28f",
     "name": "ProjectParameter_mongoose河源电联20260323162012.xlsx",
     "type": "excel",
     "fileType": "full_params",
     "size": 4347469,
-    "originalPath": null,
-    "uploadDate": "2026-03-25T21:48:02.496461",
+    "originalPath": "D:\\mycode\\ProjectParameter_mongoose河源电联20260323162012.xlsx",
+    "uploadDate": "2026-03-25T23:07:47.049553",
     "status": "ready",
     "metadata": {
       "LTESiteCount": 4108,
       "LTESectorCount": 18753,
       "NRSiteCount": 1404,
       "NRSectorCount": 15386
+    }
+  },
+  "49ac26a0-5186-414f-9ce6-bba946f30e8e": {
+    "id": "49ac26a0-5186-414f-9ce6-bba946f30e8e",
+    "name": "cell-tree-export.xlsx",
+    "type": "excel",
+    "fileType": "target_cells",
+    "size": 11370,
+    "originalPath": "D:\\mycode\\NetworkPlanningTooV3\\待规划小区\\cell-tree-export.xlsx",
+    "uploadDate": "2026-03-25T23:08:15.761817",
+    "status": "ready",
+    "metadata": {
+      "LTESiteCount": 38,
+      "LTESectorCount": 44,
+      "NRSiteCount": 1,
+      "NRSectorCount": 3
     }
   }
 }
