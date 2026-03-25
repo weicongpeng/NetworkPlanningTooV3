@@ -150,7 +150,7 @@ export function TACPage() {
         // 连续失败5次则停止轮询
         if (errorCountRef.current >= MAX_ERRORS) {
           stopPolling()
-          setError('获取任务进度失败，请刷新页面重试')
+          setError(t('tac.getProgressFailed') || '获取任务进度失败，请刷新页面重试')
         }
       }
     }, 2000)
