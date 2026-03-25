@@ -261,7 +261,7 @@ export function LabelSettingsModal({
         {/* 字体大小 */}
         <div className="mb-4">
           <label className="block text-xs text-muted-foreground mb-2">
-            字体大小 ({fontSize}px)
+            {t('map.fontSizeUnit', { size: fontSize })}
           </label>
           <input
             type="range"
