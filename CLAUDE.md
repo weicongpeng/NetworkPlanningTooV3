@@ -397,6 +397,17 @@ from app.services.data_service import data_service
 | 前端 | PascalCase | camelCase | UPPER_SNAKE_CASE | kebab-case |
 | 后端 | PascalCase | snake_case | UPPER_SNAKE_CASE | snake_case |
 
+## 多语言约束（关键）
+
+应用支持中英文切换（语言控件位于配置管理页面底部），**所有前端开发必须遵守以下规则**：
+
+1. **UI 文本必须用 `t()` 翻译函数**，不得硬编码中文字符串作为显示文本
+2. **`useTranslation()` 必须在 React 组件内部调用**，不能放在模块顶层
+3. **子函数组件（如 `UploadArea`、`DataPreview`）如需翻译，必须在自己的函数体内调用 `useTranslation()`**，不得依赖父组件传入的 `t`
+4. **日期格式化必须根据 `i18n.language` 动态设置 locale**：`i18n.language === 'en' ? 'en-US' : 'zh-CN'`，不得硬编码 `'zh-CN'`
+5. **搜索/过滤逻辑不得依赖翻译文本**：用布尔值或原始数据比较，不用 `t()` 返回值比较
+6. **翻译文件 key 必须同步**：`locales/zh.json` 和 `locales/en.json` 两者必须同步，新增 key 必须同时添加
+
 ## 开发注意事项
 
 1. **Electron 启动流程**: 需要先编译 TypeScript (`npm run build:electron`)，然后启动 Vite，最后启动 Electron
