@@ -731,7 +731,7 @@ export function DataPage() {
 
       {/* 数据预览 */}
       <div className="mt-8 bg-card p-6 rounded-lg border border-border">
-        <h2 className="text-xl font-semibold mb-4">数据预览</h2>
+        <h2 className="text-xl font-semibold mb-4">{t('data.preview') || '数据预览'}</h2>
         {!selectedId ? (
           <p className="text-muted-foreground text-center py-8">
             请选择数据查看预览
