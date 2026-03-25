@@ -185,7 +185,7 @@ export function LicensePage() {
               {isAuthorized && (
                 <>
                   <div className="flex items-center justify-between py-2 border-b border-border">
-                    <span className="text-sm text-muted-foreground">到期时间</span>
+                    <span className="text-sm text-muted-foreground">{t('license.expiryDate')}</span>
                     <span className="text-sm font-medium">{getExpiryDateDisplay(expiryDate)}</span>
                   </div>
 
