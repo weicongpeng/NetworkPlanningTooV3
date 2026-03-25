@@ -1344,7 +1344,7 @@ export function MapPage() {
             {/* 无结果提示 */}
             {showSearchResults && searchResults.length === 0 && !searching && (
               <div className="bg-card border border-border rounded-lg shadow-lg p-3 text-sm text-muted-foreground">
-                {searchMode === 'map' ? '未找到相关地点' : '未找到相关小区'}
+                {searchMode === 'map' ? (t('map.noRelatedPlace') || '未找到相关地点') : (t('map.noRelatedCell') || '未找到相关小区')}
               </div>
             )}
           </div>
