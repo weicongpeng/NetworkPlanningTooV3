@@ -256,7 +256,7 @@ export function DataPage() {
           // 使用 dataApi 的强制删除
           result = await dataApi.delete(item.id, true)
           if (result?.success) {
-            alert('已从索引中移除。如果后续遇到问题，请刷新页面或重新导入数据。')
+            alert(t('data.indexRemoved') || '已从索引中移除。如果后续遇到问题，请刷新页面或重新导入数据。')
             await fetchList(1, 50, true)
           } else {
             alert('强制删除失败。请尝试：\n1. 关闭所有 Excel 文件\n2. 重启应用后再试\n3. 手动删除 data 目录下的对应文件夹')
