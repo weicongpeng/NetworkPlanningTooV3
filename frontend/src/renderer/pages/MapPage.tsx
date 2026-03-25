@@ -1251,7 +1251,7 @@ export function MapPage() {
                   className="w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors flex items-center gap-2"
                 >
                   <CircleIcon size={12} className="text-blue-500" />
-                  圆形
+                  {t('map.circleSelect') || '圆形'}
                 </button>
                 <button
                   onClick={() => handleSelectionModeChange('polygon')}
