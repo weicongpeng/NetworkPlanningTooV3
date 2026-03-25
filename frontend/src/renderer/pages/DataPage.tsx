@@ -185,7 +185,7 @@ export function DataPage() {
 
         // 地理化数据上传成功提示
         if (context === 'geo_data') {
-          setUploadSuccess(`✅ 地理化数据「${file.name}」上传成功！已导入 ${items.filter(i => i.fileType === 'geo_data').length + 1} 个数据文件`)
+          setUploadSuccess(`${t('data.geoDataSuccess') || '地理化数据上传成功'}！${t('data.geoDataImported', { name: file.name, count: items.filter(i => i.fileType === 'geo_data').length + 1 }) || `「${file.name}」已导入 ${items.filter(i => i.fileType === 'geo_data').length + 1} 个数据文件`}`)
           setTimeout(() => setUploadSuccess(null), 3000)
         }
 
