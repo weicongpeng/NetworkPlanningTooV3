@@ -119,6 +119,39 @@ export function NeighborPage() {
     distance: t('neighbor.distance') || '距离',
   }
 
+  // 配置验证函数
+  const validateNeighborConfig = (config: any): string | null => {
+    // 验证最大邻区数
+    const maxLimit = MAX_NEIGHBORS_LIMIT[config.planningType] || 512
+    if (config.maxNeighbors < 1) {
+      return i18n.validationMaxNeighbors1
+    }
+    if (config.maxNeighbors > maxLimit) {
+      return i18n.validationMaxNeighbors2
+        .replace('{{type}}', config.planningType)
+        .replace('{{limit}}', String(maxLimit))
+        .replace('{{value}}', String(config.maxNeighbors))
+    }
+
+    // 验证覆盖圆距离系数
+    if (config.coverageDistanceFactor < 0.1 || config.coverageDistanceFactor > 2.0) {
+      return i18n.validationDistanceFactor.replace('{{value}}', String(config.coverageDistanceFactor))
+    }
+
+    // 验证覆盖圆半径系数
+    if (config.coverageRadiusFactor < 0.1 || config.coverageRadiusFactor > 2.0) {
+      return i18n.validationRadiusFactor.replace('{{value}}', String(config.coverageRadiusFactor))
+    }
+
+    // 验证两个系数的乘积不应过大
+    const factorProduct = config.coverageDistanceFactor * config.coverageRadiusFactor
+    if (factorProduct > 3.0) {
+      return i18n.validationFactorProduct.replace('{{value}}', factorProduct.toFixed(2))
+    }
+
+    return null
+  }
+
   // 邻区表格列配置
   const NEIGHBOR_COLUMNS = [
     { key: 'relationType', label: i18n.relationType, defaultWidth: 80 },
