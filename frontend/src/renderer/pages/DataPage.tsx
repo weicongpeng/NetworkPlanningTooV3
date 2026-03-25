@@ -547,7 +547,7 @@ export function DataPage() {
                             <option value="">{t('data.selectFile') || '请选择文件...'}</option>
                             {fullParamFiles.map(f => (
                                 <option key={f.id} value={f.id}>
-                                    {f.name} {f.originalPath ? '✓' : '(无路径)'}
+                                    {f.name} {f.originalPath ? '✓' : `(${t('data.noPath') || '无路径'})`}
                                 </option>
                             ))}
                         </select>
