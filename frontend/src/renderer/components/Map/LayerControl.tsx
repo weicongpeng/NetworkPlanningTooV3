@@ -1185,7 +1185,7 @@ function TreeNodeComponent({
         if (node.mapType?.id === 'satellite') return <Satellite size={14} color="#666" />
         return null
       case 'sector-layer':
-        return <SectorIcon color="#666" />
+        return <Radio size={12} color="#666" />
       case 'sector-group':
         return <Map size={14} color="#666" />
       case 'layer-files':
