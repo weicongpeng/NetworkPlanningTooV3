@@ -153,7 +153,7 @@ export function LicensePage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Key size={20} className="text-primary" />
-              <h2 className="text-lg font-semibold">License管理</h2>
+              <h2 className="text-lg font-semibold">{t('license.licenseManagement')}</h2>
             </div>
             <button
               onClick={handleRefreshStatus}
