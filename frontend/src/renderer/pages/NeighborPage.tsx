@@ -847,7 +847,7 @@ export function NeighborPage() {
       }
 
       if (!foundSector) {
-        setSearchError(`未找到小区: ${trimmedSearch}`)
+        setSearchError(i18n.searchErrorNotFound + ': ' + trimmedSearch)
         return
       }
 
