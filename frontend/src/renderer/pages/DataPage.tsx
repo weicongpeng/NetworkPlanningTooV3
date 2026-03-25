@@ -235,7 +235,7 @@ export function DataPage() {
     const itemName = item.name || (t('data.unknownFile') || '未知文件')
 
     // 确认删除
-    const confirmed = confirm(`确定要删除 "${itemName}" 吗？\n\n删除后将无法恢复，且会影响使用该数据的规划结果。`)
+    const confirmed = confirm(`${t('data.deleteConfirm', { name: itemName }) || `确定要删除 "${itemName}" 吗？`}\n\n${t('data.deleteWarning') || '删除后将无法恢复，且会影响使用该数据的规划结果。'}`)
     if (!confirmed) return
 
     try {
