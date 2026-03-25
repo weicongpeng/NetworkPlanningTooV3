@@ -900,7 +900,7 @@ function UploadArea({
               <>
                 <span className="flex-shrink-0">{icon}</span>
                 <p className="text-xs whitespace-nowrap">
-                  点击上传 {accept}
+                  {t('data.clickToUpload') || '点击上传'} {accept}
                 </p>
                 {description && (
                   <span className="text-[10px] text-muted-foreground ml-1 whitespace-nowrap hidden sm:inline">· {description}</span>
