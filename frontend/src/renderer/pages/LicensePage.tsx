@@ -99,7 +99,8 @@ export function LicensePage() {
     if (!expiryDate) return '-'
     try {
       const date = new Date(expiryDate)
-      return date.toLocaleDateString('zh-CN', {
+      const locale = i18n.language === 'en' ? 'en-US' : 'zh-CN'
+      return date.toLocaleDateString(locale, {
         year: 'numeric',
         month: 'long',
         day: 'numeric'
