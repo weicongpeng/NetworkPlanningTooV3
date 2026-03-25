@@ -1856,7 +1856,7 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
               const currentTotal = totalDist + lastSegment
 
               const labelContent = `<div style="white-space: nowrap; font-size: 11px; color: #ef4444; font-weight: bold; text-shadow: 1px 1px 1px white, -1px -1px 1px white, 1px -1px 1px white, -1px 1px 1px white;">
-                                    ${currentTotal.toFixed(2)}米
+                                    ${currentTotal.toFixed(2)}${t('map.meters')}
                                   </div>`
 
               if (shadowLabelRef.current) {
