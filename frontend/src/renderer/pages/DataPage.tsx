@@ -415,7 +415,7 @@ export function DataPage() {
           <button
             onClick={handleCleanupIndex}
             className="px-4 py-2 bg-card border border-border rounded-lg hover:bg-muted transition-colors flex items-center gap-2"
-            title="清理无效的索引项（文件不存在但索引中仍然存在的记录）"
+            title={t('data.cleanIndexTip') || '清理无效的索引项（文件不存在但索引中仍然存在的记录）'}
           >
             <RefreshCw size={16} />
             {t('data.cleanIndex') || '清理索引'}
