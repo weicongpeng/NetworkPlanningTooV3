@@ -648,13 +648,13 @@ export function DataPage() {
                           : 'bg-gray-100 text-gray-700'
                       }`}>
                         {item.fileType === 'geo_data'
-                          ? (item.geometryType === 'sector' ? '扇区数据' : '地理化')
+                          ? (item.geometryType === 'sector' ? (t('data.sectorData') || '扇区数据') : (t('data.geo') || '地理化'))
                           : item.fileType === 'full_params'
-                          ? '全量工参'
+                          ? (t('data.fullParamsLabel') || '全量工参')
                           : item.fileType === 'target_cells'
-                          ? '待规划'
+                          ? (t('data.toPlan') || '待规划')
                           : item.fileType === 'current_params'
-                          ? '现网工参'
+                          ? (t('data.currentParamsLabel') || '现网工参')
                           : item.subType === 'mapinfo'
                           ? 'MapInfo'
                           : item.type === 'excel'
