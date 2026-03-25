@@ -236,7 +236,7 @@ export function LicensePage() {
                     <label className="flex flex-col items-center justify-center w-full h-20 border-2 border-dashed border-border rounded-lg cursor-pointer hover:border-primary transition-colors bg-background">
                       <div className="flex flex-col items-center justify-center text-muted-foreground">
                         <Upload size={20} />
-                        <p className="text-xs mt-1">点击上传许可证（.lic/.dat）</p>
+                        <p className="text-xs mt-1">{t('license.uploadPrompt')}</p>
                       </div>
                       <input
                         type="file"
