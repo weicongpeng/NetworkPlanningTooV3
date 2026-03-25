@@ -643,12 +643,12 @@ export function NeighborPage() {
         }
         setLocalTaskResult(initialResult)
         // 在全局任务状态中开始新任务
-        startTask(newTaskId, 'neighbor_planning', '邻区规划开始')
+        startTask(newTaskId, 'neighbor_planning', i18n.startTaskMsg)
       } else {
-        setError(response.message || '启动规划任务失败')
+        setError(response.message || i18n.startTaskFailed)
       }
     } catch (err: any) {
-      setError(err.message || '启动规划任务失败')
+      setError(err.message || i18n.startTaskFailed)
     } finally {
       setLoading(false)
     }
