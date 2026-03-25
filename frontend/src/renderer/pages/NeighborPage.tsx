@@ -86,6 +86,7 @@ const validateNeighborConfig = (config: any): string | null => {
 }
 
 export function NeighborPage() {
+  const { t } = useTranslation()
   const [config, setConfig] = useState({
     planningType: 'LTE-LTE',  // 邻区规划类型
     maxNeighbors: 64,         // 最大邻区数
