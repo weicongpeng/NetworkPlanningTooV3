@@ -976,7 +976,7 @@ export function LayerControl({
 
         {/* 内容容器 - 处理滚动 */}
         <div style={{
-          height: '100%',
+          height: 'calc(100vh - 0px)',
           maxHeight: '100vh',
           overflowY: 'auto',
           overflowX: 'hidden',
@@ -984,6 +984,7 @@ export function LayerControl({
           paddingLeft: '8px',
           paddingRight: '8px',
           paddingBottom: '24px',
+          boxSizing: 'border-box',
         }}>
           {/* 渲染树 */}
           {tree.map(rootNode => (
