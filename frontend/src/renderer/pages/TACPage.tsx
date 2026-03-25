@@ -322,7 +322,7 @@ export function TACPage() {
       }
     } catch (err: any) {
       console.error('启动TAC核查失败:', err)
-      setError(err.message || '启动TAC核查任务失败')
+      setError(err.message || (t('tac.startFailed') || '启动TAC核查任务失败'))
     } finally {
       setLoading(false)
     }
