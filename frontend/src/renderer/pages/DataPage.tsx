@@ -299,7 +299,7 @@ export function DataPage() {
                  setUpdateSuccess(`${t('data.updateSuccess') || '更新成功'}！${t('data.savedTo') || '已保存至：'}\n${fullPath}`)
              } else if (newFile?.originalPath) {
                  // 如果没有保存到原始路径，显示系统内保存提示
-                 setUpdateSuccess('更新成功！文件已保存在系统内 (由于未记录原路径，无法写回原文件夹)，请手动下载。');
+                 setUpdateSuccess(`${t('data.updateSuccess') || '更新成功'}！${t('data.savedToSystemNoPath') || '文件已保存在系统内 (由于未记录原路径，无法写回原文件夹)，请手动下载。'}`)
              } else {
                  setUpdateSuccess('更新成功！文件已保存在系统内，请手动下载。');
              }
