@@ -2370,9 +2370,9 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
       selectedIdsRef.current = selectedIds
 
       // 更新提示信息
-      setSelectionTip(`已选中 ${selectedIds.size} 个要素，按 Ctrl+C 复制`)
+      setSelectionTip(`${t('map.featuresSelected', { count: selectedIds.size })}，${t('map.pressEscClear')}`)
     } else {
-      setSelectionTip('未选中任何要素')
+      setSelectionTip(t('map.noFeatureSelected'))
     }
 
     return { ids: selectedIds, properties: selectedProperties }
@@ -2460,9 +2460,9 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
       selectedIdsRef.current = selectedIds
 
       // 更新提示信息
-      setSelectionTip(`已选中 ${selectedIds.size} 个要素，按 Ctrl+C 复制`)
+      setSelectionTip(`${t('map.featuresSelected', { count: selectedIds.size })}，${t('map.pressEscClear')}`)
     } else {
-      setSelectionTip('未选中任何要素')
+      setSelectionTip(t('map.noFeatureSelected'))
     }
 
     return { ids: selectedIds, properties: selectedProperties }
