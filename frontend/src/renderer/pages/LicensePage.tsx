@@ -212,7 +212,7 @@ export function LicensePage() {
                         </a>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-red-400">微信：</span>
+                        <span className="text-red-400">{t('license.wechat')}</span>
                         <span className="font-mono">pengwc2010</span>
                       </div>
                     </div>
