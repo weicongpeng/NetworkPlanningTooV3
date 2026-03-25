@@ -979,7 +979,7 @@ export function TACPage() {
                   <div className="flex items-center gap-2">
                     <Download size={16} className="text-blue-500 flex-shrink-0" />
                     <span className="text-blue-600">
-                      已导出文件: <span className="font-mono">{taskResult.exportPath}</span>
+                      {t('tac.exportedFile') || '已导出文件:'} <span className="font-mono">{taskResult.exportPath}</span>
                     </span>
                   </div>
                 </div>
