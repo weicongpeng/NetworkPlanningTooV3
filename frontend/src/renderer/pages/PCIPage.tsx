@@ -1290,11 +1290,11 @@ export function PCIPage() {
           <div className="bg-card p-3 rounded-lg border border-border flex flex-col min-h-0">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-6">
-                <h2 className="text-base font-semibold">规划结果</h2>
+                <h2 className="text-base font-semibold">{t('pci.planningResult') || '规划结果'}</h2>
                 {currentTaskResult?.status === 'completed' && (
                   <div className="flex items-center gap-4 text-sm">
-                    <span className="text-blue-600">基站总数：<span className="font-bold text-blue-600">{currentTaskResult.totalSites || 0}</span></span>
-                    <span className="text-blue-600">小区总数：<span className="font-bold text-blue-600">{currentTaskResult.totalSectors || 0}</span></span>
+                    <span className="text-blue-600">{t('pci.siteTotal') || '基站总数'}：<span className="font-bold text-blue-600">{currentTaskResult.totalSites || 0}</span></span>
+                    <span className="text-blue-600">{t('pci.cellTotal') || '小区总数'}：<span className="font-bold text-blue-600">{currentTaskResult.totalSectors || 0}</span></span>
                   </div>
                 )}
               </div>
@@ -1303,46 +1303,46 @@ export function PCIPage() {
                   <button
                     onClick={() => setResultSearchEnabled(!resultSearchEnabled)}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-xs font-medium ${
-                      resultSearchEnabled 
-                        ? 'bg-blue-400 text-white hover:bg-blue-500' 
+                      resultSearchEnabled
+                        ? 'bg-blue-400 text-white hover:bg-blue-500'
                         : 'bg-card border border-border hover:bg-muted/80'
                     }`}
                   >
                     <Search size={14} />
-                    搜索
+                    {t('pci.search') || '搜索'}
                   </button>
                   <button
                     onClick={handleExport}
                     className="flex items-center justify-center gap-2 px-4 py-2 bg-card border border-border rounded-lg hover:bg-muted/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium whitespace-nowrap"
                   >
                     <Download size={14} />
-                    导出结果
+                    {t('pci.export') || '导出结果'}
                   </button>
                   <button
                     onClick={handleApplyToParams}
                     disabled={applyingToParams}
                     className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all text-xs font-medium whitespace-nowrap ${
-                      applySuccess 
-                        ? 'bg-green-500/20 border border-green-500/50 text-green-600' 
-                        : applyingToParams 
-                          ? 'bg-blue-500/20 border border-blue-500/50 text-blue-600' 
+                      applySuccess
+                        ? 'bg-green-500/20 border border-green-500/50 text-green-600'
+                        : applyingToParams
+                          ? 'bg-blue-500/20 border border-blue-500/50 text-blue-600'
                           : 'bg-card border border-border hover:bg-muted/80'
                     } disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
                     {applyingToParams ? (
                       <>
                         <Loader2 size={14} className="animate-spin" />
-                        应用中...
+                        {t('pci.applying') || '应用中...'}
                       </>
                     ) : applySuccess ? (
                       <>
                         <Check size={14} />
-                        已应用
+                        {t('pci.applied') || '已应用'}
                       </>
                     ) : (
                       <>
                         <Save size={14} />
-                        应用到工参
+                        {t('pci.apply') || '应用到工参'}
                       </>
                     )}
                   </button>
@@ -1353,13 +1353,13 @@ export function PCIPage() {
             {!currentTaskResult ? (
               <div className="text-center py-16 text-muted-foreground">
                 <Settings size={48} className="mx-auto mb-4 opacity-50" />
-                <p>配置参数后点击"开始规划"查看结果</p>
-                <p className="text-xs mt-2">需要先上传"全量工参"和"待规划小区"文件</p>
+                <p>{t('pci.configAndPlan') || '配置参数后点击"开始规划"查看结果'}</p>
+                <p className="text-xs mt-2">{t('pci.uploadRequired') || '需要先上传"全量工参"和"待规划小区"文件'}</p>
               </div>
             ) : currentTaskResult.status === 'failed' ? (
               <div className="text-center py-16 text-red-500">
                 <AlertCircle size={48} className="mx-auto mb-4" />
-                <p className="font-semibold">规划任务失败</p>
+                <p className="font-semibold">{t('pci.planFailed') || '规划任务失败'}</p>
               </div>
             ) : currentTaskResult.status === 'completed' ? (
               <>
