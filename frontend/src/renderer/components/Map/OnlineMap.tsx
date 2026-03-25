@@ -1170,12 +1170,12 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
       let labelText = ''
       let totalDist = 0
       if (updatedPoints.length === 1) {
-        labelText = '起点'
+        labelText = t('map.measureStartPoint') || '起点'
       } else {
         for (let i = 0; i < updatedPoints.length - 1; i++) {
           totalDist += calculateDistance(updatedPoints[i].lat, updatedPoints[i].lng, updatedPoints[i + 1].lat, updatedPoints[i + 1].lng)
         }
-        labelText = `${totalDist.toFixed(2)}米`
+        labelText = `${totalDist.toFixed(2)}${t('map.meters')}`
       }
 
       const distanceLabel = L.marker([latLng.lat, latLng.lng], {
