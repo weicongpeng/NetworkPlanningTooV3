@@ -978,13 +978,13 @@ export function NeighborPage() {
           {/* 规划参数面板 - 单行布局 */}
           <div className="bg-card p-3 rounded-lg border border-border shrink-0">
             <div className="flex items-center gap-2 mb-2">
-              <h2 className="text-base font-semibold">规划参数</h2>
+              <h2 className="text-base font-semibold">{i18n.planningParams}</h2>
             </div>
 
             <div className="grid grid-cols-5 gap-x-3 gap-y-1 items-end">
               {/* 邻区规划类型 */}
               <ConfigSelect
-                label="规划类型"
+                label={i18n.planningType}
                 value={config.planningType}
                 options={['LTE-LTE', 'NR-NR', 'NR-LTE']}
                 onChange={(value) => setConfig({ ...config, planningType: value })}
@@ -993,7 +993,7 @@ export function NeighborPage() {
 
               {/* 最大邻区数 */}
               <ConfigInput
-                label="最大邻区数"
+                label={i18n.maxNeighbors}
                 type="number"
                 value={config.maxNeighbors}
                 onChange={(value) => setConfig({ ...config, maxNeighbors: parseInt(value) || 32 })}
@@ -1004,7 +1004,7 @@ export function NeighborPage() {
 
               {/* 覆盖圆距离系数 */}
               <ConfigInput
-                label="距离系数"
+                label={i18n.distanceFactor}
                 type="number"
                 value={config.coverageDistanceFactor}
                 onChange={(value) => setConfig({ ...config, coverageDistanceFactor: parseFloat(value) || 0.56 })}
@@ -1012,12 +1012,12 @@ export function NeighborPage() {
                 min={0.1}
                 max={2.0}
                 step={0.01}
-                tooltip="覆盖圆距离系数：站点到覆盖圆心的距离系数，默认5/9(≈0.556)"
+                tooltip={i18n.distanceFactorTooltip}
               />
 
               {/* 覆盖圆半径系数 */}
               <ConfigInput
-                label="半径系数"
+                label={i18n.radiusFactor}
                 type="number"
                 value={config.coverageRadiusFactor}
                 onChange={(value) => setConfig({ ...config, coverageRadiusFactor: parseFloat(value) || 0.56 })}
@@ -1025,7 +1025,7 @@ export function NeighborPage() {
                 min={0.1}
                 max={2.0}
                 step={0.01}
-                tooltip="覆盖圆半径系数：覆盖半径系数，默认5/9(≈0.556)"
+                tooltip={i18n.radiusFactorTooltip}
               />
 
               {/* 开始规划按钮 */}
@@ -1038,17 +1038,17 @@ export function NeighborPage() {
                 {loading ? (
                   <>
                     <Loader2 className="animate-spin" size={16} />
-                    启动中...
+                    {i18n.starting}
                   </>
                 ) : isRunning ? (
                   <>
                     <Loader2 className="animate-spin" size={16} />
-                    规划中...
+                    {i18n.planning}
                   </>
                 ) : (
                   <>
                     <Play size={16} />
-                    开始规划
+                    {i18n.startPlan}
                   </>
                 )}
               </button>
