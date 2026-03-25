@@ -760,7 +760,7 @@ function DataPreview({ dataId }: { dataId: string }) {
         setData(result.success ? result.data : null)
       } catch (err) {
         console.error('Failed to fetch data:', err)
-        setError('加载数据失败')
+        setError(t('data.loadFailed') || '加载数据失败')
       } finally {
         setLoading(false)
       }
