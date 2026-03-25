@@ -11,8 +11,8 @@ export interface ThemeColors {
 
 export const THEME_COLORS: Record<ColorScheme, ThemeColors> = {
   blue: {
-    primary: '217.2 91.2% 59.8%',
-    primaryForeground: '222.2 47.4% 11.2%'
+    primary: '207 90% 54%',
+    primaryForeground: '0 0% 100%'
   },
   green: {
     primary: '142.1 76.2% 36.3%',
