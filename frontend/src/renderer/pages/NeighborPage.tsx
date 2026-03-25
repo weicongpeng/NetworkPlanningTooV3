@@ -9,18 +9,18 @@ const BUFFER_COUNT = 5 // 缓冲行数
 
 // 邻区表格列配置
 const NEIGHBOR_COLUMNS = [
-  { key: 'relationType', label: '关系类型', defaultWidth: 80 },
-  { key: 'sourceSiteId', label: '源基站ID', defaultWidth: 80 },
-  { key: 'sourceCellId', label: '源小区ID', defaultWidth: 80 },
-  { key: 'sourceCellName', label: '源小区名称', defaultWidth: 120 },
-  { key: 'sourceFrequency', label: '源频点', defaultWidth: 70 },
-  { key: 'sourcePci', label: '源PCI', defaultWidth: 60 },
-  { key: 'targetSiteId', label: '目标基站ID', defaultWidth: 80 },
-  { key: 'targetCellId', label: '目标小区ID', defaultWidth: 80 },
-  { key: 'targetCellName', label: '目标小区名称', defaultWidth: 120 },
-  { key: 'targetFrequency', label: '目标频点', defaultWidth: 70 },
-  { key: 'targetPci', label: '目标PCI', defaultWidth: 60 },
-  { key: 'distance', label: '距离', defaultWidth: 70 }
+  { key: 'relationType', label: i18nKeys.relationType, defaultWidth: 80 },
+  { key: 'sourceSiteId', label: i18nKeys.sourceSiteId, defaultWidth: 80 },
+  { key: 'sourceCellId', label: i18nKeys.sourceCellId, defaultWidth: 80 },
+  { key: 'sourceCellName', label: i18nKeys.sourceCellName, defaultWidth: 120 },
+  { key: 'sourceFrequency', label: i18nKeys.sourceFrequency, defaultWidth: 70 },
+  { key: 'sourcePci', label: i18nKeys.sourcePci, defaultWidth: 60 },
+  { key: 'targetSiteId', label: i18nKeys.targetSiteId, defaultWidth: 80 },
+  { key: 'targetCellId', label: i18nKeys.targetCellId, defaultWidth: 80 },
+  { key: 'targetCellName', label: i18nKeys.targetCellName, defaultWidth: 120 },
+  { key: 'targetFrequency', label: i18nKeys.targetFrequency, defaultWidth: 70 },
+  { key: 'targetPci', label: i18nKeys.targetPci, defaultWidth: 60 },
+  { key: 'distance', label: i18nKeys.distance, defaultWidth: 70 }
 ] as const
 import { neighborApi } from '../services/api'
 import type { ApiResponse } from '@shared/types'
