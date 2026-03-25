@@ -269,7 +269,7 @@ export function DataPage() {
       }
     } catch (err: any) {
       console.error('[Delete] Failed:', err)
-      alert(`删除失败: ${err.message || '未知错误'}\n\n可能原因：\n• 文件正在被其他程序使用\n• 磁盘权限不足\n• 索引文件损坏`)
+      alert(`${t('data.deleteFailed') || '删除失败'}: ${err.message || (t('data.unknownError') || '未知错误')}\n\n${t('data.deleteFailedReason') || '可能原因：'}\n• ${t('data.deleteFailedInUse') || '文件正在被其他程序使用'}\n• ${t('data.deleteFailedPermission') || '磁盘权限不足'}\n• ${t('data.deleteFailedIndex') || '索引文件损坏'}`)
     }
   }
 
