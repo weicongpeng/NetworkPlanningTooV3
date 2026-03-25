@@ -901,7 +901,7 @@ export function PCIPage() {
   // 处理小区搜索
   const handleSearch = async () => {
     if (!searchValue.trim()) {
-      setSearchError('请输入小区名称或基站ID-小区ID')
+      setSearchError(t('pci.inputSearchHint') || '请输入小区名称或基站ID-小区ID')
       return
     }
 
@@ -945,7 +945,7 @@ export function PCIPage() {
       }
 
       if (!foundSector) {
-        setSearchError(`未找到小区: ${trimmedSearch}`)
+        setSearchError((t('pci.sectorNotFound') || `未找到小区: ${trimmedSearch}`))
         return
       }
 
@@ -987,11 +987,11 @@ export function PCIPage() {
           totalMarkers: searchMarkers.length + (!markerExists ? 1 : 0)
         })
       } else {
-        setSearchError('小区缺少经纬度信息，无法定位')
+        setSearchError(t('pci.sectorNoCoords') || '小区缺少经纬度信息，无法定位')
       }
     } catch (err) {
       console.error('[PCIPage] 搜索失败', err)
-      setSearchError('搜索失败，请重试')
+      setSearchError(t('pci.searchFailed') || '搜索失败，请重试')
     }
   }
 
