@@ -1211,7 +1211,7 @@ export function MapPage() {
             title={mapDragTool ? (t('map.disableDrag') || '禁用地图拖拽') : (t('map.enableDrag') || '启用地图拖拽')}
           >
             <Hand size={14} />
-            <span>拖拽</span>
+            <span>{t('map.drag') || '拖拽'}</span>
           </button>
 
           {/* 圈选按钮 */}
