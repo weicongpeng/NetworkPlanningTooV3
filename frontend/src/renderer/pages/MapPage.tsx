@@ -1166,7 +1166,7 @@ export function MapPage() {
               }
             }}
             className="px-2 py-1.5 text-xs rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground flex items-center gap-1"
-            title="清除所有搜索标记和圈选状态"
+            title={t('map.clearAllMarkers') || '清除所有搜索标记和圈选状态'}
           >
             <Trash2 size={14} />
             清除
