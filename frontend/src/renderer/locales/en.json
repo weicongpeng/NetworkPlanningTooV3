@@ -535,7 +535,10 @@
     "pointsAdded": "{{count}} points added",
     "doubleClickFinish": "Double-click to finish drawing",
     "clickToAddPolygon": "Click to add polygon vertex, double-click to finish",
-    "backspaceDelete": "Press Backspace to delete last point"
+    "backspaceDelete": "Press Backspace to delete last point",
+    "measureStartPoint": "Start Point",
+    "noFeatureSelected": "No features selected",
+    "clickToSelectFeatures": "Click to select features (click again to deselect), Shift+click to multi-select, Ctrl+C to copy"
   },
   "common": {
     "confirm": "Confirm",
