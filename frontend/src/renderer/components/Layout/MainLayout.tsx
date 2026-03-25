@@ -55,7 +55,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
             cursor: 'pointer',
           }}
           className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center justify-center z-30"
-          title={sidebarOpen ? '收起侧边栏' : '展开侧边栏'}
+          title={sidebarOpen ? t('common.collapse') || '收起侧边栏' : t('common.expand') || '展开侧边栏'}
         >
           {/* 箭头图标 */}
           {sidebarOpen ? (
