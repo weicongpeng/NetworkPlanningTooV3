@@ -304,7 +304,7 @@ export function LicensePage() {
             </div>
 
             <div>
-              <h3 className="text-xs font-medium text-muted-foreground mb-3">配色方案</h3>
+              <h3 className="text-xs font-medium text-muted-foreground mb-3">{t('theme.colorScheme')}</h3>
               <div className="flex flex-wrap gap-2">
                 {(['blue', 'green', 'purple', 'orange', 'pink'] as ColorScheme[]).map((color) => (
                   <ColorSwatch
