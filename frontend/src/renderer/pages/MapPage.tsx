@@ -1109,7 +1109,7 @@ export function MapPage() {
                 : 'text-muted-foreground hover:bg-muted'
                 }`}
             >
-              工参搜索
+              {t('map.searchCell') || '工参搜索'}
             </button>
             {searchMode === 'parameter' && missingCoordCount > 0 && (
               <div className="flex items-center gap-1 ml-2 text-xs text-amber-600" title="部分扇区缺少坐标信息">
