@@ -535,7 +535,7 @@ export function DataPage() {
 
             {/* 工参更新 */}
             <div className="bg-card p-3 rounded-lg border border-border -mt-6">
-                <h2 className="text-xl font-semibold mb-2">工参更新</h2>
+                <h2 className="text-xl font-semibold mb-2">{t('data.updateParameters') || '工参更新'}</h2>
                 <div className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium mb-1">选择全量工参</label>
