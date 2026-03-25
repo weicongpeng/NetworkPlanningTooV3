@@ -179,7 +179,12 @@
     "clear": "清除",
     "clearAll": "清除全部",
     "clearAllMarkersTip": "清除所有标记（定位 + 测距）",
-    "searchMarkersAdded": "已添加 个搜索标记"
+    "searchMarkersAdded": "已添加 个搜索标记",
+    "legend": "PCI规划图例",
+    "hideLegend": "隐藏图例",
+    "selectedCell": "选中的小区",
+    "sameFreqPCI": "同频同PCI",
+    "otherCell": "其他小区"
   },
   "neighbor": {
     "title": "邻区规划",
