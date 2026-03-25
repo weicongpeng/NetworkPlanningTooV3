@@ -185,7 +185,7 @@ export function LabelSettingsModal({
                 <div className="absolute z-10 w-full mt-1 bg-background border border-border rounded shadow-lg max-h-96 overflow-y-auto">
                   {fieldOptions.length === 0 ? (
                     <div className="px-3 py-2 text-xs text-muted-foreground">
-                      暂无可用字段
+                      {t('map.noAvailableFields')}
                     </div>
                   ) : (
                     fieldOptions.map((option) => (
