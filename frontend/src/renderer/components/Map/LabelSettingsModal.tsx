@@ -80,6 +80,9 @@ export function LabelSettingsModal({
   fieldOptions = [],
   loadingFields = false
 }: LabelSettingsModalProps) {
+  // i18n translation
+  const { t } = useTranslation()
+
   // 内部状态
   const [content, setContent] = useState<LabelField>(currentSettings?.content || fieldOptions[0]?.value || 'name')
   const [color, setColor] = useState(currentSettings?.color || '#000000')
