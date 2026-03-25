@@ -1370,7 +1370,7 @@ export function MapPage() {
             {mapType === 'roadmap' ? (
               <>
                 <MapIcon size={14} />
-                <span>平面图</span>
+                <span>{t('map.vector') || '平面图'}</span>
               </>
             ) : (
               <>
