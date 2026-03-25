@@ -947,7 +947,7 @@ export function LayerControl({
             minWidth: '240px',
             height: '100vh',
             maxHeight: '100vh',
-            overflow: 'visible',
+            overflow: 'hidden',
             fontSize: '14px',
             border: '1px solid rgba(0, 0, 0, 0.1)',
             borderRight: 'none',
