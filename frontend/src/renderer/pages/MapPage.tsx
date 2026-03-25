@@ -1258,7 +1258,7 @@ export function MapPage() {
                   className="w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors flex items-center gap-2"
                 >
                   <Pentagon size={12} className="text-green-500" />
-                  多边形
+                  {t('map.polygonSelect') || '多边形'}
                 </button>
               </div>
             )}
