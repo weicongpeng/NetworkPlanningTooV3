@@ -1403,7 +1403,7 @@ function NeighborTable({
           {groupedData.length === 0 ? (
             <tr>
               <td colSpan={NEIGHBOR_COLUMNS.length} className="px-3 py-8 text-center text-muted-foreground">
-                暂无匹配结果
+                {i18n.noMatchResult}
               </td>
             </tr>
           ) : (
