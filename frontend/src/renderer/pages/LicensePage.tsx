@@ -87,7 +87,7 @@ export function LicensePage() {
         setUploadMessage({ type: 'error', text: result.message })
       }
     } catch (error) {
-      setUploadMessage({ type: 'error', text: '上传失败，请稍后重试' })
+      setUploadMessage({ type: 'error', text: t('license.uploadError') })
       console.error('上传许可证失败:', error)
     } finally {
       setIsUploading(false)
