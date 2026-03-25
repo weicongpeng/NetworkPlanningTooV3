@@ -1368,9 +1368,9 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
 
             // 更新提示信息
             if (selectionPointsRef.current.length === 0) {
-              setSelectionTip('点击添加多边形顶点，双击完成绘制，按 Backspace 删除上一个点')
+              setSelectionTip(`${t('map.clickToAddPolygon')}，${t('map.backspaceDelete')}`)
             } else {
-              setSelectionTip(`已添加 ${selectionPointsRef.current.length} 个点，双击完成绘制，按 Backspace 删除上一个点`)
+              setSelectionTip(`${t('map.pointsAdded', { count: selectionPointsRef.current.length })}，${t('map.doubleClickFinish')}，${t('map.backspaceDelete')}`)
             }
           }
         } else if (e.key === 'c' && (e.ctrlKey || e.metaKey)) {
