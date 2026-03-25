@@ -253,7 +253,12 @@
     "validationFactorProduct": "覆盖圆系数乘积({{value}})过大，可能产生过多无效邻区，建议减小系数",
     "distanceFactorTooltip": "覆盖圆距离系数：站点到覆盖圆心的距离系数，默认5/9(≈0.556)",
     "radiusFactorTooltip": "覆盖圆半径系数：覆盖半径系数，默认5/9(≈0.556)",
-    "startTaskMsg": "邻区规划开始"
+    "startTaskMsg": "邻区规划开始",
+    "legend": "邻区规划图例",
+    "hideLegend": "隐藏图例",
+    "sourceCellLegend": "源小区",
+    "targetCellLegend": "目标小区",
+    "otherCellLegend": "其他小区"
   },
   "tac": {
     "title": "TAC核查",
