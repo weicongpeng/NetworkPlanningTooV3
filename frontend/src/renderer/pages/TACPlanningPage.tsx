@@ -415,7 +415,7 @@ export function TACPlanningPage() {
                                 ) : (
                                     <Loader2 size={18} className="animate-spin text-primary" />
                                 )}
-                                <h2 className="text-sm font-semibold">规划结果</h2>
+                                <h2 className="text-sm font-semibold">{t('tacPlanning.result') || '规划结果'}</h2>
                             </div>
                             {/* 统计卡片 - 与标题同一行居左 */}
                             <div className="flex items-center gap-2">
