@@ -946,7 +946,7 @@ function UploadArea({
             <>
               <span className="flex-shrink-0 transition-transform duration-200 group-hover:scale-110">{icon}</span>
               <p className="text-xs flex-1 text-center">
-                点击上传 {accept}
+                {t('data.clickToUpload') || '点击上传'} {accept}
               </p>
             </>
           )}
