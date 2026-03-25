@@ -328,7 +328,7 @@ export function DataPage() {
         const items = result.data?.items || []
 
         if (removed > 0) {
-          alert(`清理完成！已移除 ${removed} 个无效索引项：\n\n${items.map((i: any) => `• ${i.name}`).join('\n')}`)
+          alert(`${t('data.cleanComplete') || `清理完成！已移除 ${removed} 个无效索引项`}:\n\n${items.map((i: any) => `• ${i.name}`).join('\n')}`)
         } else {
           alert('索引状态良好，没有发现无效项。')
         }
