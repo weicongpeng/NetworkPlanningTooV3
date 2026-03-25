@@ -1259,7 +1259,7 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
     const totalLabel = L.marker([lastPoint.lat, lastPoint.lng], {
       icon: L.divIcon({
         html: `<div style="color: #ef4444; white-space: nowrap; font-size: 13px; font-weight: bold; text-shadow: 1px 1px 2px white, -1px -1px 2px white, 1px -1px 2px white, -1px 1px 2px white;">
-                总长 ${totalDist.toFixed(2)}米
+                ${t('map.totalDistance')} ${totalDist.toFixed(2)}${t('map.meters')}
               </div>`,
         className: 'measure-total-label',
         iconSize: [0, 0],
