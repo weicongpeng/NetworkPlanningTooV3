@@ -1426,7 +1426,7 @@ export function MapPage() {
             <h3 className="text-sm font-semibold mb-3">{t('map.latLngLocation') || '输入经纬度定位'}</h3>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs text-muted-foreground mb-1">经度</label>
+                <label className="block text-xs text-muted-foreground mb-1">{t('map.longitude') || '经度'}</label>
                 <input
                   type="text"
                   value={locationInput.lng}
