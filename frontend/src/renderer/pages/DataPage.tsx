@@ -707,7 +707,7 @@ export function DataPage() {
                         handleDownload(item)
                       }}
                       className="p-2 hover:bg-background rounded text-primary"
-                      title="下载"
+                      title={t('data.download') || '下载'}
                     >
                       <Download size={16} />
                     </button>
