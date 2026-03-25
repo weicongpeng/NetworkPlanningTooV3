@@ -275,7 +275,7 @@ export function LicensePage() {
         <div className="bg-card p-5 rounded-lg border border-border">
           <div className="flex items-center gap-2 mb-4">
             <Palette size={20} className="text-primary" />
-            <h2 className="text-lg font-semibold">主题与配色</h2>
+            <h2 className="text-lg font-semibold">{t('theme.title')}</h2>
           </div>
 
           <div className="space-y-4">
