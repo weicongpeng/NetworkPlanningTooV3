@@ -329,7 +329,7 @@ export function LicensePage() {
                   onClick={handleCancelTheme}
                   className="flex-1 px-4 py-2 bg-secondary text-secondary-foreground rounded-lg hover:opacity-90 text-sm font-medium"
                 >
-                  取消
+                  {t('theme.cancel')}
                 </button>
               </div>
             )}
