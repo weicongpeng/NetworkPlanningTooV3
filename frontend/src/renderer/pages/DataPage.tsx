@@ -866,6 +866,7 @@ function UploadArea({
   inline?: boolean
   status?: 'idle' | 'success' | 'error'
 }) {
+  const { t } = useTranslation()
   // 根据状态获取边框颜色
   const getBorderClass = () => {
     if (loading) return 'border-muted bg-muted/50 cursor-not-allowed'
