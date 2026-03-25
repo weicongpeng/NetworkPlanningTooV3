@@ -436,7 +436,7 @@ export function DataPage() {
                 <div className="flex items-center gap-2">
                     <div className="flex-1">
                         <UploadArea
-                            title="全量工参"
+                            title={t('data.fullParams') || '全量工参'}
                             accept=".xlsx,.xls"
                             onUpload={(e) => handleFileUpload(e, 'excel', 'full_params')}
                             loading={loading && uploadingType === 'full_params'}
