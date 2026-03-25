@@ -320,7 +320,7 @@ export function TACPlanningPage() {
             <div className="bg-card p-3 rounded-lg border border-border mb-3 shrink-0">
                 <div className="space-y-3">
                     <div>
-                        <label className="block text-sm font-semibold mb-1.5">网络类型</label>
+                        <label className="block text-sm font-semibold mb-1.5">{t('tacPlanning.networkType') || '网络类型'}</label>
                         <div className="flex gap-3">
                             <label className="flex items-center gap-1.5 cursor-pointer">
                                 <input
