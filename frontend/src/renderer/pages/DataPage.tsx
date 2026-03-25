@@ -940,7 +940,7 @@ function UploadArea({
           ) : status === 'error' ? (
             <>
               <AlertCircle className="text-red-500" size={16} />
-              <p className="text-xs text-red-600 font-medium">上传失败</p>
+              <p className="text-xs text-red-600 font-medium">{t('data.uploadFailed') || '上传失败'}</p>
             </>
           ) : (
             <>
