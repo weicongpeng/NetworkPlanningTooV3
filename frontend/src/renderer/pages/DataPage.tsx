@@ -521,7 +521,7 @@ export function DataPage() {
                             onUpload={(e) => handleFileUpload(e, 'excel', 'geo_data')}
                             loading={loading && uploadingType === 'geo_data'}
                             icon={<MapPin size={20} className="text-purple-600" />}
-                            description="自动识别点状/扇区"
+                            description={t('data.geoDataDesc') || '自动识别点状/扇区'}
                             inline={true}
                             status={uploadStatus.geo_data}
                         />
