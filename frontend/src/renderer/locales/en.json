@@ -179,7 +179,12 @@
     "clear": "Clear",
     "clearAll": "Clear All",
     "clearAllMarkersTip": "Clear all markers (location + measure)",
-    "searchMarkersAdded": " search markers added"
+    "searchMarkersAdded": " search markers added",
+    "legend": "PCI Legend",
+    "hideLegend": "Hide Legend",
+    "selectedCell": "Selected Cell",
+    "sameFreqPCI": "Same Freq & PCI",
+    "otherCell": "Other Cells"
   },
   "neighbor": {
     "title": "Neighbor Planning",
