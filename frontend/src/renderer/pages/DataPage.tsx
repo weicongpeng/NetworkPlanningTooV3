@@ -362,7 +362,7 @@ export function DataPage() {
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3 text-red-700">
           <AlertCircle size={20} />
           <span>{error}</span>
-          <button onClick={() => fetchList(1, 50)} className="ml-auto text-sm underline">重试</button>
+          <button onClick={() => fetchList(1, 50)} className="ml-auto text-sm underline">{t('data.retry') || '重试'}</button>
         </div>
       )}
       
