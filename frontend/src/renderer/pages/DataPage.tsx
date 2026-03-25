@@ -353,7 +353,7 @@ export function DataPage() {
             isDesktop ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-yellow-100 text-yellow-700 border border-yellow-200'
         }`}>
             <div className={`w-2 h-2 rounded-full ${isDesktop ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`} />
-            {isDesktop ? t('data.desktopMode') || '桌面模式 (已连接 Electron)' : t('data.browserMode') || '浏览器模式 (受限)'}
+            {isDesktop ? (t('data.desktopMode') || '桌面模式 (已连接 Electron)') : (t('data.browserMode') || '浏览器模式 (受限)')}
         </div>
       </div>
 
