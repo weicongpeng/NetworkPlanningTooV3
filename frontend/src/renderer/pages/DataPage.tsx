@@ -815,7 +815,7 @@ function DataPreview({ dataId }: { dataId: string }) {
   return (
     <div>
       <p className="text-sm text-muted-foreground mb-4">
-        {t('data.siteCount', { count: Array.isArray(data) ? data.length : 0 }) || `共 ${Array.isArray(data) ? data.length : 0} 个基站`}
+        {tPreview('data.siteCount', { count: Array.isArray(data) ? data.length : 0 }) || `共 ${Array.isArray(data) ? data.length : 0} 个基站`}
       </p>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
