@@ -227,7 +227,7 @@ export function DataPage() {
         console.log('[Download] Success');
     } catch (err: any) {
         console.error('[Download] Failed:', err);
-        alert(`下载失败: ${err.message || '未知错误'}`);
+        alert(`${t('data.downloadFailed') || '下载失败'}: ${err.message || (t('data.unknownError') || '未知错误')}`)
     }
   }
 
