@@ -25,8 +25,8 @@ const PCI_COLUMNS = [
   { key: 'newPCI', label: t('pci.newPci') || '新PCI', defaultWidth: 60 },
   { key: 'originalMod', label: t('pci.originalMod') || '原模', defaultWidth: 50 },
   { key: 'newMod', label: t('pci.newMod') || '新模', defaultWidth: 50 },
-  { key: 'tac', label: 'TAC规划值', defaultWidth: 80 },
-  { key: 'assignmentReason', label: '分配原因', defaultWidth: 120 },
+  { key: 'tac', label: t('pci.tacPlanned') || 'TAC规划值', defaultWidth: 80 },
+  { key: 'assignmentReason', label: t('pci.assignmentReason') || '分配原因', defaultWidth: 120 },
   { key: 'minReuseDistance', label: t('pci.reuseDistance') || '复用距离', defaultWidth: 80 }
 ] as const
 
