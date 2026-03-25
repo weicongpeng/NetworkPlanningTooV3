@@ -284,14 +284,14 @@ export function LabelSettingsModal({
             onClick={onClose}
             className="flex-1 px-3 py-2 text-xs bg-muted rounded-lg hover:bg-muted/80 transition-colors"
           >
-            取消
+            {t('map.cancel')}
           </button>
           <button
             onClick={handleSave}
             disabled={loadingFields}
             className="flex-1 px-3 py-2 text-xs bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            保存
+            {t('map.save')}
           </button>
         </div>
       </div>
