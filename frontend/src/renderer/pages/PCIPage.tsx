@@ -102,6 +102,7 @@ const validateConfig = (config: any): string | null => {
 }
 
 export function PCIPage() {
+  const { t } = useTranslation()
   const [config, setConfig] = useState({
     networkType: 'LTE',
     distanceThreshold: 5.0,
