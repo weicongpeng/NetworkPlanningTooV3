@@ -1431,7 +1431,7 @@ export function MapPage() {
                   type="text"
                   value={locationInput.lng}
                   onChange={(e) => setLocationInput(prev => ({ ...prev, lng: e.target.value }))}
-                  placeholder="例如: 116.397428"
+                  placeholder={t('map.locationExample') || '例如: 116.397428'}
                   className="w-full px-3 py-2 text-xs border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
