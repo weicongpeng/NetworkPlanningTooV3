@@ -342,6 +342,7 @@
     "total": "Total",
     "success": "Success",
     "matchRate": "Match Rate",
+    "search": "Search",
     "completed": "Completed",
     "unmatched": "Unmatched",
     "selectNetworkType": "Please select network type",
