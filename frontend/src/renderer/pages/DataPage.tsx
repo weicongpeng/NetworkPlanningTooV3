@@ -488,7 +488,7 @@ export function DataPage() {
                             loading={loading && uploadingType === 'current_params'}
                             icon={<Upload size={20} />}
                             inline={true}
-                            description="中兴网管300脚本导出数据"
+                            description={t('data.currentParamsDesc') || '中兴网管300脚本导出数据'}
                             status={uploadStatus.current_params}
                         />
                     </div>
