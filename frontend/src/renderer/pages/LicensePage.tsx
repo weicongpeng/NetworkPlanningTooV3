@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Check, Upload, Palette, Sun, Moon, Key, RefreshCw, X } from 'lucide-react'
+import { Check, Upload, Palette, Sun, Moon, Key, RefreshCw, X, Globe } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import {
   useThemeStore,
   ThemeMode,
