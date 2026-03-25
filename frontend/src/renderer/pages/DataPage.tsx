@@ -94,7 +94,7 @@ export function DataPage() {
       console.log('[Template Download] Success:', filename)
     } catch (err: any) {
       console.error('[Template Download] Failed:', err)
-      alert(`下载模板失败: ${err.message || '未知错误'}`)
+      alert(`${t('data.downloadTemplateFailed') || '下载模板失败'}: ${err.message || (t('data.unknownError') || '未知错误')}`)
     }
   }
 
