@@ -421,23 +421,23 @@ export function PCIPage() {
                     console.log('[PCIPage] PCI规划结果已加载到同步服务')
                   }
                 } else {
-                  setError(resultResponse.message || '获取规划结果失败')
+                  setError(resultResponse.message || (t('pci.getResultFailed') || '获取规划结果失败'))
                   failTask(taskId, resultResponse.message || '获取规划结果失败')
                 }
               } catch (err: any) {
-                const errorMsg = '获取规划结果失败: ' + (err.message || err.toString?.() || '未知错误')
+                const errorMsg = (t('pci.getResultFailed') || '获取规划结果失败: ') + (err.message || err.toString?.() || '未知错误')
                 setError(errorMsg)
                 failTask(taskId, errorMsg)
               }
             }, 100)
           } else if (data.status === 'failed') {
             stopPolling()
-            const errorMsg = data.message || data.error || '规划任务失败'
+            const errorMsg = data.message || data.error || (t('pci.planFailed') || '规划任务失败')
             setError(errorMsg)
             failTask(taskId, errorMsg)
           }
         } else {
-          setError(response.message || '获取进度失败')
+          setError(response.message || (t('pci.getProgressFailed') || '获取进度失败'))
         }
       } catch (err: any) {
         console.error('Failed to get progress:', err)
@@ -455,11 +455,11 @@ export function PCIPage() {
 
         if (errorCountRef.current >= MAX_ERRORS) {
           stopPolling()
-          const errorMsg = '无法连接到服务器，请检查网络连接或后端服务状态'
+          const errorMsg = t('pci.connectionError') || '无法连接到服务器，请检查网络连接或后端服务状态'
           setError(errorMsg)
           failTask(taskId, errorMsg)
         } else {
-          setError(`获取进度失败 (${errorCountRef.current}/${MAX_ERRORS})，正在重试...`)
+          setError((t('pci.getProgressRetrying') || `获取进度失败 (${errorCountRef.current}/${MAX_ERRORS})，正在重试...`))
         }
       }
     }, 1000)
