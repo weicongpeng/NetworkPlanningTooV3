@@ -13,6 +13,7 @@ import {
 import { useLicenseStore } from '../store/licenseStore'
 
 export function LicensePage() {
+  const { t, i18n } = useTranslation()
   const [isUploading, setIsUploading] = useState(false)
   const [uploadMessage, setUploadMessage] = useState<{type: 'success' | 'error', text: string} | null>(null)
 
