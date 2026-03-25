@@ -1148,14 +1148,14 @@ export function PCIPage() {
 
   return (
     <div className="h-full flex flex-col p-4 min-h-0">
-      <h1 className="text-3xl font-bold mb-6 shrink-0">PCI规划</h1>
+      <h1 className="text-3xl font-bold mb-6 shrink-0">{t('pci.title') || 'PCI规划'}</h1>
 
       {/* 错误提示 */}
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3 text-red-700 shrink-0">
           <AlertCircle size={18} />
           <span className="text-sm">{error}</span>
-          <button onClick={() => setError(null)} className="ml-auto text-sm underline">关闭</button>
+          <button onClick={() => setError(null)} className="ml-auto text-sm underline">{t('pci.close') || '关闭'}</button>
         </div>
       )}
 
