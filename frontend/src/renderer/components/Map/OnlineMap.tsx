@@ -13,6 +13,7 @@
  */
 import { useEffect, useRef, useState, forwardRef, useImperativeHandle, useCallback } from 'react'
 import { Loader2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import L from 'leaflet'
 import { NetworkStatusAlert } from './NetworkStatusIndicator'
 import { frequencyColorMapper } from '../../utils/frequencyColors'
