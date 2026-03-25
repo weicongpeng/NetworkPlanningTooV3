@@ -1244,7 +1244,7 @@ export function MapPage() {
                   className="w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors flex items-center gap-2"
                 >
                   <MousePointer2 size={12} className="text-orange-500" />
-                  点选
+                  {t('map.pointSelect') || '点选'}
                 </button>
                 <button
                   onClick={() => handleSelectionModeChange('circle')}
