@@ -1483,7 +1483,7 @@ export function MapPage() {
                   }}
                   className="flex-1 px-3 py-2 text-xs bg-blue-400 text-white rounded-lg hover:bg-blue-500 transition-colors"
                 >
-                  确定
+                  {t('common.ok') || '确定'}
                 </button>
               </div>
             </div>
