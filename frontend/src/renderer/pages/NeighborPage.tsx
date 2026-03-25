@@ -804,7 +804,7 @@ export function NeighborPage() {
   // 处理小区搜索
   const handleSearch = async () => {
     if (!searchValue.trim()) {
-      setSearchError('请输入小区名称或基站ID-小区ID')
+      setSearchError(i18n.searchErrorNoInput)
       return
     }
 
