@@ -41,6 +41,7 @@ interface TACResultData {
 const MAX_ERRORS = 5
 
 export function TACPlanningPage() {
+    const { t } = useTranslation()
     const { taskId, config, result, setTaskId, setConfig, setResult, clearTAC } = useTACPlanningStore()
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
