@@ -408,7 +408,7 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
         }
         // 更新提示
         if (selectedIdsRef.current.size > 0) {
-          setSelectionTip(`已选中 ${selectedIdsRef.current.size} 个要素，按 Escape 清除选择或按 Ctrl+C 复制`)
+          setSelectionTip(`${t('map.featuresSelected', { count: selectedIdsRef.current.size })}，${t('map.pressEscClear')}`)
         } else {
           setSelectionTip('')
         }
