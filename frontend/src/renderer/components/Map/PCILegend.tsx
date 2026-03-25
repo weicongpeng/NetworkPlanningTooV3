@@ -7,6 +7,8 @@
  * - 黑边：其他扇区
  */
 
+import { useTranslation } from 'react-i18next'
+
 interface PCILegendProps {
   className?: string
   /** 图例是否可见 */
@@ -20,6 +22,8 @@ export function PCILegend({
   visible = true,
   onToggleVisible
 }: PCILegendProps) {
+  const { t } = useTranslation()
+
   // 如果图例不可见，只显示一个小的展开按钮
   if (!visible) {
     return (
@@ -40,9 +44,9 @@ export function PCILegend({
             fontSize: '10px',
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
           }}
-          title="显示图例"
+          title={t('pci.legend') || '显示图例'}
         >
-          图例
+          {t('pci.legend') || '图例'}
         </button>
       </div>
     )
@@ -63,7 +67,7 @@ export function PCILegend({
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
         <div style={{ fontWeight: 600, color: '#333', fontSize: '7px' }}>
-          PCI规划图例
+          {t('pci.legend') || 'PCI规划图例'}
         </div>
         {onToggleVisible && (
           <button
@@ -76,7 +80,7 @@ export function PCILegend({
               padding: '0 2px',
               color: '#666',
             }}
-            title="隐藏图例"
+            title={t('pci.hideLegend') || '隐藏图例'}
           >
             ×
           </button>
@@ -93,7 +97,7 @@ export function PCILegend({
           borderRadius: '1px',
           marginRight: '4px'
         }} />
-        <span style={{ color: '#333', fontWeight: 500, fontSize: '7px' }}>选中的小区</span>
+        <span style={{ color: '#333', fontWeight: 500, fontSize: '7px' }}>{t('pci.selectedCell') || '选中的小区'}</span>
       </div>
 
       {/* 同频同PCI的扇区 */}
@@ -106,7 +110,7 @@ export function PCILegend({
           borderRadius: '1px',
           marginRight: '4px'
         }} />
-        <span style={{ color: '#333', fontWeight: 500, fontSize: '7px' }}>同频同PCI</span>
+        <span style={{ color: '#333', fontWeight: 500, fontSize: '7px' }}>{t('pci.sameFreqPCI') || '同频同PCI'}</span>
       </div>
 
       {/* 其他扇区 - 白色填充带黑色边框 */}
@@ -119,7 +123,7 @@ export function PCILegend({
           borderRadius: '1px',
           marginRight: '4px'
         }} />
-        <span style={{ color: '#333', fontWeight: 500, fontSize: '7px' }}>其他小区</span>
+        <span style={{ color: '#333', fontWeight: 500, fontSize: '7px' }}>{t('pci.otherCell') || '其他小区'}</span>
       </div>
     </div>
   )
