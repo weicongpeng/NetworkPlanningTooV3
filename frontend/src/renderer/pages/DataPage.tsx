@@ -746,6 +746,7 @@ export function DataPage() {
 }
 
 function DataPreview({ dataId }: { dataId: string }) {
+  const { t: tPreview } = useTranslation()
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
