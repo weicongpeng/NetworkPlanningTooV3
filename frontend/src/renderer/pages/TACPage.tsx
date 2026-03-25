@@ -584,7 +584,7 @@ export function TACPage() {
                 />
               </div>
               <div className="flex items-center gap-1.5">
-                <label className="text-xs text-foreground whitespace-nowrap">异TAC阈值(%):</label>
+                <label className="text-xs text-foreground whitespace-nowrap">{t('tac.singularityThreshold') || '异TAC阈值(%):'}</label>
                 <input
                   type="number"
                   value={Math.round(singularityConfig.singularityThreshold * 100)}
