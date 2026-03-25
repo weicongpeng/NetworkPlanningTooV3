@@ -92,7 +92,12 @@
     "nr": "NR",
     "confirmDelete": "Confirm Delete",
     "deleteSuccess": "Delete successful",
-    "deleteError": "Delete failed"
+    "deleteError": "Delete failed",
+    "desktopMode": "Desktop Mode (Connected to Electron)",
+    "browserMode": "Browser Mode (Limited)",
+    "cleanIndex": "Clean Index",
+    "retry": "Retry",
+    "close": "Close"
   },
   "pci": {
     "title": "PCI Planning",
