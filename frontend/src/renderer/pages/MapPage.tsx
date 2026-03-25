@@ -1114,7 +1114,7 @@ export function MapPage() {
             {searchMode === 'parameter' && missingCoordCount > 0 && (
               <div className="flex items-center gap-1 ml-2 text-xs text-amber-600" title="部分扇区缺少坐标信息">
                 <AlertTriangle size={12} />
-                <span>{missingCoordCount}个扇区缺坐标</span>
+                <span>{missingCoordCount}{t('map.missingCoordCells') || '个扇区缺坐标'}</span>
               </div>
             )}
           </div>
