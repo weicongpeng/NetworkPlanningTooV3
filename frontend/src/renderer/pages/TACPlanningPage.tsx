@@ -488,7 +488,7 @@ export function TACPlanningPage() {
                                                     className="text-left p-2 font-medium bg-background z-20 relative group"
                                                     style={{ width: `${columnWidths[column.key]}px`, minWidth: `${columnWidths[column.key]}px` }}
                                                 >
-                                                    <span className="block pr-3">{column.label}</span>
+                                                    <span className="block pr-3">{t(`tacPlanning.column.${column.key}`) || column.label}</span>
                                                     {searchEnabled && column.key !== 'status' && (
                                                         <input
                                                             type="text"
