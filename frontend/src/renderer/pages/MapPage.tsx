@@ -1321,7 +1321,7 @@ export function MapPage() {
                             {!result.hasLocation && (
                               <div className="text-xs text-amber-600 flex items-center gap-1 mt-1">
                                 <AlertTriangle size={10} />
-                                缺少坐标信息
+                                {t('map.noCoordinate') || '缺少坐标信息'}
                               </div>
                             )}
                           </div>
