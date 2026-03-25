@@ -141,7 +141,7 @@
     "longitude": "经度",
     "latitude": "纬度",
     "sectorCount": "小区数",
-    "browserTip": "提示：您当前正在使用浏览器访问。若要实现"更新后保存到原文件夹"，请运行 start_app.bat 使用桌面应用。",
+    "browserTip": "提示：您当前正在使用浏览器访问。若要实现「更新后保存到原文件夹」，请运行 start_app.bat 使用桌面应用。",
     "cleanIndexTip": "清理无效的索引项（文件不存在但索引中仍然存在的记录）",
     "loadFailed": "加载数据失败",
     "loading": "加载中...",
