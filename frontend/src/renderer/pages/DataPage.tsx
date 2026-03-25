@@ -398,7 +398,7 @@ export function DataPage() {
 
       {!isDesktop && (
           <div className="mb-6 p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700">
-              提示：您当前正在使用浏览器访问。若要实现"更新后保存到原文件夹"，请运行 <strong>start_app.bat</strong> 使用桌面应用。
+              {t('data.browserTip') || '提示：您当前正在使用浏览器访问。若要实现"更新后保存到原文件夹"，请运行 start_app.bat 使用桌面应用。'}
           </div>
       )}
 
