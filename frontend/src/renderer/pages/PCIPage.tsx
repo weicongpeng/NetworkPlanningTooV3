@@ -1321,7 +1321,7 @@ export function PCIPage() {
               </div>
             )}
             {(() => {
-              const error = validateConfig(config)
+              const error = validateConfig(config, t)
               if (error && error.includes('PCI')) {
                 return <div className="mt-2 text-xs text-orange-600">{error}</div>
               }
