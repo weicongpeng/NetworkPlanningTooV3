@@ -38,21 +38,29 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
         }}
         className="bg-secondary border-r border-border flex flex-col relative z-20"
       >
-        {/* 侧边栏边缘把手 - 右边缘中部，轻微凸出 */}
+        {/* 侧边栏边缘把手 - 右边缘中部 */}
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
+          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#D0D0D0' }}
+          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#E0E0E0' }}
           style={{
-            transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease',
+            transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s ease',
+            width: '16px',
+            height: '64px',
+            backgroundColor: '#E0E0E0',
+            borderRadius: '4px',
+            border: 'none',
+            cursor: 'pointer',
           }}
-          className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/3 w-4 h-16 bg-secondary border border-border rounded-r-md hover:bg-muted flex items-center justify-center group shadow-sm hover:shadow-md z-30"
+          className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center justify-center z-30"
           title={sidebarOpen ? '收起侧边栏' : '展开侧边栏'}
         >
-          {/* 把手纹理 - 横向线条 */}
-          <div className="flex flex-col gap-1.5">
-            <div className="w-2 h-0.5 bg-muted-foreground/50 rounded-full group-hover:bg-muted-foreground/70 transition-colors"></div>
-            <div className="w-2 h-0.5 bg-muted-foreground/50 rounded-full group-hover:bg-muted-foreground/70 transition-colors"></div>
-            <div className="w-2 h-0.5 bg-muted-foreground/50 rounded-full group-hover:bg-muted-foreground/70 transition-colors"></div>
-          </div>
+          {/* 箭头图标 */}
+          {sidebarOpen ? (
+            <ChevronLeft size={14} color="#666666" />
+          ) : (
+            <ChevronRight size={14} color="#666666" />
+          )}
         </button>
 
         {/* 导航菜单 - 固定高度和间距，避免上下移动，图标位置固定，内容边距统一 */}
