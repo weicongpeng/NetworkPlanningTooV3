@@ -798,7 +798,7 @@ export function TACPage() {
                               className="text-left p-2 font-medium bg-background z-20 relative group"
                               style={{ width: `${columnWidths[column.key]}px`, minWidth: `${columnWidths[column.key]}px` }}
                             >
-                              <span className="block pr-3">{column.label}</span>
+                              <span className="block pr-3">{t(`tac.column.${column.key}`) || column.label}</span>
                               {searchEnabled && (
                                 <input
                                   type="text"
