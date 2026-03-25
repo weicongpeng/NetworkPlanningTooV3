@@ -482,7 +482,7 @@ export function DataPage() {
                 <div className="flex items-center gap-2">
                     <div className="flex-1">
                         <UploadArea
-                            title="现网工参"
+                            title={t('data.currentParams') || '现网工参'}
                             accept=".zip"
                             onUpload={(e) => handleFileUpload(e, 'map', 'current_params')}
                             loading={loading && uploadingType === 'current_params'}
