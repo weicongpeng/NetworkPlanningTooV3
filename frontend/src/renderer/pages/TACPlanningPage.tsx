@@ -137,10 +137,10 @@ export function TACPlanningPage() {
                     setResult(progressResponse.data)
                 }
             } else {
-                setError(response.message || '启动TAC规划任务失败')
+                setError(response.message || (t('tacPlanning.startFailed') || '启动TAC规划任务失败'))
             }
         } catch (err: any) {
-            setError(err.message || '启动TAC规划任务失败')
+            setError(err.message || (t('tacPlanning.startFailed') || '启动TAC规划任务失败'))
         } finally {
             setLoading(false)
         }
