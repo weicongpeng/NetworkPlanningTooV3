@@ -318,7 +318,7 @@ export function TACPage() {
           setResult(progressResponse.data)
         }
       } else {
-        setError(response.message || '启动TAC核查任务失败')
+        setError(response.message || (t('tac.startFailed') || '启动TAC核查任务失败'))
       }
     } catch (err: any) {
       console.error('启动TAC核查失败:', err)
