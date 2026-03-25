@@ -374,7 +374,7 @@ export function DataPage() {
           <button
             onClick={() => setUpdateSuccess(null)}
             className="text-green-700 hover:text-green-900 transition-colors duration-200 p-1 hover:bg-green-100 rounded-full"
-            aria-label="关闭"
+            aria-label={t('data.close') || '关闭'}
           >
             ✕
           </button>
@@ -389,7 +389,7 @@ export function DataPage() {
           <button
             onClick={() => setUploadSuccess(null)}
             className="text-purple-700 hover:text-purple-900 transition-colors duration-200 p-1 hover:bg-purple-100 rounded-full"
-            aria-label="关闭"
+            aria-label={t('data.close') || '关闭'}
           >
             ✕
           </button>
