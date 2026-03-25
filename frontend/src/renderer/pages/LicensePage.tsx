@@ -280,7 +280,7 @@ export function LicensePage() {
 
           <div className="space-y-4">
             <div>
-              <h3 className="text-xs font-medium text-muted-foreground mb-3">主题模式</h3>
+              <h3 className="text-xs font-medium text-muted-foreground mb-3">{t('theme.themeMode')}</h3>
               <div className="grid grid-cols-2 gap-3">
                 <ThemeModeCard
                   mode="dark"
