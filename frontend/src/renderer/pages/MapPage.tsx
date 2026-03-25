@@ -1232,7 +1232,7 @@ export function MapPage() {
                   setShowSelectionMenu(!showSelectionMenu)
                 }
               }}
-              title={selectionMode !== 'none' ? "退出框选模式（按ESC也可退出）" : "地图圈选工具"}
+              title={selectionMode !== 'none' ? (t('map.exitSelectMode') || '退出框选模式（按ESC也可退出）') : (t('map.mapSelectTool') || '地图圈选工具')}
             >
               <MousePointer2 size={14} />
               <span>框选</span>
