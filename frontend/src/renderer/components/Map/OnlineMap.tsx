@@ -2280,9 +2280,9 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
 
     // 更新提示信息
     if (selectedIds.size > 0) {
-      setSelectionTip(`已选中 ${selectedIds.size} 个要素，按 Ctrl+C 复制`)
+      setSelectionTip(`${t('map.featuresSelected', { count: selectedIds.size })}，${t('map.pressEscClear')}`)
     } else {
-      setSelectionTip('点击选择要素（再次点击取消），Shift+点击多选，按 Ctrl+C 复制')
+      setSelectionTip(t('map.clickToSelectFeatures') || '点击选择要素（再次点击取消），Shift+点击多选，按 Ctrl+C 复制')
     }
 
     return { ids: selectedIds, properties: selectedProperties }
