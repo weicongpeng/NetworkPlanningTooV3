@@ -897,7 +897,7 @@ export function TACPage() {
                                           ? 'bg-green-500/10 text-green-600'
                                           : 'bg-red-500/10 text-red-600'
                                         }`}>
-                                        {normalizeTac(String(cell.tac)) === normalizeTac(String(cell.existingTac)) ? '是' : '否'}
+                                        {normalizeTac(String(cell.tac)) === normalizeTac(String(cell.existingTac)) ? (t('tac.yes') || '是') : (t('tac.no') || '否')}
                                       </span>
                                     ) : (
                                       <span className="px-2 py-1 bg-muted/50 text-muted-foreground rounded">
