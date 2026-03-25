@@ -337,7 +337,7 @@ export function DataPage() {
       }
     } catch (err: any) {
       console.error('[Cleanup] Failed:', err)
-      alert(`清理失败: ${err.message || '未知错误'}`)
+      alert(`${t('data.cleanFailed') || '清理失败'}: ${err.message || (t('data.unknownError') || '未知错误')}`)
     }
   }
 
