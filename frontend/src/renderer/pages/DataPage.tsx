@@ -591,7 +591,7 @@ export function DataPage() {
 
           {items.length === 0 ? (
             <p className="text-muted-foreground text-center py-8">
-              暂无数据，请先导入
+              {t('data.noData') || '暂无数据，请先导入'}
             </p>
           ) : (
             <div className="space-y-2 max-h-[600px] overflow-y-auto">
