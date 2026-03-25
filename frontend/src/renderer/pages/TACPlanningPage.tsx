@@ -471,7 +471,7 @@ export function TACPlanningPage() {
                                     }`}
                                 >
                                     <Search size={12} />
-                                    搜索
+                                    {t('tacPlanning.search') || '搜索'}
                                 </button>
                             </div>
                             <div
