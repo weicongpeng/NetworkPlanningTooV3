@@ -664,7 +664,7 @@ export function TACPage() {
                 ) : (
                   <Loader2 size={20} className="animate-spin text-primary" />
                 )}
-                <h2 className="text-lg font-semibold">核查结果</h2>
+                <h2 className="text-lg font-semibold">{t('tac.checkResult') || '核查结果'}</h2>
                 <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
                   {getNetworkTypeLabel(taskResult?.networkType || config?.networkType || 'LTE')}
                 </span>
