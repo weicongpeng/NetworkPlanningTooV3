@@ -176,7 +176,7 @@ export function LicensePage() {
                   ) : (
                     <>
                       <X size={14} className="text-red-500" />
-                      <span className="text-sm text-red-500 font-medium">未授权</span>
+                      <span className="text-sm text-red-500 font-medium">{t('license.unauthorized')}</span>
                     </>
                   )}
                 </div>
