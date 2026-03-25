@@ -553,7 +553,7 @@ export function DataPage() {
                         </select>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium mb-1">选择现网工参 (ZIP)</label>
+                        <label className="block text-sm font-medium mb-1">{t('data.selectCurrentParams') || '选择现网工参 (ZIP)'}</label>
                         <select 
                             className="w-full p-2 border rounded-md bg-background"
                             value={selectedCurrentParamId}
