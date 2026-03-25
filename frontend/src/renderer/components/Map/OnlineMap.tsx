@@ -2627,7 +2627,7 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
           }
         }
         
-        setSelectionTip(`已添加 ${selectionPointsRef.current.length} 个点，双击完成绘制`)
+        setSelectionTip(`${t('map.pointsAdded', { count: selectionPointsRef.current.length })}，${t('map.doubleClickFinish')}`)
         L.DomEvent.stopPropagation(e)
       }
     }
