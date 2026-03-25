@@ -213,7 +213,7 @@ export function LabelSettingsModal({
 
         {/* 颜色选择 */}
         <div className="mb-4">
-          <label className="block text-xs text-muted-foreground mb-2">字体颜色</label>
+          <label className="block text-xs text-muted-foreground mb-2">{t('map.fontColor')}</label>
           <div className="space-y-2">
             {/* 预设颜色 */}
             <div className="flex flex-wrap gap-1.5">
