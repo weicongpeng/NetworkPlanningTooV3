@@ -544,7 +544,7 @@ export function DataPage() {
                             value={selectedFullParamId}
                             onChange={(e) => setSelectedFullParamId(e.target.value)}
                         >
-                            <option value="">请选择文件...</option>
+                            <option value="">{t('data.selectFile') || '请选择文件...'}</option>
                             {fullParamFiles.map(f => (
                                 <option key={f.id} value={f.id}>
                                     {f.name} {f.originalPath ? '✓' : '(无路径)'}
@@ -559,7 +559,7 @@ export function DataPage() {
                             value={selectedCurrentParamId}
                             onChange={(e) => setSelectedCurrentParamId(e.target.value)}
                         >
-                            <option value="">请选择文件...</option>
+                            <option value="">{t('data.selectFile') || '请选择文件...'}</option>
                             {currentParamFiles.map(f => (
                                 <option key={f.id} value={f.id}>{f.name}</option>
                             ))}
