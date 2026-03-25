@@ -1306,7 +1306,7 @@ export function PCIPage() {
               {/* 开始规划按钮 */}
               <button
                 onClick={handleRunPCI}
-                disabled={loading || isRunning || validateConfig(config) !== null}
+                disabled={loading || isRunning || validateConfig(config, t) !== null}
                 className="flex items-center gap-2 px-4 py-2 bg-blue-400 text-white rounded hover:bg-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed text-sm"
               >
                 <Play size={16} />
