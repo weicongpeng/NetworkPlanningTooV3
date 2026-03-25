@@ -440,7 +440,7 @@ export function TACPlanningPage() {
                                     className="flex items-center gap-1.5 px-4 py-2 bg-blue-400 text-white rounded-lg hover:bg-blue-500 text-sm font-medium ml-auto"
                                 >
                                     <Download size={16} />
-                                    <span>导出结果</span>
+                                    <span>{t('tacPlanning.export') || '导出结果'}</span>
                                 </button>
                             )}
                         </div>
