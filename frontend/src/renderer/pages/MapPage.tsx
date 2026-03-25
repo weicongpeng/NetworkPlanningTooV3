@@ -1235,7 +1235,7 @@ export function MapPage() {
               title={selectionMode !== 'none' ? (t('map.exitSelectMode') || '退出框选模式（按ESC也可退出）') : (t('map.mapSelectTool') || '地图圈选工具')}
             >
               <MousePointer2 size={14} />
-              <span>框选</span>
+              <span>{t('map.select') || '框选'}</span>
             </button>
             {showSelectionMenu && (
               <div className="absolute top-full left-0 mt-1 z-[3000] bg-card border border-border rounded-lg shadow-lg w-32 overflow-hidden">
