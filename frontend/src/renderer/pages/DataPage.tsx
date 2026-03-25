@@ -538,7 +538,7 @@ export function DataPage() {
                 <h2 className="text-xl font-semibold mb-2">{t('data.updateParameters') || '工参更新'}</h2>
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium mb-1">选择全量工参</label>
+                        <label className="block text-sm font-medium mb-1">{t('data.selectFullParams') || '选择全量工参'}</label>
                         <select 
                             className="w-full p-2 border rounded-md bg-background"
                             value={selectedFullParamId}

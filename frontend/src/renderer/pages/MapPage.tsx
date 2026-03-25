@@ -1169,7 +1169,7 @@ export function MapPage() {
             title={t('map.clearAllMarkers') || '清除所有搜索标记和圈选状态'}
           >
             <Trash2 size={14} />
-            清除
+            {t('map.clear') || '清除'}
           </button>
 
 
