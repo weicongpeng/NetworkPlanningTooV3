@@ -461,7 +461,7 @@ export function NeighborPage() {
           console.log('[NeighborPage] 规划完成后刷新地图数据')
         } catch (error) {
           console.error('[NeighborPage] 刷新地图数据失败:', error)
-          setError('加载规划结果失败: ' + (error instanceof Error ? error.message : String(error)))
+          setError(i18n.loadResultFailed + ': ' + (error instanceof Error ? error.message : String(error)))
         }
       }
       loadResults()
