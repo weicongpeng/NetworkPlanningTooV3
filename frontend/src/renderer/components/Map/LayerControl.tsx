@@ -892,7 +892,7 @@ export function LayerControl({
           '--panel-width': `${panelWidth}px`,
         } as React.CSSProperties}
       >
-        {/* 显示/隐藏控件 - 独立于面板 */}
+        {/* 显示/隐藏控件 - 扁平矩形样式 */}
         <div
           onClick={() => setIsVisible(!isVisible)}
           onMouseEnter={() => setIsControlHovered(true)}
@@ -902,30 +902,27 @@ export function LayerControl({
             top: '50%',
             // 面板显示时：使用 CSS 变量计算位置（在面板左侧边缘）
             // 面板隐藏时：在屏幕右边缘附近
-            right: isVisible ? 'calc(var(--panel-width) + 0px)' : '8px',
-            transform: isControlHovered ? 'translateY(-50%) scale(1.1)' : 'translateY(-50%)',
+            right: isVisible ? 'calc(var(--panel-width) + 0px)' : '0px',
+            transform: 'translateY(-50%)',
             zIndex: 1002,
             pointerEvents: 'auto',
-            backgroundColor: isControlHovered ? '#3b82f6' : '#ffffff',
-            backdropFilter: 'blur(16px)',
-            borderRadius: '12px',
-            boxShadow: isControlHovered
-              ? '0 8px 24px rgba(59, 130, 246, 0.5)'
-              : isVisible ? '-4px 0 12px rgba(0, 0, 0, 0.15)' : '0 4px 16px rgba(0, 0, 0, 0.2)',
-            width: '40px',
-            height: '40px',
+            backgroundColor: isControlHovered ? '#D0D0D0' : '#E0E0E0',
+            borderRadius: '4px',
+            boxShadow: 'none',
+            width: '16px',
+            height: '64px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
-            border: '1.5px solid rgba(59, 130, 246, 0.3)',
-            transition: isResizing.current ? 'none' : 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+            border: 'none',
+            transition: isResizing.current ? 'none' : 'background-color 0.2s ease',
           }}
         >
           {isVisible ? (
-            <ChevronLeft size={20} color={isControlHovered ? '#ffffff' : '#3b82f6'} strokeWidth={2.5} />
+            <ChevronLeft size={14} color="#666666" strokeWidth={2.5} />
           ) : (
-            <ChevronRight size={20} color={isControlHovered ? '#ffffff' : '#3b82f6'} strokeWidth={2.5} />
+            <ChevronRight size={14} color="#666666" strokeWidth={2.5} />
           )}
         </div>
 
