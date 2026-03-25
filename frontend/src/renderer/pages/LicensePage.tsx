@@ -321,9 +321,9 @@ export function LicensePage() {
               <div className="flex gap-2 pt-3 border-t border-border">
                 <button
                   onClick={handleApplyTheme}
-                  className="flex-1 px-4 py-2 bg-blue-400 text-white rounded-lg hover:opacity-90 text-sm font-medium"
+                  className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 text-sm font-medium"
                 >
-                  应用
+                  {t('theme.apply')}
                 </button>
                 <button
                   onClick={handleCancelTheme}
