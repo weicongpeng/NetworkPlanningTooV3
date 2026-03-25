@@ -458,7 +458,7 @@ export function MapPage() {
 
       // 如果已经有一个图层可见，则阻止启用新图层
       if (currentVisibleCount >= 1) {
-        alert('框选模式下只能圈选一个图层')
+        alert(t('map.onlyOneLayerInSelectMode') || '框选模式下只能圈选一个图层')
         return
       }
     }
