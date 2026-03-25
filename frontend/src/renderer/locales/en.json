@@ -258,7 +258,12 @@
     "validationFactorProduct": "Coverage circle factor product ({{value}}) is too large, may generate too many invalid neighbors, consider reducing factors",
     "distanceFactorTooltip": "Coverage circle distance factor: distance from station to circle center, default 5/9(≈0.556)",
     "radiusFactorTooltip": "Coverage circle radius factor: coverage radius factor, default 5/9(≈0.556)",
-    "startTaskMsg": "Neighbor planning started"
+    "startTaskMsg": "Neighbor planning started",
+    "legend": "Neighbor Legend",
+    "hideLegend": "Hide Legend",
+    "sourceCellLegend": "Source Cell",
+    "targetCellLegend": "Target Cell",
+    "otherCellLegend": "Other Cells"
   },
   "tac": {
     "title": "TAC Check",
