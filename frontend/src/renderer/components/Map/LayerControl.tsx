@@ -459,7 +459,7 @@ export function LayerControl({
           {
             id: 'sector-group',
             type: 'sector-group',
-            label: '基站',
+            label: t('map.baseStation'),
             expanded: isExpanded('sector-group', true),
             children: sectors.map(sector => {
               // 获取该网络类型的频点列表
