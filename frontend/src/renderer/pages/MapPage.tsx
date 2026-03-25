@@ -1365,7 +1365,7 @@ export function MapPage() {
                 : 'bg-muted text-muted-foreground opacity-50 cursor-not-allowed'
             }`}
             disabled={!onlineMapVisible}
-            title={mapType === 'roadmap' ? '切换到卫星图' : '切换到平面图'}
+            title={mapType === 'roadmap' ? (t('map.switchToSatellite') || '切换到卫星图') : (t('map.switchToRoadmap') || '切换到平面图')}
           >
             {mapType === 'roadmap' ? (
               <>
