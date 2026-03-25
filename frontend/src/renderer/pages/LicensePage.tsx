@@ -407,11 +407,11 @@ function ColorSwatch({ color, isSelected, onSelect }: ColorSwatchProps) {
   }
 
   const colorLabels = {
-    blue: '蓝色',
-    green: '绿色',
-    purple: '紫色',
-    orange: '橙色',
-    pink: '粉色'
+    blue: t('theme.blue'),
+    green: t('theme.green'),
+    purple: t('theme.purple'),
+    orange: t('theme.orange'),
+    pink: t('theme.pink')
   }
 
   return (
