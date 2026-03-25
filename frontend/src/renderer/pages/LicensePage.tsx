@@ -171,7 +171,7 @@ export function LicensePage() {
                   {isAuthorized ? (
                     <>
                       <Check size={14} className="text-green-500" />
-                      <span className="text-sm text-green-500 font-medium">已授权</span>
+                      <span className="text-sm text-green-500 font-medium">{t('license.authorized')}</span>
                     </>
                   ) : (
                     <>
