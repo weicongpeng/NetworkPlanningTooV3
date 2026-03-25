@@ -9,6 +9,7 @@ import { tacColorMapper } from '../utils/tacColors'
 import type { OnlineMapRef } from '../components/Map/OnlineMap'
 import { mapDataService } from '../services/mapDataService'
 import { DATA_REFRESH_EVENT } from '../store/dataStore'
+import { useTranslation } from 'react-i18next'
 
 // 虚拟滚动配置
 const ITEM_HEIGHT = 48 // 每行高度
