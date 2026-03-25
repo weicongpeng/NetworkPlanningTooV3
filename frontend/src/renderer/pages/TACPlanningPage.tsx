@@ -177,7 +177,7 @@ export function TACPlanningPage() {
 
             setResult((prev: TACResultData | null) => prev ? { ...prev, exportPath: filename } : null)
         } catch (err: any) {
-            setError('导出失败: ' + (err.message || '未知错误'))
+            setError((t('tacPlanning.exportFailed') || '导出失败:') + (err.message || (t('tacPlanning.unknownError') || '未知错误')))
         }
     }
 
