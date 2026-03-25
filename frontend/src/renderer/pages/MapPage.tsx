@@ -1208,7 +1208,7 @@ export function MapPage() {
             className={`px-2 py-1.5 text-xs rounded hover:bg-muted transition-colors flex items-center gap-1 ${mapDragTool ? 'bg-blue-400 text-white' : 'text-muted-foreground hover:text-foreground'
               }`}
             onClick={handleMapDragToolToggle}
-            title={mapDragTool ? '禁用地图拖拽' : '启用地图拖拽'}
+            title={mapDragTool ? (t('map.disableDrag') || '禁用地图拖拽') : (t('map.enableDrag') || '启用地图拖拽')}
           >
             <Hand size={14} />
             <span>拖拽</span>
