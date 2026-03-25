@@ -11,6 +11,7 @@ import { mapDataService } from '../services/mapDataService'
 import { CoordinateTransformer } from '../utils/coordinate'
 import type { RenderSectorData } from '../services/mapDataService'
 import { triggerDataRefresh, DATA_REFRESH_EVENT } from '../store/dataStore'
+import { useTranslation } from 'react-i18next'
 
 // PCI表格列配置
 const PCI_COLUMNS = [
