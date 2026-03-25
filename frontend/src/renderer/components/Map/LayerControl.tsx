@@ -491,7 +491,7 @@ export function LayerControl({
             {
               id: 'layer-files',
               type: 'layer-files' as TreeNodeType,
-              label: '图层文件',
+              label: t('map.layerFiles'),
               expanded: isExpanded('layer-files', true),
               children: layerFiles.map(file => ({
                 id: file.id,
