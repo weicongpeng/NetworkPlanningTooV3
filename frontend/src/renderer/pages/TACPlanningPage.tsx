@@ -420,15 +420,15 @@ export function TACPlanningPage() {
                             {/* 统计卡片 - 与标题同一行居左 */}
                             <div className="flex items-center gap-2">
                                 <div className="flex items-center gap-1 px-2 py-1.5 bg-muted/50 rounded-lg">
-                                    <span className="text-[10px] text-muted-foreground">总</span>
+                                    <span className="text-[10px] text-muted-foreground">{t('tacPlanning.total') || '总'}</span>
                                     <span className="text-sm font-bold">{taskResult.totalCells || 0}</span>
                                 </div>
                                 <div className="flex items-center gap-1 px-2 py-1.5 bg-green-500/10 border border-green-500/20 rounded-lg">
-                                    <span className="text-[10px] text-green-600">成功</span>
+                                    <span className="text-[10px] text-green-600">{t('tacPlanning.success') || '成功'}</span>
                                     <span className="text-sm font-bold text-green-500">{taskResult.matchedCells || 0}</span>
                                 </div>
                                 <div className="flex items-center gap-1 px-2 py-1.5 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                                    <span className="text-[10px] text-blue-600">匹配率</span>
+                                    <span className="text-[10px] text-blue-600">{t('tacPlanning.matchRate') || '匹配率'}</span>
                                     <span className="text-sm font-bold text-blue-500">
                                         {taskResult.totalCells > 0 ? ((taskResult.matchedCells / taskResult.totalCells) * 100).toFixed(1) : 0}%
                                     </span>
