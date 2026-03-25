@@ -580,7 +580,7 @@ export function DataPage() {
         {/* 数据列表 */}
         <div className="bg-card p-6 rounded-lg border border-border h-full">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">已导入数据</h2>
+            <h2 className="text-xl font-semibold">{t('data.importedData') || '已导入数据'}</h2>
             <button
               onClick={() => fetchList(1, 50, true)}
               className="text-sm text-primary hover:underline"
