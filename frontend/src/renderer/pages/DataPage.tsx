@@ -585,7 +585,7 @@ export function DataPage() {
               onClick={() => fetchList(1, 50, true)}
               className="text-sm text-primary hover:underline"
             >
-              刷新
+              {t('data.refresh') || '刷新'}
             </button>
           </div>
 
