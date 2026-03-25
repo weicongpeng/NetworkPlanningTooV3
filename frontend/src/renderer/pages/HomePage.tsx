@@ -8,59 +8,62 @@ import {
   Shield,
   LucideIcon
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 export function HomePage() {
+  const { t } = useTranslation()
+
   return (
     <div className="p-8">
-      <h1 className="text-3xl font-bold mb-8">欢迎使用网络规划工具 v2.0</h1>
+      <h1 className="text-3xl font-bold mb-8">{t('home.title')} v2.0</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* 功能卡片 */}
         <FeatureCard
-          title="数据管理"
-          description="导入和管理工参数据"
+          title={t('nav.data')}
+          description={t('home.dataDesc') || '导入和管理工参数据'}
           icon={Database}
           link="/data"
           iconColor="text-blue-500"
         />
         <FeatureCard
-          title="PCI规划"
-          description="LTE和NR的PCI自动规划"
+          title={t('nav.pci')}
+          description={t('home.pciDesc') || 'LTE和NR的PCI自动规划'}
           icon={Settings}
           link="/pci"
           iconColor="text-purple-500"
         />
         <FeatureCard
-          title="邻区规划"
-          description="自动生成邻区关系"
+          title={t('nav.neighbor')}
+          description={t('home.neighborDesc') || '自动生成邻区关系'}
           icon={Network}
           link="/neighbor"
           iconColor="text-green-500"
         />
         <FeatureCard
-          title="TAC核查"
-          description="对比图层TAC与现网TAC，统计一致性"
+          title={t('nav.tac')}
+          description={t('home.tacDesc') || '对比图层TAC与现网TAC，统计一致性'}
           icon={Layers}
           link="/tac"
           iconColor="text-orange-500"
         />
         <FeatureCard
-          title="TAC规划"
-          description="数据驱动的新站小区TAC分配"
+          title={t('nav.tacPlanning')}
+          description={t('home.tacPlanningDesc') || '数据驱动的新站小区TAC分配'}
           icon={MapPin}
           link="/tac-planning"
           iconColor="text-red-500"
         />
         <FeatureCard
-          title="地图工具"
-          description="查看基站分布和覆盖"
+          title={t('nav.map')}
+          description={t('home.mapDesc') || '查看基站分布和覆盖'}
           icon={Map}
           link="/map"
           iconColor="text-cyan-500"
         />
         <FeatureCard
-          title="配置管理"
-          description="管理系统配置"
+          title={t('nav.config')}
+          description={t('home.configDesc') || '管理系统配置'}
           icon={Shield}
           link="/license"
           iconColor="text-slate-500"
@@ -69,11 +72,11 @@ export function HomePage() {
 
       {/* 系统状态 */}
       <div className="mt-8 p-6 bg-card rounded-lg border border-border">
-        <h2 className="text-xl font-semibold mb-4">系统状态</h2>
+        <h2 className="text-xl font-semibold mb-4">{t('home.systemStatus')}</h2>
         <div className="space-y-2">
-          <StatusItem label="后端服务" status="online" />
-          <StatusItem label="数据库" status="online" />
-          <StatusItem label="许可证" status="valid" />
+          <StatusItem label={t('home.backendService') || '后端服务'} status="online" />
+          <StatusItem label={t('home.database') || '数据库'} status="online" />
+          <StatusItem label={t('home.license') || '许可证'} status="valid" />
         </div>
       </div>
     </div>
@@ -114,11 +117,13 @@ function StatusItem({
   label: string
   status: 'online' | 'offline' | 'valid' | 'invalid'
 }) {
+  const { t } = useTranslation()
+
   const statusConfig = {
-    online: { color: 'text-green-500', text: '运行中' },
-    offline: { color: 'text-red-500', text: '离线' },
-    valid: { color: 'text-green-500', text: '已激活' },
-    invalid: { color: 'text-red-500', text: '未激活' }
+    online: { color: 'text-green-500', text: t('home.online') || '运行中' },
+    offline: { color: 'text-red-500', text: t('home.offline') || '离线' },
+    valid: { color: 'text-green-500', text: t('home.valid') || '已激活' },
+    invalid: { color: 'text-red-500', text: t('home.invalid') || '未激活' }
   }
 
   const config = statusConfig[status]
