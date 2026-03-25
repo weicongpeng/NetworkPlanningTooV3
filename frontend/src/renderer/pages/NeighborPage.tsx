@@ -897,11 +897,11 @@ export function NeighborPage() {
           totalMarkers: searchMarkers.length + (!markerExists ? 1 : 0)
         })
       } else {
-        setSearchError('小区缺少经纬度信息，无法定位')
+        setSearchError(i18n.searchErrorNoCoords)
       }
     } catch (err) {
       console.error('[NeighborPage] 搜索失败', err)
-      setSearchError('搜索失败，请重试')
+      setSearchError(i18n.searchErrorFailed)
     }
   }
 
