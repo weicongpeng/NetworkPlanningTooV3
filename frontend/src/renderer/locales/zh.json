@@ -301,6 +301,9 @@
     "singularityDetection": "TAC插花检测",
     "importTacLayerTip": "• 需导入TAC图层(4G_TAC.zip/5G_TAC.zip)",
     "importParamsTip": "• 需导入全量工参(ProjectParameter_mongoose)",
+    "legend": "图例",
+    "hideLegend": "隐藏图例",
+    "totalTacValues": "共 {{count}} 个不同TAC值",
     "column": {
       "firstGroup": "运营商/厂家",
       "siteId": "站点ID",
