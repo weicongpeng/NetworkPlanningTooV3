@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Play, Download, Loader2, AlertCircle, CheckCircle2, FileSpreadsheet, Search, GripVertical } from 'lucide-react'
 import { tacPlanningApi } from '../services/api'
 import { useTACPlanningStore } from '../store/tacPlanningStore'
+import { useTranslation } from 'react-i18next'
 
 // 虚拟滚动配置
 const ITEM_HEIGHT = 48 // 每行高度
