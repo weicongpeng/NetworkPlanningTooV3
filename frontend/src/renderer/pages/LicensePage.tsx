@@ -166,7 +166,7 @@ export function LicensePage() {
           {!isLoading && (
             <div className="space-y-3">
               <div className="flex items-center justify-between py-2 border-b border-border">
-                <span className="text-sm text-muted-foreground">状态</span>
+                <span className="text-sm text-muted-foreground">{t('license.status')}</span>
                 <div className="flex items-center gap-1.5">
                   {isAuthorized ? (
                     <>
