@@ -1064,35 +1064,35 @@ export function NeighborPage() {
           <div className="bg-card p-3 rounded-lg border border-border flex flex-col flex-1 min-h-0 overflow-hidden">
             {/* 标题行 + 统计卡片 */}
             <div className="flex items-center gap-3 mb-3 flex-wrap">
-              <h2 className="text-base font-semibold">规划结果</h2>
+              <h2 className="text-base font-semibold">{i18n.result}</h2>
 
               {/* 统计卡片 - 与标题同行 */}
               {taskResult?.status === 'completed' && (
                 <>
                   <div className="flex gap-2">
-                    <CompactStatCard title="基站数" value={taskResult.totalSites || 0} />
-                    <CompactStatCard title="小区数" value={taskResult.totalSectors || 0} />
-                    <CompactStatCard title="邻区数" value={taskResult.totalNeighbors || 0} />
-                    <CompactStatCard title="平均邻区数" value={taskResult.avgNeighbors || 0} />
+                    <CompactStatCard title={i18n.siteCount} value={taskResult.totalSites || 0} />
+                    <CompactStatCard title={i18n.cellCount} value={taskResult.totalSectors || 0} />
+                    <CompactStatCard title={i18n.neighborCount} value={taskResult.totalNeighbors || 0} />
+                    <CompactStatCard title={i18n.avgNeighbors} value={taskResult.avgNeighbors || 0} />
                   </div>
                   <div className="flex items-center gap-3 ml-auto">
                     <button
                       onClick={() => setResultSearchEnabled(!resultSearchEnabled)}
                       className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-xs font-medium ${
-                        resultSearchEnabled 
-                          ? 'bg-blue-400 text-white hover:bg-blue-500' 
+                        resultSearchEnabled
+                          ? 'bg-blue-400 text-white hover:bg-blue-500'
                           : 'bg-card border border-border hover:bg-muted/80'
                       }`}
                     >
                       <Search size={14} />
-                      搜索
+                      {i18n.search}
                     </button>
                     <button
                       onClick={handleExport}
                       className="flex items-center justify-center gap-2 px-3 py-1.5 bg-card border border-border rounded-lg hover:bg-muted/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium whitespace-nowrap"
                     >
                       <Download size={14} />
-                      导出结果
+                      {i18n.export}
                     </button>
                   </div>
                 </>
@@ -1102,13 +1102,13 @@ export function NeighborPage() {
             {!taskResult ? (
               <div className="text-center py-16 text-muted-foreground">
                 <Settings size={48} className="mx-auto mb-4 opacity-50" />
-                <p>配置参数后点击"开始规划"查看结果</p>
-                <p className="text-xs mt-2">需要先上传"全量工参"和"待规划小区"文件</p>
+                <p>{i18n.configTip}</p>
+                <p className="text-xs mt-2">{i18n.needUpload}</p>
               </div>
             ) : taskResult.status === 'failed' ? (
               <div className="text-center py-16 text-red-500">
                 <AlertCircle size={48} className="mx-auto mb-4" />
-                <p className="font-semibold">规划任务失败</p>
+                <p className="font-semibold">{i18n.taskFailed}</p>
               </div>
             ) : taskResult.status === 'completed' ? (
               <>
@@ -1127,14 +1127,14 @@ export function NeighborPage() {
                   />
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">
-                    <p>暂无规划结果</p>
+                    <p>{i18n.noResult}</p>
                   </div>
                 )}
               </>
             ) : (
               <div className="text-center py-16 text-muted-foreground">
                 <Loader2 className="animate-spin mx-auto mb-4" size={48} />
-                <p>规划进行中，请稍候...</p>
+                <p>{i18n.planningInProgress}</p>
               </div>
             )}
           </div>

@@ -681,12 +681,12 @@ export function DataPage() {
                             item.metadata?.LTESiteCount
                                 ? `LTE ${item.metadata.LTESiteCount}站/${item.metadata.LTESectorCount}小区 · NR ${item.metadata.NRSiteCount}站/${item.metadata.NRSectorCount}小区`
                                 : (item.fileType === 'full_params'
-                                    ? '全量工参数据'
+                                    ? (t('data.fullParamsData') || '全量工参数据')
                                     : (item.fileType === 'target_cells'
-                                        ? '待规划小区数据'
+                                        ? (t('data.targetCellsData') || '待规划小区数据')
                                         : (item.fileType === 'default' && item.metadata?.siteCount
-                                            ? `${item.metadata.siteCount} 个基站`
-                                            : 'Excel 数据')))
+                                            ? `${item.metadata.siteCount} ${t('data.baseStations') || '个基站'}`
+                                            : (t('data.excelData') || 'Excel 数据'))))
                         ) : (
                             item.type === 'map'
                                 ? (item.subType === 'mapinfo'
