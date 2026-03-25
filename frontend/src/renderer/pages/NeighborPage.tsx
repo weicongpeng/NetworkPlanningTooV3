@@ -87,6 +87,72 @@ const validateNeighborConfig = (config: any): string | null => {
 
 export function NeighborPage() {
   const { t } = useTranslation()
+
+  // 翻译文本（带中文后备）
+  const i18n = {
+    title: t('neighbor.title') || '邻区规划',
+    planningParams: t('neighbor.planningParams') || '规划参数',
+    result: t('neighbor.result') || '规划结果',
+    startPlan: t('neighbor.startPlan') || '开始规划',
+    planning: t('neighbor.planning') || '规划中...',
+    starting: t('neighbor.starting') || '启动中...',
+    export: t('neighbor.export') || '导出结果',
+    search: t('neighbor.search') || '搜索',
+    clear: t('neighbor.clear') || '清除',
+    clearAll: t('neighbor.clearAll') || '清除全部',
+    noResult: t('neighbor.noResult') || '暂无规划结果',
+    planningInProgress: t('neighbor.planningInProgress') || '规划进行中，请稍候...',
+    noMatchResult: t('neighbor.noMatchResult') || '暂无匹配结果',
+    measure: t('neighbor.measure') || '测距',
+    searchPlaceholder: t('neighbor.searchPlaceholder') || '输入小区名称或 基站ID-小区ID',
+    searchColPlaceholder: t('neighbor.searchColPlaceholder') || '搜索',
+    configTip: t('neighbor.configTip') || '配置参数后点击"开始规划"查看结果',
+    needUpload: t('neighbor.needUpload') || '需要先上传"全量工参"和"待规划小区"文件',
+    taskFailed: t('neighbor.taskFailed') || '规划任务失败',
+    close: t('neighbor.close') || '关闭',
+    // 表格列
+    sourcePci: t('neighbor.sourcePci') || '源PCI',
+    targetPci: t('neighbor.targetPci') || '目标PCI',
+    // 统计卡片
+    siteCount: t('neighbor.siteCount') || '基站数',
+    cellCount: t('neighbor.cellCount') || '小区数',
+    neighborCount: t('neighbor.neighborCount') || '邻区数',
+    avgNeighbors: t('neighbor.avgNeighbors') || '平均邻区数',
+    // 配置参数
+    planningType: t('neighbor.planningType') || '规划类型',
+    maxNeighbors: t('neighbor.maxNeighbors') || '最大邻区数',
+    distanceFactor: t('neighbor.distanceFactor') || '距离系数',
+    radiusFactor: t('neighbor.radiusFactor') || '半径系数',
+    // 搜索相关
+    searchErrorNoInput: t('neighbor.searchErrorNoInput') || '请输入小区名称或基站ID-小区ID',
+    searchErrorNotFound: t('neighbor.searchErrorNotFound') || '未找到小区',
+    searchErrorNoCoords: t('neighbor.searchErrorNoCoords') || '小区缺少经纬度信息，无法定位',
+    searchErrorFailed: t('neighbor.searchErrorFailed') || '搜索失败，请重试',
+    searchMarkerCount: t('neighbor.searchMarkerCount') || '已添加 {{count}} 个搜索标记',
+    // 验证消息
+    validationMaxNeighbors1: t('neighbor.validationMaxNeighbors1') || '最大邻区数不能小于1',
+    validationMaxNeighbors2: t('neighbor.validationMaxNeighbors2') || '{{type}}规划最多配置{{limit}}条邻区关系，当前值为{{value}}',
+    validationDistanceFactor: t('neighbor.validationDistanceFactor') || '覆盖圆距离系数必须在0.1-2.0之间，当前值为{{value}}',
+    validationRadiusFactor: t('neighbor.validationRadiusFactor') || '覆盖圆半径系数必须在0.1-2.0之间，当前值为{{value}}',
+    validationFactorProduct: t('neighbor.validationFactorProduct') || '覆盖圆系数乘积({{value}})过大，可能产生过多无效邻区，建议减小系数',
+    // 其他
+    exitMeasureMode: t('neighbor.exitMeasureMode') || '退出测距模式',
+    enterMeasureMode: t('neighbor.enterMeasureMode') || '进入测距模式',
+    clearMarkersTip: t('neighbor.clearMarkersTip') || '清除所有标记（定位 + 测距）',
+    exportFailed: t('neighbor.exportFailed') || '导出失败',
+    getResultFailed: t('neighbor.getResultFailed') || '获取规划结果失败',
+    startTaskFailed: t('neighbor.startTaskFailed') || '启动规划任务失败',
+    loadResultFailed: t('neighbor.loadResultFailed') || '加载规划结果失败',
+    getProgressFailed: t('neighbor.getProgressFailed') || '获取进度失败',
+    cannotConnect: t('neighbor.cannotConnect') || '无法连接到服务器，请检查网络连接或后端服务状态',
+    retrying: t('neighbor.retrying') || '获取进度失败 ({{count}}/{{max}})，正在重试...',
+    taskFailed2: t('neighbor.taskFailed2') || '规划任务失败',
+    // 工具提示
+    distanceFactorTooltip: t('neighbor.distanceFactorTooltip') || '覆盖圆距离系数：站点到覆盖圆心的距离系数，默认5/9(≈0.556)',
+    radiusFactorTooltip: t('neighbor.radiusFactorTooltip') || '覆盖圆半径系数：覆盖半径系数，默认5/9(≈0.556)',
+    // 规划类型描述
+    startTaskMsg: t('neighbor.startTaskMsg') || '邻区规划开始',
+  }
   const [config, setConfig] = useState({
     planningType: 'LTE-LTE',  // 邻区规划类型
     maxNeighbors: 64,         // 最大邻区数
