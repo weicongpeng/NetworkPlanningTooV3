@@ -326,7 +326,7 @@ export function MapPage() {
       }
 
       if (visibleCount > 1) {
-        alert('当前显示图层多于1个，请先在图层控制面板关闭冗余图层，确保只显示一个目标图层再进行圈选')
+        alert(t('map.onlyOneLayerAtATime') || '当前显示图层多于1个，请先在图层控制面板关闭冗余图层，确保只显示一个目标图层再进行圈选')
         return
       }
     }
