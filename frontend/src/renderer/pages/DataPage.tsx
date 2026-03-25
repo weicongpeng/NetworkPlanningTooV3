@@ -314,9 +314,9 @@ export function DataPage() {
 
   const handleCleanupIndex = async () => {
     const confirmed = confirm(
-      '确定要清理无效索引吗？\n\n' +
-      '这将会移除所有文件不存在但索引中仍然存在的记录。\n' +
-      '此操作不会影响有效的数据文件。'
+      `${t('data.cleanIndexConfirm') || '确定要清理无效索引吗？'}\n\n` +
+      `${t('data.cleanIndexTip2') || '这将会移除所有文件不存在但索引中仍然存在的记录。'}\n` +
+      `${t('data.cleanIndexSafe') || '此操作不会影响有效的数据文件。'}`
     )
 
     if (!confirmed) return
