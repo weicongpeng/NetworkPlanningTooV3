@@ -289,7 +289,7 @@ export function TACPage() {
 
   const handleStartPlanning = async () => {
     if (!config?.networkType) {
-      setError('请选择网络类型')
+      setError(t('tac.selectNetworkType') || '请选择网络类型')
       return
     }
 
