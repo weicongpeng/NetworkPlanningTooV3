@@ -516,7 +516,7 @@ export function DataPage() {
                 <div className="flex items-center gap-2">
                     <div className="flex-1">
                         <UploadArea
-                            title="地理化数据"
+                            title={t('data.geoData') || '地理化数据'}
                             accept=".xlsx,.xls,.csv,.txt"
                             onUpload={(e) => handleFileUpload(e, 'excel', 'geo_data')}
                             loading={loading && uploadingType === 'geo_data'}

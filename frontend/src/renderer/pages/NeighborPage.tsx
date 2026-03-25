@@ -7,6 +7,23 @@ const ITEM_HEIGHT = 40 // 每行高度
 const VISIBLE_COUNT = 25 // 可见行数
 const BUFFER_COUNT = 5 // 缓冲行数
 
+// 翻译 key 常量（用于静态配置如表格列）
+const i18nKeys = {
+  // 表格列
+  relationType: t('neighbor.relationType') || '关系类型',
+  sourceSiteId: t('neighbor.sourceSiteId') || '源基站ID',
+  sourceCellId: t('neighbor.sourceCellId') || '源小区ID',
+  sourceCellName: t('neighbor.sourceCellName') || '源小区名称',
+  sourceFrequency: t('neighbor.sourceFrequency') || '源频点',
+  sourcePci: t('neighbor.sourcePci') || '源PCI',
+  targetSiteId: t('neighbor.targetSiteId') || '目标基站ID',
+  targetCellId: t('neighbor.targetCellId') || '目标小区ID',
+  targetCellName: t('neighbor.targetCellName') || '目标小区名称',
+  targetFrequency: t('neighbor.targetFrequency') || '目标频点',
+  targetPci: t('neighbor.targetPci') || '目标PCI',
+  distance: t('neighbor.distance') || '距离',
+}
+
 // 邻区表格列配置
 const NEIGHBOR_COLUMNS = [
   { key: 'relationType', label: i18nKeys.relationType, defaultWidth: 80 },
