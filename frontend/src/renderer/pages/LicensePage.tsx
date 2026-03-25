@@ -203,7 +203,7 @@ export function LicensePage() {
               {!isAuthorized && errorMessage && (
                 <>
                   <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-                    <p className="text-sm text-red-500 font-medium mb-2">License已到期，请联系管理员：</p>
+                    <p className="text-sm text-red-500 font-medium mb-2">{t('license.expiredMessage')}</p>
                     <div className="space-y-1 text-sm">
                       <div className="flex items-center gap-2">
                         <span className="text-red-400">邮箱：</span>
