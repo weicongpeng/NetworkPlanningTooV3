@@ -534,7 +534,16 @@
     "backspaceDelete": "按 Backspace 删除上一个点",
     "measureStartPoint": "起点",
     "noFeatureSelected": "未选中任何要素",
-    "clickToSelectFeatures": "点击选择要素（再次点击取消），Shift+点击多选，按 Ctrl+C 复制"
+    "clickToSelectFeatures": "点击选择要素（再次点击取消），Shift+点击多选，按 Ctrl+C 复制",
+    "labelContent": "标签内容",
+    "fontColor": "字体颜色",
+    "fontSize": "字体大小",
+    "fontSizeUnit": "字体大小 ({{size}}px)",
+    "cancel": "取消",
+    "save": "保存",
+    "loadingFields": "加载字段中...",
+    "noAvailableFields": "暂无可用字段",
+    "customColor": "自定义颜色"
   },
   "common": {
     "confirm": "确认",
