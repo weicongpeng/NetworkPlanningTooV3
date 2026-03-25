@@ -294,7 +294,7 @@ export function LicensePage() {
                 <ThemeModeCard
                   mode="light"
                   icon={<Sun size={18} />}
-                  label="浅色"
+                  label={t('theme.light')}
                   isSelected={(previewTheme || themeMode) === 'light'}
                   onSelect={() => handleThemeSelect('light')}
                   previewBg="bg-white"
