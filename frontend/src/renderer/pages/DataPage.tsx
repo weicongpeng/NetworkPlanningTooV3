@@ -539,13 +539,13 @@ export function DataPage() {
                 <h2 className="text-xl font-semibold mb-2">{t('data.updateParameters') || '工参更新'}</h2>
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium mb-1">{t('data.selectFullParams') || '选择全量工参'}</label>
-                        <select 
-                            className="w-full p-2 border rounded-md bg-background"
+                        <select
+                            className="w-full p-2 border rounded-md bg-background text-sm"
                             value={selectedFullParamId}
                             onChange={(e) => setSelectedFullParamId(e.target.value)}
+                            title={t('data.selectFullParams') || '选择全量工参'}
                         >
-                            <option value="">{t('data.selectFile') || '请选择文件...'}</option>
+                            <option value="" disabled>{t('data.selectFullParams') || '选择全量工参'}</option>
                             {fullParamFiles.map(f => (
                                 <option key={f.id} value={f.id}>
                                     {f.name} {f.originalPath ? '✓' : `(${t('data.noPath') || '无路径'})`}
@@ -554,13 +554,13 @@ export function DataPage() {
                         </select>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium mb-1">{t('data.selectCurrentParams') || '选择现网工参 (ZIP)'}</label>
-                        <select 
-                            className="w-full p-2 border rounded-md bg-background"
+                        <select
+                            className="w-full p-2 border rounded-md bg-background text-sm"
                             value={selectedCurrentParamId}
                             onChange={(e) => setSelectedCurrentParamId(e.target.value)}
+                            title={t('data.selectCurrentParams') || '选择现网工参 (ZIP)'}
                         >
-                            <option value="">{t('data.selectFile') || '请选择文件...'}</option>
+                            <option value="" disabled>{t('data.selectCurrentParams') || '选择现网工参 (ZIP)'}</option>
                             {currentParamFiles.map(f => (
                                 <option key={f.id} value={f.id}>{f.name}</option>
                             ))}
