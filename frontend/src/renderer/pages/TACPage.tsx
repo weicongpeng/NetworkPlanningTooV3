@@ -684,27 +684,27 @@ export function TACPage() {
             {/* 统计卡片 - 紧凑横向排列 */}
             <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
               <div className="px-2.5 py-1.5 bg-muted/50 rounded-md">
-                <p className="text-[10px] text-muted-foreground">网络类型</p>
+                <p className="text-[10px] text-muted-foreground">{t('tac.networkType') || '网络类型'}</p>
                 <p className="text-sm font-semibold">{taskResult.networkType || '-'}</p>
               </div>
               <div className="px-2.5 py-1.5 bg-muted/50 rounded-md">
-                <p className="text-[10px] text-muted-foreground">总小区</p>
+                <p className="text-[10px] text-muted-foreground">{t('tac.totalCells') || '总小区'}</p>
                 <p className="text-sm font-semibold">{taskResult.totalCells || 0}</p>
               </div>
               <div className="px-2.5 py-1.5 bg-green-500/10 border border-green-500/20 rounded-md">
-                <p className="text-[10px] text-green-600">匹配成功</p>
+                <p className="text-[10px] text-green-600">{t('tac.matched') || '匹配成功'}</p>
                 <p className="text-sm font-semibold text-green-600">{taskResult.matchedCells || 0}</p>
               </div>
               <div className="px-2.5 py-1.5 bg-orange-500/10 border border-orange-500/20 rounded-md">
-                <p className="text-[10px] text-orange-600">未匹配</p>
+                <p className="text-[10px] text-orange-600">{t('tac.unmatched') || '未匹配'}</p>
                 <p className="text-sm font-semibold text-orange-600">{taskResult.unmatchedCells || 0}</p>
               </div>
               <div className="px-2.5 py-1.5 bg-red-500/10 border border-red-500/20 rounded-md">
-                <p className="text-[10px] text-red-600">TAC错配</p>
+                <p className="text-[10px] text-red-600">{t('tac.tacMismatch') || 'TAC错配'}</p>
                 <p className="text-sm font-semibold text-red-600">{taskResult.mismatchedCells || 0}</p>
               </div>
               <div className="px-2.5 py-1.5 bg-blue-500/10 border border-blue-500/20 rounded-md">
-                <p className="text-[10px] text-blue-600">错配率</p>
+                <p className="text-[10px] text-blue-600">{t('tac.mismatchRate') || '错配率'}</p>
                 <p className="text-sm font-semibold text-blue-600">
                   {taskResult.matchedCells > 0
                     ? ((taskResult.mismatchedCells / taskResult.matchedCells) * 100).toFixed(1)
@@ -713,11 +713,11 @@ export function TACPage() {
                 </p>
               </div>
               <div className="px-2.5 py-1.5 bg-purple-500/10 border border-purple-500/20 rounded-md">
-                <p className="text-[10px] text-purple-600">TAC插花</p>
+                <p className="text-[10px] text-purple-600">{t('tac.singularity') || 'TAC插花'}</p>
                 <p className="text-sm font-semibold text-purple-600">{taskResult.singularityCount || 0}</p>
               </div>
               <div className="px-2.5 py-1.5 bg-muted/50 rounded-md">
-                <p className="text-[10px] text-muted-foreground">匹配率</p>
+                <p className="text-[10px] text-muted-foreground">{t('tac.matchRate') || '匹配率'}</p>
                 <p className="text-sm font-semibold">
                   {taskResult.totalCells > 0
                     ? ((taskResult.matchedCells / taskResult.totalCells) * 100).toFixed(1)
