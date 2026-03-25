@@ -114,6 +114,40 @@ export function LicensePage() {
       <h1 className="text-2xl font-bold mb-6">配置管理</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-5xl">
+        {/* 语言设置 */}
+        <div className="bg-card p-5 rounded-lg border border-border">
+          <div className="flex items-center gap-2 mb-4">
+            <Globe size={20} className="text-primary" />
+            <h2 className="text-lg font-semibold">{t('language.title')}</h2>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">{t('language.select')}</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleLanguageChange('zh')}
+                className={`flex-1 px-4 py-2.5 rounded-lg border-2 transition-all text-sm font-medium ${
+                  i18n.language === 'zh'
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-border hover:border-primary/50'
+                }`}
+              >
+                {t('language.zh')}
+              </button>
+              <button
+                onClick={() => handleLanguageChange('en')}
+                className={`flex-1 px-4 py-2.5 rounded-lg border-2 transition-all text-sm font-medium ${
+                  i18n.language === 'en'
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-border hover:border-primary/50'
+                }`}
+              >
+                {t('language.en')}
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* License管理 */}
         <div className="bg-card p-5 rounded-lg border border-border">
           <div className="flex items-center justify-between mb-4">
