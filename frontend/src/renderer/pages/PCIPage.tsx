@@ -1513,7 +1513,7 @@ export function PCIPage() {
                         handleSearch()
                       }
                     }}
-                    placeholder="输入小区名称或 基站ID-小区ID (例如: SITE001-SEC001)"
+                    placeholder={t('pci.searchPlaceholder') || '输入小区名称或 基站ID-小区ID (例如: SITE001-SEC001)'}
                     className="w-full pl-10 pr-10 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-xs"
                   />
                   {searchValue && (
@@ -1530,25 +1530,25 @@ export function PCIPage() {
                   className="flex items-center gap-2 px-4 py-2 bg-card border border-border rounded-lg hover:bg-muted/80 transition-colors text-xs"
                 >
                   <Search size={14} />
-                  搜索
+                  {t('pci.search') || '搜索'}
                 </button>
                 <button
                   onClick={handleToggleMeasure}
                   className={`flex items-center gap-2 px-4 py-2 bg-card border border-border rounded-lg hover:bg-muted/80 transition-colors text-xs ${
                     measureMode ? 'bg-primary' : ''
                   }`}
-                  title={measureMode ? '退出测距模式' : '进入测距模式'}
+                  title={measureMode ? (t('pci.exitMeasureMode') || '退出测距模式') : (t('pci.enterMeasureMode') || '进入测距模式')}
                 >
                   <Ruler size={14} />
-                  测距
+                  {t('pci.measure') || '测距'}
                 </button>
                 <button
                   onClick={handleClearAllMarkers}
                   className="flex items-center gap-2 px-4 py-2 bg-card border border-border rounded-lg hover:bg-muted/80 transition-colors text-xs"
-                  title="清除所有标记（定位 + 测距）"
+                  title={t('pci.clearAllMarkersTip') || '清除所有标记（定位 + 测距）'}
                 >
                   <X size={14} />
-                  清除
+                  {t('pci.clear') || '清除'}
                 </button>
                 <MapTypeSwitch mapRef={mapRef} />
               </div>
