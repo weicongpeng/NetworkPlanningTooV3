@@ -12,21 +12,23 @@ import {
   ChevronRight
 } from 'lucide-react'
 import { useState } from 'react'
-
-const navigation = [
-  { name: '首页', href: '/', icon: Home },
-  { name: '数据管理', href: '/data', icon: Database },
-  { name: 'PCI规划', href: '/pci', icon: Settings },
-  { name: '邻区规划', href: '/neighbor', icon: Network },
-  { name: 'TAC核查', href: '/tac', icon: Layers },
-  { name: 'TAC规划', href: '/tac-planning', icon: MapPin },
-  { name: '地图工具', href: '/map', icon: Map },
-  { name: '配置管理', href: '/license', icon: Shield }
-]
+import { useTranslation } from 'react-i18next'
 
 export function MainLayout({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const location = useLocation()
+
+  const navigation = [
+    { name: t('nav.home'), href: '/', icon: Home },
+    { name: t('nav.data'), href: '/data', icon: Database },
+    { name: t('nav.pci'), href: '/pci', icon: Settings },
+    { name: t('nav.neighbor'), href: '/neighbor', icon: Network },
+    { name: t('nav.tac'), href: '/tac', icon: Layers },
+    { name: t('nav.tacPlanning'), href: '/tac-planning', icon: MapPin },
+    { name: t('nav.map'), href: '/map', icon: Map },
+    { name: t('nav.config'), href: '/license', icon: Shield }
+  ]
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
