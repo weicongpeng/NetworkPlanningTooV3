@@ -1075,7 +1075,7 @@ export function MapPage() {
             <div className="px-3 py-1.5 bg-muted/50 rounded-md">
               <div className="flex items-center gap-2">
                 <Database size={14} className="text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">未导入工参文件</span>
+                <span className="text-xs text-muted-foreground">{t('map.noImportFile') || '未导入工参文件'}</span>
               </div>
             </div>
           )}
