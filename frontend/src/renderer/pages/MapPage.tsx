@@ -10,6 +10,7 @@
  * - 坐标缺失警告
  */
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Loader2, Search, X, MapPin, AlertTriangle, Database, Table, Trash2, MousePointer2, Circle as CircleIcon, Pentagon, Hand, Map as MapIcon, Satellite } from 'lucide-react'
 import { OnlineMap, OnlineMapRef, CustomLayerOption } from '../components/Map/OnlineMap'
 import { LayerControl, SectorLayerOption, LayerFileOption } from '../components/Map/LayerControl'
