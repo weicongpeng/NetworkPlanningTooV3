@@ -537,10 +537,10 @@ export function PCIPage() {
         // 在全局任务状态中开始新任务
         startTask(newTaskId, 'pci_planning', 'PCI规划开始')
       } else {
-        setError(response.message || '启动规划任务失败')
+        setError(response.message || (t('pci.startPlanFailed') || '启动规划任务失败'))
       }
     } catch (err: any) {
-      setError(err.message || '启动规划任务失败')
+      setError(err.message || (t('pci.startPlanFailed') || '启动规划任务失败'))
     } finally {
       setLoading(false)
     }
