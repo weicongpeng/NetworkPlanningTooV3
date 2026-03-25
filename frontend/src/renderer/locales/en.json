@@ -304,6 +304,9 @@
     "singularityDetection": "TAC Singularity Detection",
     "importTacLayerTip": "Need to import TAC layer (4G_TAC.zip/5G_TAC.zip)",
     "importParamsTip": "Need to import Full Parameters (ProjectParameter_mongoose)",
+    "legend": "Legend",
+    "hideLegend": "Hide Legend",
+    "totalTacValues": "{{count}} distinct TAC values",
     "column": {
       "firstGroup": "Operator/Vendor",
       "siteId": "Site ID",
