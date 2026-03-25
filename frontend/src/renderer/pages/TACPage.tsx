@@ -621,17 +621,17 @@ export function TACPage() {
               {loading ? (
                 <>
                   <Loader2 className="animate-spin" size={16} />
-                  <span>启动中...</span>
+                  <span>{t('tac.starting') || '启动中...'}</span>
                 </>
               ) : taskResult?.status === 'processing' ? (
                 <>
                   <Loader2 className="animate-spin" size={16} />
-                  <span>核查中...</span>
+                  <span>{t('tac.checking') || '核查中...'}</span>
                 </>
               ) : (
                 <>
                   <Play size={16} />
-                  <span>开始核查</span>
+                  <span>{t('tac.startCheck') || '开始核查'}</span>
                 </>
               )}
             </button>
