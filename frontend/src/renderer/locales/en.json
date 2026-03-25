@@ -538,7 +538,16 @@
     "backspaceDelete": "Press Backspace to delete last point",
     "measureStartPoint": "Start Point",
     "noFeatureSelected": "No features selected",
-    "clickToSelectFeatures": "Click to select features (click again to deselect), Shift+click to multi-select, Ctrl+C to copy"
+    "clickToSelectFeatures": "Click to select features (click again to deselect), Shift+click to multi-select, Ctrl+C to copy",
+    "labelContent": "Label Content",
+    "fontColor": "Font Color",
+    "fontSize": "Font Size",
+    "fontSizeUnit": "Font Size ({{size}}px)",
+    "cancel": "Cancel",
+    "save": "Save",
+    "loadingFields": "Loading fields...",
+    "noAvailableFields": "No available fields",
+    "customColor": "Custom Color"
   },
   "common": {
     "confirm": "Confirm",
