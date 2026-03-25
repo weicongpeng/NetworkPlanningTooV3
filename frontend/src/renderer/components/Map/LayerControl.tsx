@@ -31,6 +31,17 @@ const PREDEFINED_LABEL_FIELDS: FieldOption[] = [
   { value: 'coverageType', label: '覆盖类型' }
 ]
 
+// 预定义字段的翻译map - 用于动态获取翻译
+const PREDEFINED_FIELDS_I18N: Record<string, string> = {
+  'name': 'pci.sectorName',
+  'siteId': 'pci.siteId',
+  'frequency': 'pci.frequency',
+  'pci': 'pci.originalPci',
+  'tac': 'tac.tacCode',
+  'isShared': 'common.yes',
+  'coverageType': 'coverageType'
+}
+
 /**
  * 扇形图标组件
  */
