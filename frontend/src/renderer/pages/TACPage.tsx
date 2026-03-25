@@ -604,8 +604,8 @@ export function TACPage() {
               <div className="flex items-start gap-2">
                 <FileSpreadsheet size={12} className="flex-shrink-0 mt-0.5 text-blue-500" />
                 <div className="space-y-0.5">
-                  <p className="text-[10px] text-foreground leading-relaxed">• 需导入TAC图层(4G_TAC.zip/5G_TAC.zip)</p>
-                  <p className="text-[10px] text-foreground leading-relaxed">• 需导入全量工参(ProjectParameter_mongoose)</p>
+                  <p className="text-[10px] text-foreground leading-relaxed">{t('tac.importTacLayerTip') || '• 需导入TAC图层(4G_TAC.zip/5G_TAC.zip)'}</p>
+                  <p className="text-[10px] text-foreground leading-relaxed">{t('tac.importParamsTip') || '• 需导入全量工参(ProjectParameter_mongoose)'}</p>
                 </div>
               </div>
             </div>
