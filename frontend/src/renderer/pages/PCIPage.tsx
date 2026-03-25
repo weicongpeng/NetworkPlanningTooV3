@@ -1381,7 +1381,7 @@ export function PCIPage() {
                                   type="text"
                                   value={resultSearchFilters[column.key as keyof typeof resultSearchFilters]}
                                   onChange={(e) => handleResultSearchChange(column.key, e.target.value)}
-                                  placeholder="搜索"
+                                  placeholder={t('pci.search') || '搜索'}
                                   className="mt-1 w-full p-1 border border-border rounded text-[10px] bg-white dark:bg-slate-800"
                                 />
                               )}
