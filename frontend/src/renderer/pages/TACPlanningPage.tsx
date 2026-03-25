@@ -262,7 +262,7 @@ export function TACPlanningPage() {
                         String(cell.longitude?.toString() || '').includes(searchFilters.longitude) &&
                         String(cell.latitude?.toString() || '').includes(searchFilters.latitude) &&
                         String(cell.tac || '').toLowerCase().includes(searchFilters.tac.toLowerCase()) &&
-                        (cell.matched ? '完成' : '未匹配').includes(searchFilters.status)
+                        (cell.matched ? (t('tacPlanning.completed') || '完成') : (t('tacPlanning.unmatched') || '未匹配')).includes(searchFilters.status)
                     )
                 })
                 setFilteredResults(filtered)
