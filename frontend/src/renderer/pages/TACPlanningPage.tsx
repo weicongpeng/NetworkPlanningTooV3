@@ -106,7 +106,7 @@ export function TACPlanningPage() {
 
                 if (errorCountRef.current >= MAX_ERRORS) {
                     clearPolling()
-                    setError('获取任务进度失败，请刷新页面重试')
+                    setError(t('tacPlanning.getProgressFailed') || '获取任务进度失败，请刷新页面重试')
                 }
             }
         }, 2000)

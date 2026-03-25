@@ -674,7 +674,7 @@ export function NeighborPage() {
       document.body.removeChild(a)
       window.URL.revokeObjectURL(url)
     } catch (err: any) {
-      setError('导出失败: ' + (err.message || '未知错误'))
+      setError(i18n.exportFailed + ': ' + (err.message || '未知错误'))
     }
   }
 
