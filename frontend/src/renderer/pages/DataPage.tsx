@@ -717,7 +717,7 @@ export function DataPage() {
                         handleDelete(item)
                       }}
                       className="p-2 hover:bg-background rounded text-red-500"
-                      title="删除"
+                      title={t('data.delete') || '删除'}
                     >
                       <Trash2 size={16} />
                     </button>
