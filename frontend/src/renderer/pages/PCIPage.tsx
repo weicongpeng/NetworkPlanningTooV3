@@ -497,7 +497,7 @@ export function PCIPage() {
     // 解析PCI范围字符串
     const pciRangeMatch = config.pciRange.match(/^(\d+)-(\d+)$/)
     if (!pciRangeMatch) {
-      setError(`PCI范围格式错误，正确格式为：0-503（当前值：${config.pciRange}）`)
+      setError(t('pci.pciRangeFormatError') || `PCI范围格式错误，正确格式为：0-503（当前值：${config.pciRange}）`)
       setLoading(false)
       return
     }
