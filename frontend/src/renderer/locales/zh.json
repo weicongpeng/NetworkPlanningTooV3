@@ -531,7 +531,10 @@
     "pointsAdded": "已添加 {{count}} 个点",
     "doubleClickFinish": "双击完成绘制",
     "clickToAddPolygon": "点击添加多边形顶点，双击完成绘制",
-    "backspaceDelete": "按 Backspace 删除上一个点"
+    "backspaceDelete": "按 Backspace 删除上一个点",
+    "measureStartPoint": "起点",
+    "noFeatureSelected": "未选中任何要素",
+    "clickToSelectFeatures": "点击选择要素（再次点击取消），Shift+点击多选，按 Ctrl+C 复制"
   },
   "common": {
     "confirm": "确认",
