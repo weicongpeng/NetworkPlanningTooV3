@@ -930,7 +930,7 @@ function UploadArea({
           {loading ? (
             <>
               <Loader2 className="animate-spin text-primary" size={16} />
-              <p className="text-xs text-primary font-medium">解析中...</p>
+              <p className="text-xs text-primary font-medium">{t('data.parsing') || '解析中...'}</p>
             </>
           ) : status === 'success' ? (
             <>
