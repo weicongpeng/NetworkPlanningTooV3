@@ -1423,7 +1423,7 @@ export function MapPage() {
       {showLocationModal && (
         <div className="fixed inset-0 z-[4000] flex items-center justify-center bg-black/20">
           <div className="bg-card border border-border rounded-lg shadow-lg p-4 w-64">
-            <h3 className="text-sm font-semibold mb-3">输入经纬度定位</h3>
+            <h3 className="text-sm font-semibold mb-3">{t('map.latLngLocation') || '输入经纬度定位'}</h3>
             <div className="space-y-3">
               <div>
                 <label className="block text-xs text-muted-foreground mb-1">经度</label>
