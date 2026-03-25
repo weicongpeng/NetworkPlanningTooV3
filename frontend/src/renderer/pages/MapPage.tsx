@@ -62,6 +62,7 @@ interface ParameterSearchResult {
 type SearchResult = PlaceSearchResult | ParameterSearchResult
 
 export function MapPage() {
+  const { t } = useTranslation()
   // 视图模式
   const [viewMode, setViewMode] = useState<'online' | 'offline'>(() => {
     // 从状态服务获取当前视图模式
