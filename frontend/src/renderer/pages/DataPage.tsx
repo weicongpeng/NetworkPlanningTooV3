@@ -30,6 +30,7 @@ export function DataPage() {
 
   const {
     items,
+    total,
     loading,
     uploadingType,
     isUpdating,
