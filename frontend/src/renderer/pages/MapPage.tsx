@@ -1453,7 +1453,7 @@ export function MapPage() {
                   }}
                   className="flex-1 px-3 py-2 text-xs bg-muted rounded-lg hover:bg-muted/80 transition-colors"
                 >
-                  取消
+                  {t('common.cancel') || '取消'}
                 </button>
                 <button
                   onClick={async () => {
