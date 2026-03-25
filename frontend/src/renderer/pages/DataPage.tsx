@@ -772,7 +772,7 @@ function DataPreview({ dataId }: { dataId: string }) {
     return (
       <div className="flex items-center justify-center py-16">
         <Loader2 className="animate-spin" />
-        <span className="ml-2 text-muted-foreground">加载中...</span>
+        <span className="ml-2 text-muted-foreground">{t('data.loading') || '加载中...'}</span>
       </div>
     )
   }
