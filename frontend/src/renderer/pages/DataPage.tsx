@@ -232,7 +232,7 @@ export function DataPage() {
   }
 
   const handleDelete = async (item: DataItem) => {
-    const itemName = item.name || '未知文件'
+    const itemName = item.name || (t('data.unknownFile') || '未知文件')
 
     // 确认删除
     const confirmed = confirm(`确定要删除 "${itemName}" 吗？\n\n删除后将无法恢复，且会影响使用该数据的规划结果。`)
