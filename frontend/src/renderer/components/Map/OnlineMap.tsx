@@ -708,10 +708,10 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
       // 添加弹窗信息 - 定位点编号和经纬度
       mapMarker.bindPopup(`
         <div style="padding: 8px; min-width: 150px;">
-          <h3 style="margin: 0 0 5px 0; font-size: 14px; color: #ef4444;">定位点${index}</h3>
+          <h3 style="margin: 0 0 5px 0; font-size: 14px; color: #ef4444;">${t('map.locationPoint')}${index}</h3>
           <p style="margin: 0; font-size: 12px; color: #666;">
-            经度: ${marker.lng.toFixed(6)}<br>
-            纬度: ${marker.lat.toFixed(6)}
+            ${t('map.longitude')}: ${marker.lng.toFixed(6)}<br>
+            ${t('map.latitude')}: ${marker.lat.toFixed(6)}
           </p>
         </div>
       `)
