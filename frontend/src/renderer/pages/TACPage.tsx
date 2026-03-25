@@ -804,7 +804,7 @@ export function TACPage() {
                                   type="text"
                                   value={searchFilters[column.key as keyof typeof searchFilters]}
                                   onChange={(e) => handleSearchChange(column.key, e.target.value)}
-                                  placeholder="搜索"
+                                  placeholder={t('tac.search') || '搜索'}
                                   className="mt-1 w-full p-1 border border-border rounded text-[10px] bg-white dark:bg-slate-800"
                                 />
                               )}
