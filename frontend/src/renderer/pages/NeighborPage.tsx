@@ -6,39 +6,6 @@ import { useTranslation } from 'react-i18next'
 const ITEM_HEIGHT = 40 // 每行高度
 const VISIBLE_COUNT = 25 // 可见行数
 const BUFFER_COUNT = 5 // 缓冲行数
-
-// 翻译 key 常量（用于静态配置如表格列）
-const i18nKeys = {
-  // 表格列
-  relationType: t('neighbor.relationType') || '关系类型',
-  sourceSiteId: t('neighbor.sourceSiteId') || '源基站ID',
-  sourceCellId: t('neighbor.sourceCellId') || '源小区ID',
-  sourceCellName: t('neighbor.sourceCellName') || '源小区名称',
-  sourceFrequency: t('neighbor.sourceFrequency') || '源频点',
-  sourcePci: t('neighbor.sourcePci') || '源PCI',
-  targetSiteId: t('neighbor.targetSiteId') || '目标基站ID',
-  targetCellId: t('neighbor.targetCellId') || '目标小区ID',
-  targetCellName: t('neighbor.targetCellName') || '目标小区名称',
-  targetFrequency: t('neighbor.targetFrequency') || '目标频点',
-  targetPci: t('neighbor.targetPci') || '目标PCI',
-  distance: t('neighbor.distance') || '距离',
-}
-
-// 邻区表格列配置
-const NEIGHBOR_COLUMNS = [
-  { key: 'relationType', label: i18nKeys.relationType, defaultWidth: 80 },
-  { key: 'sourceSiteId', label: i18nKeys.sourceSiteId, defaultWidth: 80 },
-  { key: 'sourceCellId', label: i18nKeys.sourceCellId, defaultWidth: 80 },
-  { key: 'sourceCellName', label: i18nKeys.sourceCellName, defaultWidth: 120 },
-  { key: 'sourceFrequency', label: i18nKeys.sourceFrequency, defaultWidth: 70 },
-  { key: 'sourcePci', label: i18nKeys.sourcePci, defaultWidth: 60 },
-  { key: 'targetSiteId', label: i18nKeys.targetSiteId, defaultWidth: 80 },
-  { key: 'targetCellId', label: i18nKeys.targetCellId, defaultWidth: 80 },
-  { key: 'targetCellName', label: i18nKeys.targetCellName, defaultWidth: 120 },
-  { key: 'targetFrequency', label: i18nKeys.targetFrequency, defaultWidth: 70 },
-  { key: 'targetPci', label: i18nKeys.targetPci, defaultWidth: 60 },
-  { key: 'distance', label: i18nKeys.distance, defaultWidth: 70 }
-] as const
 import { neighborApi } from '../services/api'
 import type { ApiResponse } from '@shared/types'
 import { useTaskStore } from '../store/taskStore'
