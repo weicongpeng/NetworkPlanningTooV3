@@ -1273,6 +1273,43 @@ function NeighborTable({
   resizingColumn: string | null
   onResizeStart: (columnKey: string, startX: number) => void
 }) {
+  const { t } = useTranslation()
+
+  // 表格翻译文本
+  const tableI18n = {
+    noMatchResult: t('neighbor.noMatchResult') || '暂无匹配结果',
+    searchColPlaceholder: t('neighbor.searchColPlaceholder') || '搜索',
+    // 表格列
+    relationType: t('neighbor.relationType') || '关系类型',
+    sourceSiteId: t('neighbor.sourceSiteId') || '源基站ID',
+    sourceCellId: t('neighbor.sourceCellId') || '源小区ID',
+    sourceCellName: t('neighbor.sourceCellName') || '源小区名称',
+    sourceFrequency: t('neighbor.sourceFrequency') || '源频点',
+    sourcePci: t('neighbor.sourcePci') || '源PCI',
+    targetSiteId: t('neighbor.targetSiteId') || '目标基站ID',
+    targetCellId: t('neighbor.targetCellId') || '目标小区ID',
+    targetCellName: t('neighbor.targetCellName') || '目标小区名称',
+    targetFrequency: t('neighbor.targetFrequency') || '目标频点',
+    targetPci: t('neighbor.targetPci') || '目标PCI',
+    distance: t('neighbor.distance') || '距离',
+  }
+
+  // 邻区表格列配置
+  const tableColumns = [
+    { key: 'relationType', label: tableI18n.relationType, defaultWidth: 80 },
+    { key: 'sourceSiteId', label: tableI18n.sourceSiteId, defaultWidth: 80 },
+    { key: 'sourceCellId', label: tableI18n.sourceCellId, defaultWidth: 80 },
+    { key: 'sourceCellName', label: tableI18n.sourceCellName, defaultWidth: 120 },
+    { key: 'sourceFrequency', label: tableI18n.sourceFrequency, defaultWidth: 70 },
+    { key: 'sourcePci', label: tableI18n.sourcePci, defaultWidth: 60 },
+    { key: 'targetSiteId', label: tableI18n.targetSiteId, defaultWidth: 80 },
+    { key: 'targetCellId', label: tableI18n.targetCellId, defaultWidth: 80 },
+    { key: 'targetCellName', label: tableI18n.targetCellName, defaultWidth: 120 },
+    { key: 'targetFrequency', label: tableI18n.targetFrequency, defaultWidth: 70 },
+    { key: 'targetPci', label: tableI18n.targetPci, defaultWidth: 60 },
+    { key: 'distance', label: tableI18n.distance, defaultWidth: 70 }
+  ]
+
   console.log('[NeighborTable] Props received:', { selectedSectorKey, resultsCount: results?.length })
 
   // 按源小区分组（使用下划线格式，与sector.id一致）
