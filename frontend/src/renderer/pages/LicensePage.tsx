@@ -206,7 +206,7 @@ export function LicensePage() {
                     <p className="text-sm text-red-500 font-medium mb-2">{t('license.expiredMessage')}</p>
                     <div className="space-y-1 text-sm">
                       <div className="flex items-center gap-2">
-                        <span className="text-red-400">邮箱：</span>
+                        <span className="text-red-400">{t('license.email')}</span>
                         <a href="mailto:weicongpeng1@163.com" className="text-primary hover:underline">
                           weicongpeng1@163.com
                         </a>
