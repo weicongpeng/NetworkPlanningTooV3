@@ -1166,13 +1166,13 @@ export function PCIPage() {
           {/* 规划参数面板 - 单行布局 */}
           <div className="bg-card p-3 rounded-lg border border-border">
             <div className="flex items-center gap-2 mb-2">
-              <h2 className="text-base font-semibold">规划参数</h2>
+              <h2 className="text-base font-semibold">{t('pci.planningParams') || '规划参数'}</h2>
             </div>
 
             <div className="grid grid-cols-6 gap-x-3 gap-y-1 items-center">
               {/* 网络类型 */}
               <ConfigSelect
-                label="网络类型"
+                label={t('pci.networkType') || '网络类型'}
                 value={config.networkType}
                 options={['LTE', 'NR']}
                 onChange={(value) => {
@@ -1189,7 +1189,7 @@ export function PCIPage() {
 
               {/* 复用距离 */}
               <ConfigInput
-                label="复用距离(km)"
+                label={t('pci.distanceLabel') || '复用距离(km)'}
                 type="number"
                 value={config.distanceThreshold}
                 onChange={(value) =>
@@ -1206,7 +1206,7 @@ export function PCIPage() {
 
               {/* PCI范围 */}
               <ConfigInput
-                label="PCI范围"
+                label={t('pci.pciRange') || 'PCI范围'}
                 type="text"
                 value={config.pciRange}
                 onChange={(value) => {
@@ -1236,7 +1236,7 @@ export function PCIPage() {
                   disabled={isRunning}
                 />
                 <label htmlFor="inheritModulus" className="text-xs cursor-pointer">
-                  继承模{config.networkType === 'LTE' ? '3' : '30'}
+                  {t('pci.inheritMod') || `继承模${config.networkType === 'LTE' ? '3' : '30'}`}
                 </label>
               </div>
 
@@ -1256,7 +1256,7 @@ export function PCIPage() {
                   disabled={isRunning}
                 />
                 <label htmlFor="enableTACPlanning" className="text-xs cursor-pointer">
-                  TAC规划
+                  {t('pci.enableTac') || 'TAC规划'}
                 </label>
               </div>
 
@@ -1267,14 +1267,14 @@ export function PCIPage() {
                 className="flex items-center gap-2 px-4 py-2 bg-blue-400 text-white rounded hover:bg-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed text-sm"
               >
                 <Play size={16} />
-                开始规划
+                {t('pci.startPlan') || '开始规划'}
               </button>
             </div>
 
             {/* 验证错误提示 */}
             {(config.distanceThreshold < 0.1 || config.distanceThreshold > 50) && (
               <div className="mt-2 text-xs text-orange-600">
-                复用距离必须在0.1-50公里之间
+                {t('pci.distanceRangeError') || '复用距离必须在0.1-50公里之间'}
               </div>
             )}
             {(() => {
