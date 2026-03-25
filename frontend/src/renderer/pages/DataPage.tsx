@@ -690,9 +690,9 @@ export function DataPage() {
                         ) : (
                             item.type === 'map'
                                 ? (item.subType === 'mapinfo'
-                                    ? `${item.metadata?.layerCount || 0} 个图层`
-                                    : '压缩文件')
-                                : '未知类型'
+                                    ? `${item.metadata?.layerCount || 0} ${t('data.layers') || '个图层'}`
+                                    : (t('data.zipFile') || '压缩文件'))
+                                : (t('data.unknownType') || '未知类型')
                         )}
                       </span>
                       <span className="text-[10px] opacity-60">
