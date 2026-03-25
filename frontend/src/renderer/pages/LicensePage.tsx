@@ -285,7 +285,7 @@ export function LicensePage() {
                 <ThemeModeCard
                   mode="dark"
                   icon={<Moon size={18} />}
-                  label="深色"
+                  label={t('theme.dark')}
                   isSelected={(previewTheme || themeMode) === 'dark'}
                   onSelect={() => handleThemeSelect('dark')}
                   previewBg="bg-slate-900"
