@@ -571,7 +571,7 @@ export function DataPage() {
                         className="w-full py-2 px-4 bg-blue-400 text-white rounded-md hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                         {isUpdating ? <Loader2 className="animate-spin" size={16} /> : <RefreshCw size={16} />}
-                        {isUpdating ? '更新中...' : '开始更新'}
+                        {isUpdating ? (t('data.updating') || '更新中...') : (t('data.startUpdate') || '开始更新')}
                     </button>
                 </div>
             </div>
