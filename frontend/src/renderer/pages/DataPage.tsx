@@ -410,7 +410,7 @@ export function DataPage() {
             className="px-4 py-2 bg-card border border-border rounded-lg hover:bg-muted transition-colors flex items-center gap-2"
           >
             <RefreshCw size={16} />
-            刷新列表
+            {t('common.refresh') || '刷新列表'}
           </button>
           <button
             onClick={handleCleanupIndex}
