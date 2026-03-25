@@ -1135,7 +1135,7 @@ export function MapPage() {
                 // 延迟隐藏，以便点击搜索结果
                 setTimeout(() => setShowSearchResults(false), 200)
               }}
-              placeholder={searchMode === 'map' ? '输入地名、道路名称等' : '输入小区名称、基站ID'}
+              placeholder={searchMode === 'map' ? (t('map.inputPlaceHint') || '输入地名、道路名称等') : (t('map.inputCellHint') || '输入小区名称、基站ID')}
               className="w-full pl-8 pr-14 py-1.5 text-xs border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary placeholder:text-xs"
             />
 
