@@ -59,17 +59,17 @@ export const LIGHT_THEME_VARS = {
   cardForeground: '222.2 84% 4.9%',
   popover: '0 0% 100%',
   popoverForeground: '222.2 84% 4.9%',
-  secondary: '210 40% 96.1%',
+  secondary: '220 14% 96%',
   secondaryForeground: '222.2 47.4% 11.2%',
-  muted: '210 40% 96.1%',
+  muted: '220 14% 96%',
   mutedForeground: '215.4 16.3% 46.9%',
-  accent: '210 40% 96.1%',
+  accent: '220 14% 96%',
   accentForeground: '222.2 47.4% 11.2%',
   destructive: '0 84.2% 60.2%',
   destructiveForeground: '210 40% 98%',
-  border: '214.3 31.8% 91.4%',
-  input: '214.3 31.8% 91.4%',
-  ring: '221.2 83.2% 53.3%'
+  border: '220 13% 91%',
+  input: '220 13% 91%',
+  ring: '207 90% 54%'
 }
 
 interface ThemeState {
