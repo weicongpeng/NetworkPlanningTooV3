@@ -429,3 +429,13 @@ from app.services.data_service import data_service
 - **后端编码错误**: 确保 `PYTHONIOENCODING=utf-8` 环境变量已设置（main.py 已配置）
 - **地图不显示**: 检查高德地图 API Key 配置（config.py），确保网络可访问高德服务
 - **文件上传失败**: 检查开发环境下 `VITE_API_URL` 环境变量配置
+
+## 前端 React 开发规范
+
+项目使用 React 18 + TypeScript + Zustand，遵循以下核心规范：
+
+- **Effects 是外部系统的同步工具**：地图组件、事件监听、WebSocket 连接等才用 Effect；派生状态用 `useMemo` 或直接计算
+- **组件内状态更新用事件处理器**：不要在 Effect 中处理用户交互逻辑
+- **组件间通信优先用组合**：通过 `children` 或 Context 传递，避免 prop drilling
+- **Ref 用于不触发渲染的可变值**：如定时器 ID、DOM 引用
+- **自定义 Hook 以 `use` 前缀命名**，且必须内部真正使用了 Hooks
