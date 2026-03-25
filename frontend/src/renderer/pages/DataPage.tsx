@@ -821,12 +821,12 @@ function DataPreview({ dataId }: { dataId: string }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b">
-              <th className="text-left p-2">{t('data.siteId') || '基站ID'}</th>
-              <th className="text-left p-2">{t('data.siteName') || '基站名称'}</th>
-              <th className="text-left p-2">{t('data.networkType') || '网络类型'}</th>
-              <th className="text-left p-2">{t('data.longitude') || '经度'}</th>
-              <th className="text-left p-2">{t('data.latitude') || '纬度'}</th>
-              <th className="text-left p-2">{t('data.sectorCount') || '小区数'}</th>
+              <th className="text-left p-2">{tPreview('data.siteId') || '基站ID'}</th>
+              <th className="text-left p-2">{tPreview('data.siteName') || '基站名称'}</th>
+              <th className="text-left p-2">{tPreview('data.networkType') || '网络类型'}</th>
+              <th className="text-left p-2">{tPreview('data.longitude') || '经度'}</th>
+              <th className="text-left p-2">{tPreview('data.latitude') || '纬度'}</th>
+              <th className="text-left p-2">{tPreview('data.sectorCount') || '小区数'}</th>
             </tr>
           </thead>
           <tbody>
