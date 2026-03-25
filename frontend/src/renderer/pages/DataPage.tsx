@@ -330,7 +330,7 @@ export function DataPage() {
         if (removed > 0) {
           alert(`${t('data.cleanComplete') || `清理完成！已移除 ${removed} 个无效索引项`}:\n\n${items.map((i: any) => `• ${i.name}`).join('\n')}`)
         } else {
-          alert('索引状态良好，没有发现无效项。')
+          alert(t('data.noInvalidIndex') || '索引状态良好，没有发现无效项。')
         }
 
         await fetchList(1, 50, true)
