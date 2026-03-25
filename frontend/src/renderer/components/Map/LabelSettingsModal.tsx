@@ -236,7 +236,7 @@ export function LabelSettingsModal({
                 }}
                 className={`w-6 h-6 rounded border-2 border-gray-300 hover:border-gray-400 flex items-center justify-center transition-all bg-gradient-to-br from-red-500 via-green-500 to-blue-500 ${showCustomColor ? 'ring-1 ring-primary ring-offset-1' : ''
                   }`}
-                title="自定义颜色"
+                title={t('map.customColor')}
               >
                 <span className="text-white text-xs">+</span>
               </button>
