@@ -139,7 +139,35 @@ export function NeighborPage() {
     radiusFactorTooltip: t('neighbor.radiusFactorTooltip') || '覆盖圆半径系数：覆盖半径系数，默认5/9(≈0.556)',
     // 规划类型描述
     startTaskMsg: t('neighbor.startTaskMsg') || '邻区规划开始',
+    // 表格列
+    relationType: t('neighbor.relationType') || '关系类型',
+    sourceSiteId: t('neighbor.sourceSiteId') || '源基站ID',
+    sourceCellId: t('neighbor.sourceCellId') || '源小区ID',
+    sourceCellName: t('neighbor.sourceCellName') || '源小区名称',
+    sourceFrequency: t('neighbor.sourceFrequency') || '源频点',
+    targetSiteId: t('neighbor.targetSiteId') || '目标基站ID',
+    targetCellId: t('neighbor.targetCellId') || '目标小区ID',
+    targetCellName: t('neighbor.targetCellName') || '目标小区名称',
+    targetFrequency: t('neighbor.targetFrequency') || '目标频点',
+    distance: t('neighbor.distance') || '距离',
   }
+
+  // 邻区表格列配置
+  const NEIGHBOR_COLUMNS = [
+    { key: 'relationType', label: i18n.relationType, defaultWidth: 80 },
+    { key: 'sourceSiteId', label: i18n.sourceSiteId, defaultWidth: 80 },
+    { key: 'sourceCellId', label: i18n.sourceCellId, defaultWidth: 80 },
+    { key: 'sourceCellName', label: i18n.sourceCellName, defaultWidth: 120 },
+    { key: 'sourceFrequency', label: i18n.sourceFrequency, defaultWidth: 70 },
+    { key: 'sourcePci', label: i18n.sourcePci, defaultWidth: 60 },
+    { key: 'targetSiteId', label: i18n.targetSiteId, defaultWidth: 80 },
+    { key: 'targetCellId', label: i18n.targetCellId, defaultWidth: 80 },
+    { key: 'targetCellName', label: i18n.targetCellName, defaultWidth: 120 },
+    { key: 'targetFrequency', label: i18n.targetFrequency, defaultWidth: 70 },
+    { key: 'targetPci', label: i18n.targetPci, defaultWidth: 60 },
+    { key: 'distance', label: i18n.distance, defaultWidth: 70 }
+  ] as const
+
   const [config, setConfig] = useState({
     planningType: 'LTE-LTE',  // 邻区规划类型
     maxNeighbors: 64,         // 最大邻区数
