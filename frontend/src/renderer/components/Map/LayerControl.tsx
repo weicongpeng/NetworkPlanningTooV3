@@ -10,7 +10,7 @@
  * - 右键菜单支持标签设置
  */
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { ChevronDown, ChevronRight, ChevronLeft, Map, Folder, File, X, Satellite } from 'lucide-react'
+import { ChevronDown, ChevronRight, ChevronLeft, Map, Folder, File, X, Satellite, Radio } from 'lucide-react'
 import { NetworkType } from '../../config/sector-config'
 import { LabelSettingsModal, LabelSettings, FieldOption } from './LabelSettingsModal'
 import { layerApi } from '../../services/api'
