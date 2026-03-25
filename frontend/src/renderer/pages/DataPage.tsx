@@ -430,7 +430,7 @@ export function DataPage() {
         <div className="space-y-8">
             {/* 文件上传 */}
             <div className="bg-card p-3 rounded-lg border border-border">
-            <h2 className="text-xl font-semibold mb-2">导入数据</h2>
+            <h2 className="text-xl font-semibold mb-2">{t('data.importData') || '导入数据'}</h2>
 
              <div className="space-y-2">
                 <div className="flex items-center gap-2">
