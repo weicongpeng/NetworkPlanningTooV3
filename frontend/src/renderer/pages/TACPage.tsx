@@ -731,15 +731,15 @@ export function TACPage() {
           {/* 任务状态 */}
           <div className="mb-4 shrink-0">
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs font-medium">核查进度</span>
+              <span className="text-xs font-medium">{t('tac.progress') || '核查进度'}</span>
               <span className="text-xs text-muted-foreground">
                 {taskResult.status === 'completed'
-                  ? '已完成'
+                  ? (t('tac.completed') || '已完成')
                   : taskResult.status === 'failed'
-                    ? '失败'
+                    ? (t('tac.failed') || '失败')
                     : taskResult.status === 'processing'
-                      ? '进行中'
-                      : '等待中'} ({taskResult.progress}%)
+                      ? (t('tac.processing') || '进行中')
+                      : (t('tac.waiting') || '等待中')} ({taskResult.progress}%)
               </span>
             </div>
             <div className="w-full bg-muted rounded-full h-1.5">
