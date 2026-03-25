@@ -1237,7 +1237,6 @@ function TreeNodeComponent({
           alignItems: 'center',
           justifyContent: 'flex-start',
           padding: node.type === 'frequency' ? '4px 8px' : '8px 12px',
-          marginLeft: node.type === 'frequency' ? '-24px' : '0px',
           cursor: node.type === 'root' ? 'default' : (isExpandable ? 'pointer' : 'default'),
           userSelect: 'none',
           borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
@@ -1251,6 +1250,8 @@ function TreeNodeComponent({
           lineHeight: '1.2',
           position: 'relative',
           transition: 'all 0.2s ease',
+          // 频点行内容左移3个字符宽度，保持树形连线位置不变
+          ...(node.type === 'frequency' ? { paddingLeft: '4px' } : {}),
           ...getIndent()
         }}
         onClick={node.type === 'root' ? undefined : handleClick}
