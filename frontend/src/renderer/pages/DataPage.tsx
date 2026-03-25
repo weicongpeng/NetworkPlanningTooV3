@@ -499,7 +499,7 @@ export function DataPage() {
                 <div className="flex items-center gap-2">
                     <div className="flex-1">
                         <UploadArea
-                            title="图层文件"
+                            title={t('data.mapLayer') || '图层文件'}
                             accept=".zip,.tab,.mif"
                             onUpload={(e) => handleFileUpload(e, 'map', 'map_layer')}
                             loading={loading && uploadingType === 'map_layer'}
