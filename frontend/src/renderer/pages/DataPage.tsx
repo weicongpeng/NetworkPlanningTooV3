@@ -472,10 +472,10 @@ export function DataPage() {
                         <button
                             onClick={() => handleDownloadTemplate('target_cells')}
                             className="w-full px-2 py-1.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
-                            title="下载待规划小区模板"
+                            title={t('data.downloadTemplate') || '下载待规划小区模板'}
                         >
                             <FileDown size={12} />
-                            <span>模板</span>
+                            <span>{t('data.template') || '模板'}</span>
                         </button>
                     </div>
                 </div>
