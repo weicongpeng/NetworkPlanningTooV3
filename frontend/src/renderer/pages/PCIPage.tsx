@@ -65,7 +65,7 @@ const validateConfig = (config: any): string | null => {
   // 解析PCI范围字符串
   const pciRangeMatch = config.pciRange.match(/^(\d+)-(\d+)$/)
   if (!pciRangeMatch) {
-    return `PCI范围格式错误，正确格式为：0-503（当前值：${config.pciRange}）`
+    return t('pci.pciRangeFormatError') || `PCI范围格式错误，正确格式为：0-503（当前值：${config.pciRange}）`
   }
 
   const pciMin = parseInt(pciRangeMatch[1])
@@ -73,29 +73,29 @@ const validateConfig = (config: any): string | null => {
 
   // 验证PCI最小值
   if (pciMin < 0 || pciMin > maxPCI) {
-    return `PCI最小值必须在0-${maxPCI}之间，当前值为${pciMin}`
+    return (t('pci.pciMinError') || `PCI最小值必须在0-${maxPCI}之间，当前值为${pciMin}`)
   }
 
   // 验证PCI最大值
   if (pciMax < 0 || pciMax > maxPCI) {
-    return `PCI最大值必须在0-${maxPCI}之间，当前值为${pciMax}`
+    return (t('pci.pciMaxError') || `PCI最大值必须在0-${maxPCI}之间，当前值为${pciMax}`)
   }
 
   // 验证PCI范围逻辑
   if (pciMin >= pciMax) {
-    return `PCI最小值(${pciMin})必须小于最大值(${pciMax})`
+    return (t('pci.pciRangeLogicError') || `PCI最小值(${pciMin})必须小于最大值(${pciMax})`)
   }
 
   // 验证复用距离
   if (config.distanceThreshold < 0.1 || config.distanceThreshold > 50) {
-    return `复用距离必须在0.1-50公里之间，当前值为${config.distanceThreshold}`
+    return (t('pci.distanceRangeError') || `复用距离必须在0.1-50公里之间，当前值为${config.distanceThreshold}`)
   }
 
   // 验证模数与网络类型匹配
   const expectedModulus = config.networkType === 'LTE' ? 3 : 30
   const pciModulus = config.networkType === 'LTE' ? 3 : 30
   if (pciModulus !== expectedModulus) {
-    return `${config.networkType}网络模数必须为${expectedModulus}`
+    return (t('pci.modulusError') || `${config.networkType}网络模数必须为${expectedModulus}`)
   }
 
   return null
