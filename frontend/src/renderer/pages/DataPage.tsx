@@ -422,9 +422,6 @@ export function DataPage() {
             {t('data.cleanIndex') || '清理索引'}
           </button>
         </div>
-        <div className="text-sm text-muted-foreground">
-          {t('data.dataCount', { count: total }) || `共 ${total} 条数据`}
-        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
