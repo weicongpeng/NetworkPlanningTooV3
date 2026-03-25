@@ -572,7 +572,7 @@ export function TACPage() {
             </label>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5">
-                <label className="text-xs text-foreground whitespace-nowrap">搜索半径(米):</label>
+                <label className="text-xs text-foreground whitespace-nowrap">{t('tac.searchRadius') || '搜索半径(米):'}</label>
                 <input
                   type="number"
                   value={singularityConfig.searchRadius}
