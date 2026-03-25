@@ -200,6 +200,23 @@ export function PCIPage() {
   })
   const [filteredResults, setFilteredResults] = useState<any[]>([])
 
+  // 翻译后的表格列配置
+  const PCI_COLUMNS = [
+    { key: 'networkType', label: t('pci.networkType') || '网元类型', defaultWidth: 80 },
+    { key: 'siteId', label: t('pci.siteId') || '基站ID', defaultWidth: 100 },
+    { key: 'cellId', label: t('pci.cellId') || '网元ID', defaultWidth: 80 },
+    { key: 'sectorId', label: t('pci.sectorId') || '小区ID', defaultWidth: 80 },
+    { key: 'sectorName', label: t('pci.sectorName') || '小区名称', defaultWidth: 150 },
+    { key: 'frequency', label: t('pci.frequency') || '频点', defaultWidth: 60 },
+    { key: 'originalPCI', label: t('pci.originalPci') || '原PCI', defaultWidth: 60 },
+    { key: 'newPCI', label: t('pci.newPci') || '新PCI', defaultWidth: 60 },
+    { key: 'originalMod', label: t('pci.originalMod') || '原模', defaultWidth: 50 },
+    { key: 'newMod', label: t('pci.newMod') || '新模', defaultWidth: 50 },
+    { key: 'tac', label: t('pci.tacPlanned') || 'TAC规划值', defaultWidth: 80 },
+    { key: 'assignmentReason', label: t('pci.assignmentReason') || '分配原因', defaultWidth: 120 },
+    { key: 'minReuseDistance', label: t('pci.reuseDistance') || '复用距离', defaultWidth: 80 }
+  ]
+
   // 列宽状态
   const [pciColumnWidths, setPciColumnWidths] = useState<Record<string, number>>(
     Object.fromEntries(PCI_COLUMNS.map(col => [col.key, col.defaultWidth]))
