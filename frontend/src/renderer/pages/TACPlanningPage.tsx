@@ -396,7 +396,7 @@ export function TACPlanningPage() {
                 <div className="mb-3 p-2.5 bg-red-500/10 border border-red-500/20 rounded-lg flex items-start gap-2 shrink-0">
                     <AlertCircle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
-                        <p className="text-red-500 font-medium text-xs mb-0.5">规划失败</p>
+                        <p className="text-red-500 font-medium text-xs mb-0.5">{t('tacPlanning.failed') || '规划失败'}</p>
                         <p className="text-red-600 text-xs">{error}</p>
                     </div>
                 </div>

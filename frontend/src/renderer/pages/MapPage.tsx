@@ -1436,7 +1436,7 @@ export function MapPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs text-muted-foreground mb-1">纬度</label>
+                <label className="block text-xs text-muted-foreground mb-1">{t('map.latitude') || '纬度'}</label>
                 <input
                   type="text"
                   value={locationInput.lat}
