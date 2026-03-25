@@ -644,12 +644,12 @@ export function PCIPage() {
           setApplySuccess(false)
         }, 5000)
       } else {
-        const errorMsg = '❌ 应用到工参失败: ' + (response.message || '未知错误')
+        const errorMsg = `❌ ${t('pci.applyFailed') || '应用到工参失败'}: ` + (response.message || '未知错误')
         setError(errorMsg)
         console.error('[PCIPage] 应用到工参失败:', errorMsg)
       }
     } catch (err: any) {
-      const errorMsg = '❌ 应用到工参失败: ' + (err.message || '未知错误')
+      const errorMsg = `❌ ${t('pci.applyFailed') || '应用到工参失败'}: ` + (err.message || '未知错误')
       setError(errorMsg)
       console.error('[PCIPage] 应用到工参异常:', err)
     } finally {
