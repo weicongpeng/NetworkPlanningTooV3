@@ -1375,7 +1375,7 @@ export function MapPage() {
             ) : (
               <>
                 <Satellite size={14} />
-                <span>卫星图</span>
+                <span>{t('map.satellite') || '卫星图'}</span>
               </>
             )}
           </button>
