@@ -674,8 +674,8 @@ export function DataPage() {
                         {item.fileType === 'geo_data' ? (
                           <>
                             {item.geometryType === 'sector'
-                              ? `${item.metadata?.pointCount || 0} 个扇区`
-                              : `${item.metadata?.pointCount || 0} 个点`}
+                              ? `${item.metadata?.pointCount || 0} ${t('data.sectors') || '个扇区'}`
+                              : `${item.metadata?.pointCount || 0} ${t('data.points') || '个点'}`}
                           </>
                         ) : item.type === 'excel' ? (
                             item.metadata?.LTESiteCount
