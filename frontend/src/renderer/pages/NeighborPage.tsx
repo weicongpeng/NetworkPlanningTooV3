@@ -1530,7 +1530,7 @@ function NeighborTable({
               })}
               {/* 底部占位行 */}
               <tr style={{ height: `${virtualData.totalHeight - virtualData.offsetY - virtualData.visibleData.length * ITEM_HEIGHT}px` }}>
-                <td colSpan={NEIGHBOR_COLUMNS.length}></td>
+                <td colSpan={tableColumns.length}></td>
               </tr>
             </>
           )}
