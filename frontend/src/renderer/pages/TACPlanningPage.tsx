@@ -551,9 +551,9 @@ export function TACPlanningPage() {
                                                                     return cell.tac || '-'
                                                                 case 'status':
                                                                     return cell.matched ? (
-                                                                        <span className="px-1.5 py-0.5 bg-green-500/10 text-green-600 rounded text-[10px]">完成</span>
+                                                                        <span className="px-1.5 py-0.5 bg-green-500/10 text-green-600 rounded text-[10px]">{t('tacPlanning.completed') || '完成'}</span>
                                                                     ) : (
-                                                                        <span className="px-1.5 py-0.5 bg-orange-500/10 text-orange-600 rounded text-[10px]">未匹配</span>
+                                                                        <span className="px-1.5 py-0.5 bg-orange-500/10 text-orange-600 rounded text-[10px]">{t('tacPlanning.unmatched') || '未匹配'}</span>
                                                                     )
                                                                 default:
                                                                     return null
