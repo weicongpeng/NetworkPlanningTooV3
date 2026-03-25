@@ -5,8 +5,10 @@ import { dataApi } from '../services/api'
 import type { DataItem } from '@shared/types'
 import { DATA_REFRESH_EVENT, triggerDataRefresh } from '../store/dataStore'
 import { mapDataService } from '../services/mapDataService'
+import { useTranslation } from 'react-i18next'
 
 export function DataPage() {
+  const { t } = useTranslation()
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   // 工参更新相关状态
