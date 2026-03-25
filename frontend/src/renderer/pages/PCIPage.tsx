@@ -219,7 +219,7 @@ export function PCIPage() {
 
   // 列宽状态
   const [pciColumnWidths, setPciColumnWidths] = useState<Record<string, number>>(
-    Object.fromEntries(PCI_COLUMNS.map(col => [col.key, col.defaultWidth]))
+    Object.fromEntries(PCI_COLUMNS_STATIC.map(col => [col.key, col.defaultWidth]))
   )
 
   // 列宽拖拽状态
