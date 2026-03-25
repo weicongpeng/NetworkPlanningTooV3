@@ -558,23 +558,23 @@ export function NeighborPage() {
                   // 将完成的任务结果保存到全局状态
                   completeTask(taskId, resultResponse.data)
                 } else {
-                  setError(resultResponse.message || '获取规划结果失败')
-                  failTask(taskId, resultResponse.message || '获取规划结果失败')
+                  setError(resultResponse.message || i18n.getResultFailed)
+                  failTask(taskId, resultResponse.message || i18n.getResultFailed)
                 }
               } catch (err: any) {
-                const errorMsg = '获取规划结果失败: ' + (err.message || err.toString?.() || '未知错误')
+                const errorMsg = i18n.getResultFailed + ': ' + (err.message || err.toString?.() || '未知错误')
                 setError(errorMsg)
                 failTask(taskId, errorMsg)
               }
             }, 100)
           } else if (data.status === 'failed') {
             clearPolling()
-            const errorMsg = data.message || data.error || '规划任务失败'
+            const errorMsg = data.message || data.error || i18n.taskFailed2
             setError(errorMsg)
             failTask(taskId, errorMsg)
           }
         } else {
-          setError(response.message || '获取进度失败')
+          setError(response.message || i18n.getProgressFailed)
         }
       } catch (err: any) {
         console.error('Failed to get progress:', err)
@@ -592,11 +592,11 @@ export function NeighborPage() {
 
         if (errorCountRef.current >= MAX_ERRORS) {
           clearPolling()
-          const errorMsg = '无法连接到服务器，请检查网络连接或后端服务状态'
+          const errorMsg = i18n.cannotConnect
           setError(errorMsg)
           failTask(taskId, errorMsg)
         } else {
-          setError(`获取进度失败 (${errorCountRef.current}/${MAX_ERRORS})，正在重试...`)
+          setError(i18n.retrying.replace('{{count}}', String(errorCountRef.current)).replace('{{max}}', String(MAX_ERRORS)))
         }
       }
     }, 1000)
