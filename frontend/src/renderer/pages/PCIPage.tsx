@@ -597,12 +597,12 @@ export function PCIPage() {
         setApplySuccess(true)
 
         // 显示成功消息
-        let successMsg = `✅ 成功将PCI规划结果应用到工参，更新了${updatedCount}个小区的PCI`
+        let successMsg = `✅ ${t('pci.applySuccess') || '成功将PCI规划结果应用到工参，更新了'}${updatedCount}${t('pci.cells') || '个小区的PCI'}`
         if (newFileName) {
-          successMsg += `\n📄 新工参文件: ${newFileName}`
+          successMsg += `\n📄 ${t('pci.newFile') || '新工参文件'}: ${newFileName}`
         }
         if (savedToOriginal) {
-          successMsg += '\n📁 已保存副本到原始目录'
+          successMsg += `\n📁 ${t('pci.savedCopy') || '已保存副本到原始目录'}`
         }
         setError(successMsg)
         console.log('[PCIPage] 应用到工参成功:', response.data)
