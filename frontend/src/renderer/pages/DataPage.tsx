@@ -797,7 +797,7 @@ function DataPreview({ dataId }: { dataId: string }) {
       return (
           <div>
               <p className="text-sm text-muted-foreground mb-4">
-                  {t('data.containsFiles', { count: data.files.length }) || `包含 ${data.files.length} 个文件`}
+                  {tPreview('data.containsFiles', { count: data.files.length }) || `包含 ${data.files.length} 个文件`}
               </p>
               <div className="max-h-60 overflow-y-auto border rounded-md">
                   <ul className="divide-y">
