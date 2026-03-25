@@ -1337,7 +1337,7 @@ export function MapPage() {
             {searching && (
               <div className="bg-card border border-border rounded-lg shadow-lg p-3 text-sm text-muted-foreground flex items-center justify-center gap-2">
                 <Loader2 className="animate-spin" size={14} />
-                搜索中...
+                {t('map.searching') || '搜索中...'}
               </div>
             )}
 
