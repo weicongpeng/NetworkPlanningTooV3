@@ -59,6 +59,7 @@ interface TACResultData {
 const MAX_ERRORS = 5
 
 export function TACPage() {
+  const { t } = useTranslation()
   const { taskId, config, result, setTaskId, setConfig, setResult, clearTAC } = useTACStore()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
