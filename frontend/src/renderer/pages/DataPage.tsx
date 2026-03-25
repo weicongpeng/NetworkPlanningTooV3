@@ -74,7 +74,7 @@ export function DataPage() {
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
 
       const blob = await response.blob()
-      if (blob.size === 0) throw new Error('文件内容为空')
+      if (blob.size === 0) throw new Error(t('data.emptyFile') || '文件内容为空')
 
       console.log('[Template Download] Blob size:', blob.size)
 
@@ -209,7 +209,7 @@ export function DataPage() {
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
         const blob = await response.blob();
-        if (blob.size === 0) throw new Error('文件内容为空');
+        if (blob.size === 0) throw new Error(t('data.emptyFile') || '文件内容为空');
 
         const blobUrl = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
