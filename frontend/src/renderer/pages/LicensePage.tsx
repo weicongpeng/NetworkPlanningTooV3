@@ -398,6 +398,7 @@ interface ColorSwatchProps {
 }
 
 function ColorSwatch({ color, isSelected, onSelect }: ColorSwatchProps) {
+  const { t } = useTranslation()
   const colorMap = {
     blue: 'bg-blue-500',
     green: 'bg-green-500',
