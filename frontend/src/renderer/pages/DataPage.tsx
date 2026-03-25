@@ -418,7 +418,7 @@ export function DataPage() {
             title="清理无效的索引项（文件不存在但索引中仍然存在的记录）"
           >
             <RefreshCw size={16} />
-            清理索引
+            {t('data.cleanIndex') || '清理索引'}
           </button>
         </div>
         <div className="text-sm text-muted-foreground">
