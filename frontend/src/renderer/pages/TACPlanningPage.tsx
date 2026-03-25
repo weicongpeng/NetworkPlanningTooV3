@@ -315,7 +315,7 @@ export function TACPlanningPage() {
 
     return (
         <div className="h-full flex flex-col p-4 min-h-0">
-            <h1 className="text-xl font-bold mb-4 shrink-0">TAC规划</h1>
+            <h1 className="text-xl font-bold mb-4 shrink-0">{t('tacPlanning.title') || 'TAC规划'}</h1>
 
             <div className="bg-card p-3 rounded-lg border border-border mb-3 shrink-0">
                 <div className="space-y-3">
