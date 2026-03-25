@@ -1068,7 +1068,7 @@ export function LayerControl({
             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
           >
             <X size={14} />
-            <span>卸载图层</span>
+            <span>{t('map.unloadLayer')}</span>
           </button>
         </div>
       )}
