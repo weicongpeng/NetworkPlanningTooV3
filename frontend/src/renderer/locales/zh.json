@@ -92,7 +92,12 @@
     "nr": "NR",
     "confirmDelete": "确认删除",
     "deleteSuccess": "删除成功",
-    "deleteError": "删除失败"
+    "deleteError": "删除失败",
+    "desktopMode": "桌面模式 (已连接 Electron)",
+    "browserMode": "浏览器模式 (受限)",
+    "cleanIndex": "清理索引",
+    "retry": "重试",
+    "close": "关闭"
   },
   "pci": {
     "title": "PCI规划",
