@@ -789,7 +789,7 @@ function DataPreview({ dataId }: { dataId: string }) {
   }
 
   if (!data) {
-    return <p className="text-muted-foreground text-center py-8">{t('data.cannotLoadData') || '无法加载数据'}</p>
+    return <p className="text-muted-foreground text-center py-8">{tPreview('data.cannotLoadData') || '无法加载数据'}</p>
   }
   
   // 如果是文件列表（ZIP文件）
