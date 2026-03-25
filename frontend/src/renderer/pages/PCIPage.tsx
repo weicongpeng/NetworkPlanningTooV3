@@ -571,7 +571,7 @@ export function PCIPage() {
       document.body.removeChild(a)
       window.URL.revokeObjectURL(url)
     } catch (err: any) {
-      setError('导出失败: ' + (err.message || '未知错误'))
+      setError((t('pci.exportFailed') || '导出失败: ') + (err.message || '未知错误'))
     }
   }
 
