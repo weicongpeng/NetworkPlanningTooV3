@@ -379,12 +379,12 @@ export function TACPlanningPage() {
                             {loading || taskResult?.status === 'processing' ? (
                                 <>
                                     <Loader2 className="animate-spin" size={16} />
-                                    <span>规划进行中...</span>
+                                    <span>{t('tacPlanning.planning') || '规划进行中...'}</span>
                                 </>
                             ) : (
                                 <>
                                     <Play size={16} />
-                                    <span>开始TAC规划</span>
+                                    <span>{t('tacPlanning.startPlan') || '开始TAC规划'}</span>
                                 </>
                             )}
                         </button>
