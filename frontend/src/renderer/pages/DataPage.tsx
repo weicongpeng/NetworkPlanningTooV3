@@ -423,7 +423,7 @@ export function DataPage() {
           </button>
         </div>
         <div className="text-sm text-muted-foreground">
-          {t('data.dataCount', { count: items.length }) || `共 ${items.length} 条数据`}
+          {t('data.dataCount', { count: total }) || `共 ${total} 条数据`}
         </div>
       </div>
 
