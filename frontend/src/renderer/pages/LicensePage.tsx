@@ -111,7 +111,7 @@ export function LicensePage() {
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">配置管理</h1>
+      <h1 className="text-2xl font-bold mb-6">{t('license.title')}</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-5xl">
         {/* 语言设置 */}
