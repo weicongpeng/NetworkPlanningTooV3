@@ -245,11 +245,11 @@ export function DataPage() {
       // 如果删除失败，询问是否强制删除
       if (!result) {
         const forceDelete = confirm(
-          `删除失败：文件可能正在被其他程序使用。\n\n` +
-          `是否要强制删除？\n` +
-          `• 强制删除会从索引中移除该数据\n` +
-          `• 部分文件可能需要手动清理\n` +
-          `• 建议先关闭相关程序后再试`
+          `${t('data.forceDeleteTip') || '删除失败：文件可能正在被其他程序使用。'}\n\n` +
+          `${t('data.forceDeleteConfirm') || '是否要强制删除？'}\n` +
+          `• ${t('data.forceDeleteRemoveIndex') || '强制删除会从索引中移除该数据'}\n` +
+          `• ${t('data.forceDeleteManualCleanup') || '部分文件可能需要手动清理'}\n` +
+          `• ${t('data.forceDeleteClosePrograms') || '建议先关闭相关程序后再试'}`
         )
 
         if (forceDelete) {
