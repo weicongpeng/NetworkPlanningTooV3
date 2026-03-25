@@ -1096,7 +1096,7 @@ export function MapPage() {
                 : 'text-muted-foreground hover:bg-muted'
                 }`}
             >
-              地名搜索
+              {t('map.searchPlace') || '地名搜索'}
             </button>
             <button
               onClick={() => {
