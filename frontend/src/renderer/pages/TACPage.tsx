@@ -371,7 +371,7 @@ export function TACPage() {
       setResult((prev: TACResultData | null) => prev ? { ...prev, exportPath: filename } : null)
     } catch (err: any) {
       console.error('导出失败:', err)
-      setError('导出失败: ' + (err.message || '未知错误'))
+      setError((t('tac.exportFailed') || '导出失败:') + (err.message || (t('tac.unknownError') || '未知错误')))
     }
   }
 
