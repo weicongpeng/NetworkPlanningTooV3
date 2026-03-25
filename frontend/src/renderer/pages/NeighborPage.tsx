@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Play, Download, Settings, Loader2, AlertCircle, HelpCircle, Search, X, Ruler, GripVertical } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 // 虚拟滚动配置
 const ITEM_HEIGHT = 40 // 每行高度
