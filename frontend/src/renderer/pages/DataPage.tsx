@@ -665,7 +665,7 @@ export function DataPage() {
                       {item.originalPath && (
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700 flex items-center gap-0.5">
                           <CheckCircle2 size={10} />
-                          已记录
+                          {t('data.recorded') || '已记录'}
                         </span>
                       )}
                     </div>
