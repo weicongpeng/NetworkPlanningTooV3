@@ -10,6 +10,7 @@
 import { useState, useEffect } from 'react'
 import { X, ChevronDown } from 'lucide-react'
 import { HexColorPicker } from 'react-colorful'
+import { useTranslation } from 'react-i18next'
 
 /**
  * 标签字段类型 - 现在支持任意字符串
