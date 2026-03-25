@@ -644,7 +644,7 @@ export function TACPage() {
         <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-start gap-2 shrink-0">
           <AlertCircle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
           <div className="flex-1">
-            <p className="text-red-500 text-sm font-medium">核查失败</p>
+            <p className="text-red-500 text-sm font-medium">{t('tac.failed') || '核查失败'}</p>
             <p className="text-red-600 text-xs">{error}</p>
           </div>
         </div>
