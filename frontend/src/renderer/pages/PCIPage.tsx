@@ -1488,7 +1488,7 @@ export function PCIPage() {
             ) : (
               <div className="text-center py-16 text-muted-foreground">
                 <Loader2 className="animate-spin mx-auto mb-4" size={48} />
-                <p>规划进行中，请稍候...</p>
+                <p>{t('pci.planning') || '规划进行中，请稍候...'}</p>
               </div>
             )}
           </div>
