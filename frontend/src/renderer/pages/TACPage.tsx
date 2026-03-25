@@ -536,7 +536,7 @@ export function TACPage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           {/* 网络类型选择 */}
           <div className="lg:col-span-3">
-            <label className="block text-sm font-semibold mb-2 text-foreground">网络类型</label>
+            <label className="block text-sm font-semibold mb-2 text-foreground">{t('tac.networkType') || '网络类型'}</label>
             <div className="flex gap-2">
               <label className="flex items-center gap-2 cursor-pointer px-3 py-1.5 rounded-md border border-border hover:bg-muted/50 transition-colors flex-1 justify-center">
                 <input
