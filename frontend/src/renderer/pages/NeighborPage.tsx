@@ -1380,7 +1380,7 @@ function NeighborTable({
                     type="text"
                     value={searchFilters?.[column.key] || ''}
                     onChange={(e) => onSearchChange(column.key, e.target.value)}
-                    placeholder="搜索"
+                    placeholder={i18n.searchColPlaceholder}
                     className="mt-1 w-full p-1 border border-border rounded text-[10px] bg-white dark:bg-slate-800"
                   />
                 )}
