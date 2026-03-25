@@ -348,7 +348,7 @@ export function DataPage() {
   return (
     <div className="p-8">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">数据管理</h1>
+        <h1 className="text-3xl font-bold">{t('data.title')}</h1>
         <div className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-2 ${
             isDesktop ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-yellow-100 text-yellow-700 border border-yellow-200'
         }`}>
