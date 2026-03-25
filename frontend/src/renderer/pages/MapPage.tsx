@@ -1145,7 +1145,7 @@ export function MapPage() {
                 <button
                   onClick={clearSearchInput}
                   className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-                  title="清除输入"
+                  title={t('map.clearInput') || '清除输入'}
                 >
                   <X size={12} />
                 </button>
