@@ -77,26 +77,29 @@ const validateNeighborConfig = (config: any): string | null => {
   // 验证最大邻区数
   const maxLimit = MAX_NEIGHBORS_LIMIT[config.planningType] || 512
   if (config.maxNeighbors < 1) {
-    return '最大邻区数不能小于1'
+    return i18n.validationMaxNeighbors1
   }
   if (config.maxNeighbors > maxLimit) {
-    return `${config.planningType}规划最多配置${maxLimit}条邻区关系，当前值为${config.maxNeighbors}`
+    return i18n.validationMaxNeighbors2
+      .replace('{{type}}', config.planningType)
+      .replace('{{limit}}', String(maxLimit))
+      .replace('{{value}}', String(config.maxNeighbors))
   }
 
   // 验证覆盖圆距离系数
   if (config.coverageDistanceFactor < 0.1 || config.coverageDistanceFactor > 2.0) {
-    return `覆盖圆距离系数必须在0.1-2.0之间，当前值为${config.coverageDistanceFactor}`
+    return i18n.validationDistanceFactor.replace('{{value}}', String(config.coverageDistanceFactor))
   }
 
   // 验证覆盖圆半径系数
   if (config.coverageRadiusFactor < 0.1 || config.coverageRadiusFactor > 2.0) {
-    return `覆盖圆半径系数必须在0.1-2.0之间，当前值为${config.coverageRadiusFactor}`
+    return i18n.validationRadiusFactor.replace('{{value}}', String(config.coverageRadiusFactor))
   }
 
   // 验证两个系数的乘积不应过大
   const factorProduct = config.coverageDistanceFactor * config.coverageRadiusFactor
   if (factorProduct > 3.0) {
-    return `覆盖圆系数乘积(${factorProduct.toFixed(2)})过大，可能产生过多无效邻区，建议减小系数`
+    return i18n.validationFactorProduct.replace('{{value}}', factorProduct.toFixed(2))
   }
 
   return null
