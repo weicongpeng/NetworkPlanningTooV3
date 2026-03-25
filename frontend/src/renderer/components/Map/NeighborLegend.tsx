@@ -7,6 +7,8 @@
  * - 灰色：其他小区
  */
 
+import { useTranslation } from 'react-i18next'
+
 interface NeighborLegendProps {
   className?: string
   /** 图例是否可见 */
@@ -20,6 +22,8 @@ export function NeighborLegend({
   visible = true,
   onToggleVisible
 }: NeighborLegendProps) {
+  const { t } = useTranslation()
+
   // 如果图例不可见，只显示一个小的展开按钮
   if (!visible) {
     return (
@@ -40,9 +44,9 @@ export function NeighborLegend({
             fontSize: '10px',
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
           }}
-          title="显示图例"
+          title={t('neighbor.legend') || '显示图例'}
         >
-          图例
+          {t('neighbor.legend') || '图例'}
         </button>
       </div>
     )
@@ -63,7 +67,7 @@ export function NeighborLegend({
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
         <div style={{ fontWeight: 600, color: '#333', fontSize: '7px' }}>
-          邻区规划图例
+          {t('neighbor.legend') || '邻区规划图例'}
         </div>
         {onToggleVisible && (
           <button
@@ -76,7 +80,7 @@ export function NeighborLegend({
               padding: '0 2px',
               color: '#666',
             }}
-            title="隐藏图例"
+            title={t('neighbor.hideLegend') || '隐藏图例'}
           >
             ×
           </button>
@@ -93,7 +97,7 @@ export function NeighborLegend({
           borderRadius: '1px',
           marginRight: '4px'
         }} />
-        <span style={{ color: '#333', fontWeight: 500, fontSize: '7px' }}>源小区</span>
+        <span style={{ color: '#333', fontWeight: 500, fontSize: '7px' }}>{t('neighbor.sourceCellLegend') || '源小区'}</span>
       </div>
 
       {/* 目标小区 */}
@@ -106,7 +110,7 @@ export function NeighborLegend({
           borderRadius: '1px',
           marginRight: '4px'
         }} />
-        <span style={{ color: '#333', fontWeight: 500, fontSize: '7px' }}>目标小区</span>
+        <span style={{ color: '#333', fontWeight: 500, fontSize: '7px' }}>{t('neighbor.targetCellLegend') || '目标小区'}</span>
       </div>
 
       {/* 其他小区 - 白色填充带黑色边框 */}
@@ -119,7 +123,7 @@ export function NeighborLegend({
           borderRadius: '1px',
           marginRight: '4px'
         }} />
-        <span style={{ color: '#333', fontWeight: 500, fontSize: '7px' }}>其他小区</span>
+        <span style={{ color: '#333', fontWeight: 500, fontSize: '7px' }}>{t('neighbor.otherCellLegend') || '其他小区'}</span>
       </div>
     </div>
   )
