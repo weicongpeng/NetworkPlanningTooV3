@@ -510,7 +510,7 @@ export function LayerControl({
           {
             id: 'custom-group',
             type: 'custom-group' as TreeNodeType,
-            label: '地理化数据',
+            label: t('map.geoData'),
             expanded: isExpanded('custom-group', true),
             children: [
               // 优先显示 pointFiles，为每个文件添加标签子项
