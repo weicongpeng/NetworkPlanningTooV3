@@ -193,7 +193,7 @@ export function LicensePage() {
                     <div className="flex items-center justify-between py-2">
                       <span className="text-sm text-muted-foreground">{t('license.remainingDays')}</span>
                       <span className={`text-sm font-medium ${remainingDays <= 30 ? 'text-orange-500' : ''}`}>
-                        {remainingDays} 天
+                        {remainingDays} {t('license.days')}
                       </span>
                     </div>
                   )}
