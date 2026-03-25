@@ -354,19 +354,19 @@ export function TACPlanningPage() {
                             <ul className="space-y-1.5">
                                 <li className="flex items-start gap-1.5">
                                     <span className="bg-primary/20 text-primary rounded-full w-4 h-4 flex items-center justify-center text-[10px] mt-0.5 shrink-0">1</span>
-                                    <span><b>待规划小区</b>：导入 cell-tree-export 格式的 Excel 文件，系统将通过小区 ID 自动关联全量工参获取坐标。</span>
+                                    <span><b>{t('tacPlanning.planningCell') || '待规划小区'}</b>：{t('tacPlanning.planningCellTip') || '导入 cell-tree-export 格式的 Excel 文件，系统将通过小区 ID 自动关联全量工参获取坐标。'}</span>
                                 </li>
                                 <li className="flex items-start gap-1.5">
                                     <span className="bg-primary/20 text-primary rounded-full w-4 h-4 flex items-center justify-center text-[10px] mt-0.5 shrink-0">2</span>
-                                    <span><b>全量工参</b>：在首页数据管理中导入对应的 4G 或 5G 全量工参，用于提供待规划小区的经纬度信息。</span>
+                                    <span><b>{t('tacPlanning.fullParams') || '全量工参'}</b>：{t('tacPlanning.fullParamsTip') || '在首页数据管理中导入对应的 4G 或 5G 全量工参，用于提供待规划小区的经纬度信息。'}</span>
                                 </li>
                                 <li className="flex items-start gap-1.5">
                                     <span className="bg-primary/20 text-primary rounded-full w-4 h-4 flex items-center justify-center text-[10px] mt-0.5 shrink-0">3</span>
-                                    <span><b>TAC图层</b>：在数据管理导入 4G 或 5G TAC 图层，图层格式为 zip 压缩包（包含 .tab 或 .shp 等 MapInfo 格式数据）。</span>
+                                    <span><b>{t('tacPlanning.tacLayer') || 'TAC图层'}</b>：{t('tacPlanning.tacLayerTip') || '在数据管理导入 4G 或 5G TAC 图层，图层格式为 zip 压缩包（包含 .tab 或 .shp 等 MapInfo 格式数据）。'}</span>
                                 </li>
                                 <li className="flex items-start gap-1.5">
                                     <FileSpreadsheet size={14} className="flex-shrink-0 mt-0.5" />
-                                    <p>备注：此为数据驱动规划，用于新站点/新增小区的TAC分配。</p>
+                                    <p>{t('tacPlanning.remark') || '备注：此为数据驱动规划，用于新站点/新增小区的TAC分配。'}</p>
                                 </li>
                             </ul>
                         </div>
