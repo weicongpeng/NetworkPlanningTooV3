@@ -321,7 +321,7 @@ export function MapPage() {
     // 圆形和多边形框选需要检查可见图层
     if (mode === 'circle' || mode === 'polygon') {
       if (visibleCount === 0) {
-        alert('请先在图层控制面板开启需要圈选的图层')
+        alert(t('map.enableLayerFirst') || '请先在图层控制面板开启需要圈选的图层')
         return
       }
 
