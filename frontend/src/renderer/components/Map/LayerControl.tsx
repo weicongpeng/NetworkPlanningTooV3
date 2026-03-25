@@ -1078,7 +1078,7 @@ export function LayerControl({
         isOpen={showLabelSettingsModal}
         onClose={() => setShowLabelSettingsModal(false)}
         onSave={handleSaveLabelSettings}
-        title={currentSettingsNode?.type === 'sector-layer' ? '扇区标签设置' : '图层文件标签设置'}
+        title={currentSettingsNode?.type === 'sector-layer' ? t('map.sectorLabelSettings') : t('map.layerFileLabelSettings')}
         currentSettings={currentLabelSettings}
         fieldOptions={fieldOptions}
         loadingFields={loadingFields}
