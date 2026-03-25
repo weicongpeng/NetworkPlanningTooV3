@@ -939,11 +939,11 @@ export function TACPage() {
                                   case 'matched':
                                     cellContent = cell.matched ? (
                                       <span className="px-2 py-1 bg-green-500/10 text-green-600 rounded">
-                                        已匹配
+                                        {t('tac.matched') || '已匹配'}
                                       </span>
                                     ) : (
                                       <span className="px-2 py-1 bg-orange-500/10 text-orange-600 rounded">
-                                        未匹配
+                                        {t('tac.unmatched') || '未匹配'}
                                       </span>
                                     )
                                     break
