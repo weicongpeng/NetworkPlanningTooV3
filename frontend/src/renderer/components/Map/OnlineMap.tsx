@@ -250,6 +250,9 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
   const preserveSelectionRef = useRef<boolean>(false) // 同步跟踪保留状态，避免 state 异步更新问题
   const [customLayerVisibility, setCustomLayerVisibilityState] = useState<Record<string, boolean>>({})
 
+  // i18n translation
+  const { t } = useTranslation()
+
   // 同步Ref
   useEffect(() => { measureModeRef.current = measureMode }, [measureMode])
   useEffect(() => { selectionModeRef.current = selectionMode }, [selectionMode])
