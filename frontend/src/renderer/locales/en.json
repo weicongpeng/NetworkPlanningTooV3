@@ -186,6 +186,9 @@
     "remove": "Remove",
     "select": "Select",
     "selected": "Selected",
-    "noData": "No Data"
+    "noData": "No Data",
+    "collapseSidebar": "Collapse Sidebar",
+    "expandSidebar": "Expand Sidebar",
+    "version": "Version"
   }
 }
