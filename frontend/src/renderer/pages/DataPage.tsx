@@ -889,7 +889,7 @@ function UploadArea({
             ) : status === 'success' ? (
               <>
                 <CheckCircle2 className="text-green-500" size={14} />
-                <p className="text-xs text-green-600 font-medium whitespace-nowrap">上传成功</p>
+                <p className="text-xs text-green-600 font-medium whitespace-nowrap">{t('data.uploadSuccess') || '上传成功'}</p>
               </>
             ) : status === 'error' ? (
               <>
