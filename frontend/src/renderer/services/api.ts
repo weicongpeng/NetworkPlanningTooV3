@@ -363,18 +363,6 @@ export const dataApi = {
     return response
   },
 
-  /** 删除数据 */
-  deleteData: async (dataId: string): Promise<boolean> => {
-    try {
-      const res = await apiClient.delete<ApiResponse<{ success: boolean }>>(`/data/${dataId}`)
-      // Axios interceptor should have returned res.data, but to be safe:
-      return (res as any).success || (res.data as any)?.success || false
-    } catch (error) {
-      console.error('Delete data error:', error)
-      return false
-    }
-  },
-
   // 获取数据列表（支持分页，支持绕过缓存）
   list: async (page: number = 1, pageSize: number = 50, cacheBust: boolean = false): Promise<ApiResponse<DataItem[]> & { total?: number }> => {
     const cacheParam = cacheBust ? `&_t=${Date.now()}` : ''
