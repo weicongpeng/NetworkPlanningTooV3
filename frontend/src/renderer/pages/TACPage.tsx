@@ -568,7 +568,7 @@ export function TACPage() {
           {/* TAC插花检测配置 - 横向布局 */}
           <div className="lg:col-span-4">
             <label className="text-sm font-semibold text-foreground mb-2">
-              TAC插花检测
+              {t('tac.singularityDetection') || 'TAC插花检测'}
             </label>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5">
