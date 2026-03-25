@@ -1195,7 +1195,7 @@ export function MapPage() {
               setSelectionMode('none') // 退出圈选模式
               setMapDragTool(false) // 退出地图拖拽工具
             }}
-            title={measureMode ? '退出测距模式' : '测距工具'}
+            title={measureMode ? (t('map.exitDistanceMode') || '退出测距模式') : (t('map.distanceMode') || '测距工具')}
           >
             <div className="w-4 h-4 flex items-center justify-center">
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2h8v20H8V2z"></path><path d="M13 6h3"></path><path d="M13 10h3"></path><path d="M13 14h3"></path><path d="M13 18h3"></path></svg>
