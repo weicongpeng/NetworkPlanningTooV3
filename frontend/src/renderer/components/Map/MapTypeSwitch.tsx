@@ -5,6 +5,7 @@
 
 import { useState } from 'react'
 import { Layers, Satellite } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { OnlineMapRef } from './OnlineMap'
 
 type MapLayerType = 'roadmap' | 'satellite'
@@ -14,6 +15,7 @@ interface MapTypeSwitchProps {
 }
 
 export function MapTypeSwitch({ mapRef }: MapTypeSwitchProps) {
+  const { t } = useTranslation()
   const [mapType, setMapType] = useState<MapLayerType>('roadmap')
 
   const handleToggle = () => {
@@ -26,17 +28,17 @@ export function MapTypeSwitch({ mapRef }: MapTypeSwitchProps) {
     <button
       onClick={handleToggle}
       className="flex items-center gap-2 px-3 py-2 bg-card border border-border rounded-lg hover:bg-muted/80 transition-colors text-xs"
-      title={mapType === 'roadmap' ? '切换到卫星地图' : '切换到平面地图'}
+      title={mapType === 'roadmap' ? t('map.switchToSatelliteMap') : t('map.switchToVectorMap')}
     >
       {mapType === 'roadmap' ? (
         <>
           <Layers size={14} />
-          <span className="whitespace-nowrap">平面地图</span>
+          <span className="whitespace-nowrap">{t('map.vectorMap')}</span>
         </>
       ) : (
         <>
           <Satellite size={14} />
-          <span className="whitespace-nowrap">卫星地图</span>
+          <span className="whitespace-nowrap">{t('map.satelliteMap')}</span>
         </>
       )}
     </button>
