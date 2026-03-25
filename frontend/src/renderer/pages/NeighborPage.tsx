@@ -29,6 +29,8 @@ import { NeighborLegend } from '../components/Map/NeighborLegend'
 import { MapTypeSwitch } from '../components/Map/MapTypeSwitch'
 import { neighborDataSyncService } from '../services/neighborDataSyncService'
 import type { RenderSectorData } from '../services/mapDataService'
+import { mapDataService } from '../services/mapDataService'
+import { DATA_REFRESH_EVENT } from '../store/dataStore'
 
 interface NeighborResultData {
   taskId: string
@@ -223,6 +225,24 @@ export function NeighborPage() {
       }
     }
 
+    // 监听数据刷新事件（当在其他页面上传新工参时）
+    const handleDataRefresh = async () => {
+      console.log('[NeighborPage] 收到数据刷新事件，正在重新初始化...')
+      try {
+        // 清除地图数据缓存
+        mapDataService.clearCache()
+        console.log('[NeighborPage] 已清除地图数据缓存')
+
+        // 重新初始化邻区数据同步服务
+        await initSyncService()
+        console.log('[NeighborPage] 数据同步服务已重新初始化')
+      } catch (error) {
+        console.warn('[NeighborPage] 数据刷新失败:', error)
+      }
+    }
+
+    window.addEventListener(DATA_REFRESH_EVENT, handleDataRefresh)
+
     // 延迟初始化，优先保证页面渲染
     const timeoutId = setTimeout(() => {
       initSyncService()
@@ -230,6 +250,7 @@ export function NeighborPage() {
 
     return () => {
       mounted = false
+      window.removeEventListener(DATA_REFRESH_EVENT, handleDataRefresh)
       clearTimeout(timeoutId)
     }
   }, [])
@@ -850,8 +871,8 @@ export function NeighborPage() {
   const isRunning = localTaskResult?.status === 'pending' || localTaskResult?.status === 'processing'
 
   return (
-    <div className="p-8 h-screen flex flex-col overflow-hidden">
-      <h1 className="text-3xl font-bold mb-8 shrink-0">邻区规划</h1>
+    <div className="h-full flex flex-col p-4 min-h-0">
+      <h1 className="text-3xl font-bold mb-6 shrink-0">邻区规划</h1>
 
       {/* 错误提示 */}
       {error && (
@@ -863,11 +884,11 @@ export function NeighborPage() {
       )}
 
       {/* 两列布局：左侧参数+结果，右侧地图 */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-1 min-h-0 flex-1">
+      <div className="flex flex-col lg:flex-row gap-4 min-h-0 flex-1 overflow-hidden">
         {/* 左列：规划参数 + 规划结果 */}
-        <div className="flex flex-col gap-1 min-h-0 overflow-hidden">
+        <div className="flex flex-col gap-4 min-h-0 w-1/2 min-w-0">
           {/* 规划参数面板 - 单行布局 */}
-          <div className="bg-card p-3 rounded-lg border border-border">
+          <div className="bg-card p-3 rounded-lg border border-border shrink-0">
             <div className="flex items-center gap-2 mb-2">
               <h2 className="text-base font-semibold">规划参数</h2>
             </div>
@@ -952,7 +973,7 @@ export function NeighborPage() {
           </div>
 
           {/* 规划结果面板 */}
-          <div className="bg-card p-3 rounded-lg border border-border flex flex-col min-h-0">
+          <div className="bg-card p-3 rounded-lg border border-border flex flex-col flex-1 min-h-0 overflow-hidden">
             {/* 标题行 + 统计卡片 */}
             <div className="flex items-center gap-3 mb-3 flex-wrap">
               <h2 className="text-base font-semibold">规划结果</h2>
@@ -1032,8 +1053,8 @@ export function NeighborPage() {
         </div>
 
         {/* 右列：地图窗口 */}
-        <div className="min-h-0">
-          <div className="bg-card rounded-lg border border-border p-3 h-full flex flex-col">
+        <div className="flex flex-col min-h-0 w-1/2 min-w-0">
+          <div className="bg-card rounded-lg border border-border p-3 flex-1 flex flex-col min-h-0">
             {/* 搜索栏 */}
             <div className="flex items-center gap-2 mb-2">
               <div className="relative flex-1 max-w-[300px]">
@@ -1123,7 +1144,7 @@ export function NeighborPage() {
             )}
 
             {/* 地图容器 */}
-            <div className="flex-1 rounded-lg overflow-hidden relative min-h-[400px]">
+            <div className="flex-1 rounded-lg overflow-hidden relative min-h-0">
             <OnlineMap
               ref={mapRef}
               mode="neighbor-planning"
@@ -1255,15 +1276,14 @@ function NeighborTable({
       ref={tableContainerRef}
       onScroll={handleScroll}
       className="overflow-x-auto rounded-lg border border-border overflow-y-auto flex-1 min-h-0"
-      style={{ maxHeight: '600px' }}
     >
-      <table className="w-full text-[0.6rem] text-left border-collapse table-fixed">
-        <thead className="bg-muted text-muted-foreground uppercase text-[0.55rem] sticky top-0 z-20 shadow-sm">
+      <table className="w-full text-xs text-left border-collapse table-fixed">
+        <thead className="sticky top-0 z-20 bg-background border-b border-border shadow-sm">
           <tr>
             {NEIGHBOR_COLUMNS.map((column) => (
               <th
                 key={column.key}
-                className="text-left px-3 py-2 font-medium bg-muted z-20 relative group"
+                className="text-left p-2 font-medium bg-background z-20 relative group"
                 style={{ width: `${columnWidths[column.key]}px`, minWidth: `${columnWidths[column.key]}px` }}
               >
                 <span className="block pr-3">{column.label}</span>
@@ -1273,7 +1293,7 @@ function NeighborTable({
                     value={searchFilters?.[column.key] || ''}
                     onChange={(e) => onSearchChange(column.key, e.target.value)}
                     placeholder="搜索"
-                    className="mt-1 w-full p-1 border border-border rounded text-[0.5rem] bg-white dark:bg-slate-800"
+                    className="mt-1 w-full p-1 border border-border rounded text-[10px] bg-white dark:bg-slate-800"
                   />
                 )}
                 {/* 拖拽手柄 */}
@@ -1328,7 +1348,7 @@ function NeighborTable({
                       switch (column.key) {
                         case 'relationType':
                           cellContent = (
-                            <span className={`px-2 py-1 rounded text-[0.55rem] ${
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] ${
                               group.relationType === 'LTE-LTE' ? 'bg-blue-100 text-blue-700' :
                               group.relationType === 'NR-NR' ? 'bg-purple-100 text-purple-700' :
                                 'bg-green-100 text-green-700'
@@ -1377,7 +1397,7 @@ function NeighborTable({
                       return (
                         <td
                           key={column.key}
-                          className="px-3 py-2 truncate"
+                          className="p-2 truncate"
                           style={{ width: `${width}px`, minWidth: `${width}px`, maxWidth: `${width}px` }}
                           title={column.key.includes('Name') ? cellContent : undefined}
                         >

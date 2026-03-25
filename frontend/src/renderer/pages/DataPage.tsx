@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Upload, FileSpreadsheet, Trash2, Download, Loader2, AlertCircle, RefreshCw, CheckCircle2, Layers, FileDown, MapPin, Navigation } from 'lucide-react'
 import { useDataStore } from '../store/dataStore'
+import { dataApi } from '../services/api'
 import type { DataItem } from '@shared/types'
+import { DATA_REFRESH_EVENT, triggerDataRefresh } from '../store/dataStore'
+import { mapDataService } from '../services/mapDataService'
 
 export function DataPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -37,9 +40,22 @@ export function DataPage() {
     updateParameters,
   } = useDataStore()
 
+  // 初始化数据列表 + 监听跨页面刷新事件
   useEffect(() => {
     fetchList(1, 50)
-  }, [fetchList])
+
+    // 监听数据刷新事件（从其他页面触发，如PCI应用后）
+    const handleDataRefresh = () => {
+      console.log('[DataPage] 收到数据刷新事件，正在刷新列表...')
+      fetchList(1, 50, true)  // 强制刷新，忽略缓存
+    }
+
+    window.addEventListener(DATA_REFRESH_EVENT, handleDataRefresh)
+
+    return () => {
+      window.removeEventListener(DATA_REFRESH_EVENT, handleDataRefresh)
+    }
+  }, []) // 修复：移除 fetchList 依赖，使用空依赖数组，避免事件监听器被反复移除/添加导致事件丢失
 
   const isDesktop = !!(window as any).electronAPI
 
@@ -129,6 +145,13 @@ export function DataPage() {
         event.target.value = ''
         setUploadStatus(prev => ({ ...prev, [context]: 'success' }))
         setTimeout(() => setUploadStatus(prev => ({ ...prev, [context]: 'idle' })), 3000)
+
+        // 清除地图数据缓存，确保 pciDataSyncService 能获取到最新数据
+        await mapDataService.clearCache()
+
+        // 触发数据刷新事件，通知其他页面（PCI、邻区、TAC）重新加载数据
+        triggerDataRefresh()
+        console.log('[DataPage] 已触发数据刷新事件')
       } else {
         setUploadStatus(prev => ({ ...prev, [context]: 'error' }))
         setTimeout(() => setUploadStatus(prev => ({ ...prev, [context]: 'idle' })), 3000)
@@ -155,11 +178,18 @@ export function DataPage() {
         setUploadStatus(prev => ({ ...prev, [context]: 'success' }))
         setTimeout(() => setUploadStatus(prev => ({ ...prev, [context]: 'idle' })), 3000)
 
+        // 清除地图数据缓存，确保 pciDataSyncService 能获取到最新数据
+        await mapDataService.clearCache()
+
         // 地理化数据上传成功提示
         if (context === 'geo_data') {
           setUploadSuccess(`✅ 地理化数据「${file.name}」上传成功！已导入 ${items.filter(i => i.fileType === 'geo_data').length + 1} 个数据文件`)
           setTimeout(() => setUploadSuccess(null), 3000)
         }
+
+        // 触发数据刷新事件，通知其他页面（PCI、邻区、TAC）重新加载数据
+        triggerDataRefresh()
+        console.log('[DataPage] 已触发数据刷新事件')
       } else {
         setUploadStatus(prev => ({ ...prev, [context]: 'error' }))
         setTimeout(() => setUploadStatus(prev => ({ ...prev, [context]: 'idle' })), 3000)
@@ -171,11 +201,11 @@ export function DataPage() {
     try {
         console.log('[Download] Requesting:', item.id);
         const url = `/api/v1/data/${item.id}/download`;
-        
+
         // 强制使用 Fetch + Blob 模式，这种方式在 Electron 和浏览器中最稳定
         const response = await fetch(url);
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        
+
         const blob = await response.blob();
         if (blob.size === 0) throw new Error('文件内容为空');
 
@@ -185,13 +215,13 @@ export function DataPage() {
         link.setAttribute('download', item.name); // 显式设置文件名
         document.body.appendChild(link);
         link.click();
-        
+
         // 清理
         setTimeout(() => {
             document.body.removeChild(link);
             window.URL.revokeObjectURL(blobUrl);
         }, 100);
-        
+
         console.log('[Download] Success');
     } catch (err: any) {
         console.error('[Download] Failed:', err);
@@ -199,21 +229,63 @@ export function DataPage() {
     }
   }
 
+  const handleDelete = async (item: DataItem) => {
+    const itemName = item.name || '未知文件'
+
+    // 确认删除
+    const confirmed = confirm(`确定要删除 "${itemName}" 吗？\n\n删除后将无法恢复，且会影响使用该数据的规划结果。`)
+    if (!confirmed) return
+
+    try {
+      // 先尝试普通删除
+      let result = await deleteItem(item.id)
+
+      // 如果删除失败，询问是否强制删除
+      if (!result) {
+        const forceDelete = confirm(
+          `删除失败：文件可能正在被其他程序使用。\n\n` +
+          `是否要强制删除？\n` +
+          `• 强制删除会从索引中移除该数据\n` +
+          `• 部分文件可能需要手动清理\n` +
+          `• 建议先关闭相关程序后再试`
+        )
+
+        if (forceDelete) {
+          // 使用 dataApi 的强制删除
+          result = await dataApi.delete(item.id, true)
+          if (result?.success) {
+            alert('已从索引中移除。如果后续遇到问题，请刷新页面或重新导入数据。')
+            await fetchList(1, 50, true)
+          } else {
+            alert('强制删除失败。请尝试：\n1. 关闭所有 Excel 文件\n2. 重启应用后再试\n3. 手动删除 data 目录下的对应文件夹')
+          }
+        } else {
+          alert('删除已取消。')
+        }
+      } else {
+        await fetchList(1, 50, true)
+      }
+    } catch (err: any) {
+      console.error('[Delete] Failed:', err)
+      alert(`删除失败: ${err.message || '未知错误'}\n\n可能原因：\n• 文件正在被其他程序使用\n• 磁盘权限不足\n• 索引文件损坏`)
+    }
+  }
+
   const handleUpdateParameters = async () => {
      if (!selectedFullParamId || !selectedCurrentParamId) return
-     
+
      setUpdateSuccess(null)
      try {
          const result = await updateParameters(selectedFullParamId, selectedCurrentParamId)
          console.log('Update parameters result:', result);
          if (result?.success) {
             await fetchList(1, 50);
-             
+
              // 使用后端返回的新文件名
              const newFileName = result?.data?.newFileName;
              const savedToOriginal = result?.data?.savedToOriginal;
              const updatedItems = useDataStore.getState().items;
-             const newFile = [...updatedItems].sort((a, b) => 
+             const newFile = [...updatedItems].sort((a, b) =>
                  new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime()
              )[0];
              console.log('Newest file:', newFile);
@@ -229,7 +301,7 @@ export function DataPage() {
              } else {
                  setUpdateSuccess('更新成功！文件已保存在系统内，请手动下载。');
              }
-             
+
              setSelectedFullParamId('')
              setSelectedCurrentParamId('')
          }
@@ -237,6 +309,35 @@ export function DataPage() {
          console.error('Update failed:', err);
      }
    }
+
+  const handleCleanupIndex = async () => {
+    const confirmed = confirm(
+      '确定要清理无效索引吗？\n\n' +
+      '这将会移除所有文件不存在但索引中仍然存在的记录。\n' +
+      '此操作不会影响有效的数据文件。'
+    )
+
+    if (!confirmed) return
+
+    try {
+      const result = await dataApi.cleanupIndex()
+      if (result?.success) {
+        const removed = result.data?.removed || 0
+        const items = result.data?.items || []
+
+        if (removed > 0) {
+          alert(`清理完成！已移除 ${removed} 个无效索引项：\n\n${items.map((i: any) => `• ${i.name}`).join('\n')}`)
+        } else {
+          alert('索引状态良好，没有发现无效项。')
+        }
+
+        await fetchList(1, 50, true)
+      }
+    } catch (err: any) {
+      console.error('[Cleanup] Failed:', err)
+      alert(`清理失败: ${err.message || '未知错误'}`)
+    }
+  }
 
   // 筛选文件列表
   const fullParamFiles = items.filter(i => i.fileType === 'full_params')
@@ -295,9 +396,33 @@ export function DataPage() {
 
       {!isDesktop && (
           <div className="mb-6 p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700">
-              提示：您当前正在使用浏览器访问。若要实现“更新后保存到原文件夹”，请运行 <strong>start_app.bat</strong> 使用桌面应用。
+              提示：您当前正在使用浏览器访问。若要实现"更新后保存到原文件夹"，请运行 <strong>start_app.bat</strong> 使用桌面应用。
           </div>
       )}
+
+      {/* 工具栏 */}
+      <div className="mb-6 flex justify-between items-center">
+        <div className="flex gap-2">
+          <button
+            onClick={() => fetchList(1, 50, true)}
+            className="px-4 py-2 bg-card border border-border rounded-lg hover:bg-muted transition-colors flex items-center gap-2"
+          >
+            <RefreshCw size={16} />
+            刷新列表
+          </button>
+          <button
+            onClick={handleCleanupIndex}
+            className="px-4 py-2 bg-card border border-border rounded-lg hover:bg-muted transition-colors flex items-center gap-2"
+            title="清理无效的索引项（文件不存在但索引中仍然存在的记录）"
+          >
+            <RefreshCw size={16} />
+            清理索引
+          </button>
+        </div>
+        <div className="text-sm text-muted-foreground">
+          共 {items.length} 条数据
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="space-y-8">
@@ -587,7 +712,7 @@ export function DataPage() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
-                        deleteItem(item.id)
+                        handleDelete(item)
                       }}
                       className="p-2 hover:bg-background rounded text-red-500"
                       title="删除"

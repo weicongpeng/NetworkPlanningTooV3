@@ -27,16 +27,22 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation()
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen bg-background overflow-hidden">
       {/* 侧边栏 */}
       <aside
-        className={`${sidebarOpen ? 'w-44' : 'w-16'
-          } bg-secondary border-r border-border transition-all duration-300 flex flex-col relative`}
+        style={{
+          width: sidebarOpen ? '116px' : '42px',
+          transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
+        className="bg-secondary border-r border-border flex flex-col relative z-20"
       >
         {/* 侧边栏边缘把手 - 右边缘中部，轻微凸出 */}
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/3 w-4 h-16 bg-secondary border border-border rounded-r-md hover:bg-muted transition-all duration-200 flex items-center justify-center group shadow-sm hover:shadow-md z-10"
+          style={{
+            transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease',
+          }}
+          className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/3 w-4 h-16 bg-secondary border border-border rounded-r-md hover:bg-muted flex items-center justify-center group shadow-sm hover:shadow-md z-30"
           title={sidebarOpen ? '收起侧边栏' : '展开侧边栏'}
         >
           {/* 把手纹理 - 横向线条 */}
@@ -47,8 +53,8 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
           </div>
         </button>
 
-        {/* 导航菜单 */}
-        <nav className={`flex-1 overflow-y-auto ${sidebarOpen ? 'p-4 space-y-2' : 'p-2 space-y-2'}`}>
+        {/* 导航菜单 - 固定高度和间距，避免上下移动，图标位置固定，内容边距统一 */}
+        <nav className="flex-1 overflow-y-auto py-3">
           {navigation.map((item) => {
             const Icon = item.icon
             const isActive = location.pathname === item.href
@@ -60,25 +66,49 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                 className={`${isActive
                     ? 'bg-blue-400 text-white hover:bg-blue-500'
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                  } flex items-center ${sidebarOpen ? 'justify-start px-4' : 'justify-center px-2'} gap-3 py-3 rounded-lg transition-colors`}
+                  } flex items-center h-[42px] rounded-lg transition-colors`}
+                style={{
+                  paddingLeft: '6px',
+                  paddingRight: '6px',
+                  gap: '8px',
+                }}
               >
-                <Icon size={20} />
-                {sidebarOpen && <span>{item.name}</span>}
+                <div className="flex-shrink-0 w-6 flex justify-center">
+                  <Icon size={20} />
+                </div>
+                <span
+                  style={{
+                    opacity: sidebarOpen ? 1 : 0,
+                    maxWidth: sidebarOpen ? '200px' : '0px',
+                    transition: 'opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    display: 'block',
+                  }}
+                >
+                  {item.name}
+                </span>
               </Link>
             )
           })}
         </nav>
 
-        {/* 底部信息 */}
-        {sidebarOpen && (
-          <div className="p-4 border-t border-border text-xs text-muted-foreground">
+        {/* 底部信息 - 使用固定高度容器避免菜单上下移动 */}
+        <div className="border-t border-border text-xs text-muted-foreground">
+          <div
+            style={{
+              opacity: sidebarOpen ? 1 : 0,
+              transition: 'opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+            }}
+            className="px-4 py-4 h-[52px]"
+          >
             <p>版本: 2.0.0</p>
           </div>
-        )}
+        </div>
       </aside>
 
       {/* 主内容区域 */}
-      <main className="flex-1 overflow-auto flex flex-col">
+      <main className="flex-1 overflow-auto flex flex-col relative z-10">
         {children}
       </main>
     </div>

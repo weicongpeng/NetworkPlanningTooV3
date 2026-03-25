@@ -11,6 +11,8 @@
 import L from 'leaflet'
 import { CoordinateTransformer } from '../../utils/coordinate'
 
+const IS_DEV = import.meta.env.DEV
+
 /**
  * 图层要素类型
  */
@@ -222,7 +224,7 @@ export class MapInfoLayer {
    */
   getFeaturesInCircle(center: L.LatLng, radius: number): any[] {
     if (!this.geoJSONLayer) {
-      console.log('[MapInfoLayer] getFeaturesInCircle: geoJSONLayer不存在', this.id)
+      if (IS_DEV) console.log('[MapInfoLayer] getFeaturesInCircle: geoJSONLayer不存在', this.id)
       return []
     }
     const results: any[] = []
@@ -247,7 +249,7 @@ export class MapInfoLayer {
       }
     })
 
-    console.log('[MapInfoLayer] getFeaturesInCircle:', {
+    if (IS_DEV) console.log('[MapInfoLayer] getFeaturesInCircle:', {
       id: this.id,
       name: this.name,
       totalLayers: layerCount,
@@ -315,7 +317,7 @@ export class MapInfoLayer {
 
     // 先移除（如果已存在），避免重复添加
     if (map.hasLayer(this.geoJSONLayer)) {
-      console.log('[MapInfoLayer] Layer already on map, removing first:', this.id)
+      if (IS_DEV) console.log('[MapInfoLayer] Layer already on map, removing first:', this.id)
       map.removeLayer(this.geoJSONLayer)
     }
 
@@ -324,14 +326,14 @@ export class MapInfoLayer {
 
     // 如果标签已开启，在添加到地图时自动创建标签
     if (this.labelsEnabled) {
-      console.log('[MapInfoLayer] Labels enabled, creating labels upon adding to map:', this.id)
+      if (IS_DEV) console.log('[MapInfoLayer] Labels enabled, creating labels upon adding to map:', this.id)
       this._createLabels(map)
     }
 
     // 监听缩放变化，缩放结束后重新应用高亮样式
     map.on('zoomend', this._onZoomEnd.bind(this))
 
-    console.log('[MapInfoLayer] Layer added to map:', this.id)
+    if (IS_DEV) console.log('[MapInfoLayer] Layer added to map:', this.id)
     return this
   }
 
@@ -341,7 +343,7 @@ export class MapInfoLayer {
   private _onZoomEnd(): void {
     // 如果之前设置过高亮，缩放结束后重新应用
     if (this.selectionHighlightIds && this.selectionHighlightIds.size > 0) {
-      console.log('[MapInfoLayer] Zoom ended, re-applying highlight:', this.id)
+      if (IS_DEV) console.log('[MapInfoLayer] Zoom ended, re-applying highlight:', this.id)
       this.setSelectionHighlight(this.selectionHighlightIds)
     }
   }
@@ -351,14 +353,14 @@ export class MapInfoLayer {
    */
   remove(map: L.Map): this {
     if (this.geoJSONLayer && map.hasLayer(this.geoJSONLayer)) {
-      console.log('[MapInfoLayer] Removing layer from map:', this.id)
+      if (IS_DEV) console.log('[MapInfoLayer] Removing layer from map:', this.id)
       map.removeLayer(this.geoJSONLayer)
       // 移除 zoomend 事件监听器，防止事件泄漏
       map.off('zoomend', this._onZoomEnd)
       // 清除标签
       this._removeLabels()
     } else {
-      console.log('[MapInfoLayer] Layer not on map, skipping remove:', this.id, {
+      if (IS_DEV) console.log('[MapInfoLayer] Layer not on map, skipping remove:', this.id, {
         hasGeoJSONLayer: !!this.geoJSONLayer,
         hasLayerInMap: this.geoJSONLayer ? map.hasLayer(this.geoJSONLayer) : false
       })
@@ -373,7 +375,7 @@ export class MapInfoLayer {
    * 设置可见性
    */
   setVisible(map: L.Map, visible: boolean): this {
-    console.log('[MapInfoLayer] setVisible called:', this.id, visible, {
+    if (IS_DEV) console.log('[MapInfoLayer] setVisible called:', this.id, visible, {
       hasGeoJSONLayer: !!this.geoJSONLayer,
       hasLayerInMap: this.geoJSONLayer ? map.hasLayer(this.geoJSONLayer) : false
     })
@@ -390,7 +392,7 @@ export class MapInfoLayer {
    */
   isVisible(): boolean {
     if (!this.geoJSONLayer || !this.currentMap) {
-      console.log('[MapInfoLayer] isVisible: 不可见', {
+      if (IS_DEV) console.log('[MapInfoLayer] isVisible: 不可见', {
         id: this.id,
         name: this.name,
         hasGeoJSONLayer: !!this.geoJSONLayer,
@@ -399,7 +401,7 @@ export class MapInfoLayer {
       return false
     }
     const visible = this.currentMap.hasLayer(this.geoJSONLayer)
-    console.log('[MapInfoLayer] isVisible:', {
+    if (IS_DEV) console.log('[MapInfoLayer] isVisible:', {
       id: this.id,
       name: this.name,
       visible
@@ -419,7 +421,7 @@ export class MapInfoLayer {
       features: options.data.features.map(feature => transformFeatureCoordinates(feature))
     }
 
-    console.log('[MapInfoLayer] Applied coordinate transformation to', transformedData.features.length, 'features')
+    if (IS_DEV) console.log('[MapInfoLayer] Applied coordinate transformation to', transformedData.features.length, 'features')
 
     // 创建 GeoJSON 图层（使用转换后的数据）
     mapInfoLayer.geoJSONLayer = L.geoJSON(transformedData, {
@@ -461,7 +463,7 @@ export class MapInfoLayer {
         // 调试：打印第一个要素的样式
         if (feature && feature.properties && Object.keys(feature.properties).length > 0) {
           if (!MapInfoLayer._debugPrinted) {
-            console.log('[MapInfoLayer] Feature style sample:', {
+            if (IS_DEV) console.log('[MapInfoLayer] Feature style sample:', {
               geometry,
               featureStyle,
               properties: Object.keys(feature.properties).slice(0, 5)
@@ -533,7 +535,7 @@ export class MapInfoLayer {
           }
 
           if (mapInfoLayer.onFeatureClickCallback) {
-            console.log('[MapInfoLayer] Feature clicked:', feature.properties)
+            if (IS_DEV) console.log('[MapInfoLayer] Feature clicked:', feature.properties)
             mapInfoLayer.onFeatureClickCallback(feature.properties, e)
           }
         })
@@ -623,7 +625,7 @@ export class MapInfoLayer {
    */
   setLabelVisibility(visible: boolean): void {
     this.labelsEnabled = visible
-    console.log('[MapInfoLayer] setLabelVisibility:', this.id, visible)
+    if (IS_DEV) console.log('[MapInfoLayer] setLabelVisibility:', this.id, visible)
 
     if (!this.currentMap) {
       console.warn('[MapInfoLayer] 图层未添加到地图，无法显示标签')
@@ -644,11 +646,11 @@ export class MapInfoLayer {
   setLabelConfig(config: { content: string; color: string; fontSize: number }): void {
     // 更新配置
     this.labelConfig = { ...this.labelConfig, ...config }
-    console.log('[MapInfoLayer] setLabelConfig:', this.id, this.labelConfig)
+    if (IS_DEV) console.log('[MapInfoLayer] setLabelConfig:', this.id, this.labelConfig)
 
     // 如果标签已启用且图层已添加到地图，重新创建标签以应用新配置
     if (this.labelsEnabled && this.currentMap) {
-      console.log('[MapInfoLayer] 标签已启用，立即重新创建标签')
+      if (IS_DEV) console.log('[MapInfoLayer] 标签已启用，立即重新创建标签')
       this._removeLabels()
       this._createLabels(this.currentMap)
     }
@@ -663,13 +665,17 @@ export class MapInfoLayer {
 
     // 如果缩放级别改变较大或者标签已开启，重新创建标签以应用碰撞检测
     if (this.labelsEnabled && this.currentMap && Math.abs(oldZoom - zoom) >= 1) {
-      console.log('[MapInfoLayer] Zoom changed, re-creating labels:', this.id, zoom)
+      if (IS_DEV) console.log('[MapInfoLayer] Zoom changed, re-creating labels:', this.id, zoom)
       this._createLabels(this.currentMap)
     }
   }
 
   /**
    * 创建标签
+   *
+   * P1-3 优化:
+   * 1. 优先级采样: 按要素重要性排序后采样
+   * 2. 视口裁剪: 只渲染当前视口内的标签
    */
   private _createLabels(map: L.Map): void {
     if (!this.geoJSONLayer) return
@@ -677,18 +683,17 @@ export class MapInfoLayer {
     // 清除现有标签
     this._removeLabels()
 
-    // 遍历GeoJSON图层的每个要素
-    // 记录已占用的标签位置，用于碰撞检测
-    const occupiedPositions: L.LatLng[] = []
+    // 获取当前视口边界
+    const mapBounds = map.getBounds()
 
-    // 设置标签最小间距（像素）：随缩放级别动态调整
-    // zoom <= 11: 6倍字号 (约72px)
-    // zoom 12-16: 2.5倍字号 (约30px)
-    // zoom > 16: 1.2倍字号 (约14px)
-    const minDistance = this.currentZoom <= 11 ? this.labelConfig.fontSize * 6 : this.currentZoom <= 16 ? this.labelConfig.fontSize * 2.5 : this.labelConfig.fontSize * 1.2
-
-    // 根据缩放级别限制最大可见标签数
-    const maxVisibleLabels = this.currentZoom < 12 ? 200 : this.currentZoom < 16 ? 1000 : 3000
+    // 收集所有候选标签要素
+    interface LabelCandidate {
+      layer: any
+      latLng: L.LatLng
+      properties: any
+      priority: number  // 优先级（数值越大越优先）
+    }
+    const candidates: LabelCandidate[] = []
 
     this.geoJSONLayer.eachLayer((layer: any) => {
       try {
@@ -707,65 +712,127 @@ export class MapInfoLayer {
 
         if (!latLng) return
 
-        // 碰撞检测
-        let isOverlapping = false
-        for (const occPos of occupiedPositions) {
-          const p1 = map.latLngToContainerPoint(latLng)
-          const p2 = map.latLngToContainerPoint(occPos)
-          const dist = Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2))
-
-          if (dist < minDistance) {
-            isOverlapping = true
-            break
-          }
-        }
-
-        if (isOverlapping) return
+        // P1-3: 视口裁剪 - 只处理视口内的要素
+        if (!mapBounds.contains(latLng)) return
 
         // 获取标签内容
         const labelContent = this._getLabelContent(properties)
-
         if (!labelContent) return
 
-        // 创建标签图标
-        const labelIcon = L.divIcon({
-          className: 'mapinfo-label',
-          html: `<div style="
-              font-size: ${this.labelConfig.fontSize}px;
-              color: ${this.labelConfig.color};
-              font-weight: 500;
-              white-space: nowrap;
-              background-color: transparent;
-              padding: 0;
-              pointer-events: none;
-              text-shadow: 0 1px 2px rgba(0,0,0,0.3);
-            ">${labelContent}</div>`,
-          iconSize: L.point(0, 0),
-          iconAnchor: L.point(0, -5)
-        })
-
-        const labelMarker = L.marker(latLng, {
-          icon: labelIcon,
-          interactive: false
-        } as any)
-
-        labelMarker.addTo(map)
-        const layerId = (layer as any)._leaflet_id || String(latLng.lat)
-        this.labelMarkers.set(layerId, labelMarker)
-
-        // 记录位置
-        occupiedPositions.push(latLng)
-
-        // 限制单个图层最大显示标签数，避免性能问题
-        if (this.labelMarkers.size >= maxVisibleLabels) {
-          return
-        }
+        // P1-3: 计算优先级
+        const priority = this._calculateLabelPriority(properties, feature)
+        candidates.push({ layer, latLng, properties, priority })
       } catch (err) {
-        console.warn('[MapInfoLayer] Failed to create label:', err)
+        console.warn('[MapInfoLayer] Failed to collect label candidate:', err)
       }
     })
 
-    console.log('[MapInfoLayer] Created', this.labelMarkers.size, 'labels for layer type:', this.type, 'Zoom:', this.currentZoom)
+    // P1-3: 按优先级排序（高优先级在前）
+    candidates.sort((a, b) => b.priority - a.priority)
+
+    // 设置标签最小间距（像素）：随缩放级别动态调整
+    const minDistance = this.currentZoom <= 11 ? this.labelConfig.fontSize * 6 : this.currentZoom <= 16 ? this.labelConfig.fontSize * 2.5 : this.labelConfig.fontSize * 1.2
+
+    // 根据缩放级别限制最大可见标签数
+    const maxVisibleLabels = this.currentZoom < 12 ? 200 : this.currentZoom < 16 ? 1000 : 3000
+
+    // 记录已占用的标签位置，用于碰撞检测
+    const occupiedPositions: L.LatLng[] = []
+
+    // 按优先级顺序创建标签
+    for (const candidate of candidates) {
+      // 碰撞检测
+      let isOverlapping = false
+      for (const occPos of occupiedPositions) {
+        const p1 = map.latLngToContainerPoint(candidate.latLng)
+        const p2 = map.latLngToContainerPoint(occPos)
+        const dist = Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2))
+
+        if (dist < minDistance) {
+          isOverlapping = true
+          break
+        }
+      }
+
+      if (isOverlapping) continue
+
+      // 限制最大显示标签数
+      if (this.labelMarkers.size >= maxVisibleLabels) break
+
+      // 创建标签图标
+      const labelContent = this._getLabelContent(candidate.properties)
+      const labelIcon = L.divIcon({
+        className: 'mapinfo-label',
+        html: `<div style="
+            font-size: ${this.labelConfig.fontSize}px;
+            color: ${this.labelConfig.color};
+            font-weight: 500;
+            white-space: nowrap;
+            background-color: transparent;
+            padding: 0;
+            pointer-events: none;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+          ">${labelContent}</div>`,
+        iconSize: L.point(0, 0),
+        iconAnchor: L.point(0, -5)
+      })
+
+      const labelMarker = L.marker(candidate.latLng, {
+        icon: labelIcon,
+        interactive: false
+      } as any)
+
+      labelMarker.addTo(map)
+      const layerId = (candidate.layer as any)._leaflet_id || String(candidate.latLng.lat)
+      this.labelMarkers.set(layerId, labelMarker)
+
+      // 记录位置
+      occupiedPositions.push(candidate.latLng)
+    }
+
+    if (IS_DEV) console.log('[MapInfoLayer] Created', this.labelMarkers.size, 'labels for layer type:', this.type, 'Zoom:', this.currentZoom)
+  }
+
+  /**
+   * 计算标签优先级
+   * P1-3 优化: 返回优先级分数（数值越大越优先）
+   */
+  private _calculateLabelPriority(properties: any, feature: GeoJSON.Feature): number {
+    let priority = 0
+
+    // 1. 名称前缀优先级（"A"开头最优先）
+    const name = properties.name || properties.小区名称 || properties.CellName || ''
+    if (name) {
+      const firstChar = name.charAt(0).toUpperCase()
+      if (firstChar === 'A') priority += 100
+      else if (firstChar === 'B') priority += 80
+      else if (firstChar === 'C') priority += 60
+      else if (firstChar >= 'D' && firstChar <= 'F') priority += 40
+      else if (firstChar >= 'G' && firstChar <= 'L') priority += 20
+    }
+
+    // 2. 点要素优先级略高于线面（因为通常更重要）
+    if (feature.geometry?.type === 'Point') {
+      priority += 10
+    }
+
+    // 3. 面积/长度优先级（较大的要素优先）
+    if (properties.area) {
+      priority += Math.min(Math.log(properties.area + 1) / 10, 20)
+    }
+    if (properties.length) {
+      priority += Math.min(Math.log(properties.length + 1) / 10, 15)
+    }
+
+    // 4. 特殊标识优先级
+    if (properties.isImportant || properties.重要性 === '高') {
+      priority += 50
+    }
+    if (properties.isShared === '是' || properties.isShared === true) {
+      priority += 5
+    }
+
+    return priority
   }
 
   /**
@@ -842,6 +909,7 @@ export class MapInfoLayerManager {
    * 调试方法：打印所有图层及其在地图上的状态
    */
   debugPrintLayers(): void {
+    if (!IS_DEV) return
     console.log('[MapInfoLayerManager] === LAYER STATUS ===')
     console.log('[MapInfoLayerManager] Total layers in memory:', this.layers.size)
     console.log('[MapInfoLayerManager] Map instance:', this.map ? 'exists' : 'NULL')
@@ -866,12 +934,12 @@ export class MapInfoLayerManager {
    */
   async addLayer(options: MapInfoLayerOptions, visible: boolean = false): Promise<void> {
     const layer = await MapInfoLayer.fromGeoJSON(options)
-    console.log('[MapInfoLayerManager] Adding layer:', layer.getId(), 'visible:', visible)
+    if (IS_DEV) console.log('[MapInfoLayerManager] Adding layer:', layer.getId(), 'visible:', visible)
     this.layers.set(layer.getId(), layer)
 
     if (visible && this.map) {
       layer.addTo(this.map)
-      console.log('[MapInfoLayerManager] Layer added to map:', layer.getId())
+      if (IS_DEV) console.log('[MapInfoLayerManager] Layer added to map:', layer.getId())
     }
   }
 
@@ -879,7 +947,7 @@ export class MapInfoLayerManager {
    * 移除图层
    */
   removeLayer(layerId: string): void {
-    console.log('[MapInfoLayerManager] Removing layer:', layerId, 'existing layers:', Array.from(this.layers.keys()))
+    if (IS_DEV) console.log('[MapInfoLayerManager] Removing layer:', layerId, 'existing layers:', Array.from(this.layers.keys()))
     const layer = this.layers.get(layerId)
     if (layer && this.map) {
       layer.remove(this.map)
@@ -891,34 +959,34 @@ export class MapInfoLayerManager {
    * 设置图层可见性
    */
   setLayerVisibility(layerId: string, visible: boolean): void {
-    console.log('[MapInfoLayerManager] setLayerVisibility:', layerId, visible, 'existing layers:', Array.from(this.layers.keys()))
-    console.log('[MapInfoLayerManager] Map instance:', this.map ? 'exists' : 'NULL')
+    if (IS_DEV) console.log('[MapInfoLayerManager] setLayerVisibility:', layerId, visible, 'existing layers:', Array.from(this.layers.keys()))
+    if (IS_DEV) console.log('[MapInfoLayerManager] Map instance:', this.map ? 'exists' : 'NULL')
 
     // 调试：打印所有图层状态
     this.debugPrintLayers()
 
     const layer = this.layers.get(layerId)
     if (layer) {
-      console.log('[MapInfoLayerManager] Found layer:', layerId)
+      if (IS_DEV) console.log('[MapInfoLayerManager] Found layer:', layerId)
       if (this.map) {
         layer.setVisible(this.map, visible)
-        console.log('[MapInfoLayerManager] Layer visibility set, checking result...')
+        if (IS_DEV) console.log('[MapInfoLayerManager] Layer visibility set, checking result...')
         // 验证：检查图层是否真的在地图上
         const geoJSONLayer = (layer as any).geoJSONLayer
         if (geoJSONLayer && this.map.hasLayer(geoJSONLayer)) {
-          console.log('[MapInfoLayerManager] ✓ Layer IS on map:', layerId)
+          if (IS_DEV) console.log('[MapInfoLayerManager] ✓ Layer IS on map:', layerId)
         } else {
-          console.log('[MapInfoLayerManager] ✗ Layer NOT on map:', layerId)
+          if (IS_DEV) console.log('[MapInfoLayerManager] ✗ Layer NOT on map:', layerId)
         }
 
         // 再次打印状态以确认更改
-        console.log('[MapInfoLayerManager] After visibility change:')
+        if (IS_DEV) console.log('[MapInfoLayerManager] After visibility change:')
         this.debugPrintLayers()
       } else {
-        console.log('[MapInfoLayerManager] Map instance is null!')
+        if (IS_DEV) console.log('[MapInfoLayerManager] Map instance is null!')
       }
     } else {
-      console.log('[MapInfoLayerManager] Layer not found:', layerId)
+      if (IS_DEV) console.log('[MapInfoLayerManager] Layer not found:', layerId)
     }
   }
 

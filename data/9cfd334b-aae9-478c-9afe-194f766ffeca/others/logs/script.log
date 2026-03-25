@@ -1,0 +1,39 @@
+2026-03-06 14:57:59,583 INFO 140141778972288 execute_service.py[line:365] the server timezone is UTC+08:00
+2026-03-06 14:57:59,584 INFO 140141778972288 step.py[line:83] ###step###{"steps": [{"number": "1", "name": "step1", "zh": "开始执行", "en": "begin"}, {"number": "2", "name": "step2", "zh": "执行中", "en": "running"}, {"number": "3", "name": "step3", "zh": "执行结束", "en": "end"}]}
+2026-03-06 14:57:59,585 INFO 140141778972288 step.py[line:104] Run the step step1.
+2026-03-06 14:57:59,585 INFO 140141778972288 step.py[line:118] ###step###{"currentStep": {"name": "step1", "number": "1", "status": 1, "detail": {"zh": "", "en": ""}, "filePaths": []}}
+2026-03-06 14:57:59,586 INFO 140141778972288 step.py[line:142] Step is: step1, the detail is: success
+2026-03-06 14:57:59,586 INFO 140141778972288 step.py[line:153] ###step###{"currentStep": {"name": "step1", "number": "1", "status": "2", "detail": {"zh": "执行成功", "en": "success"}}}
+2026-03-06 14:57:59,587 INFO 140141778972288 main.py[line:114] toolversion: V20251110
+2026-03-06 14:57:59,587 INFO 140141778972288 main.py[line:124] Input Subtool_1: 300
+2026-03-06 14:57:59,588 INFO 140141778972288 main.py[line:124] Input PlannedAreaID: 
+2026-03-06 14:57:59,588 INFO 140141778972288 main.py[line:124] Input ParaFile: 20260306_145752_839_1069/300_5G站点小区信息导出工具模板_样例_20230606.xlsx
+2026-03-06 14:57:59,588 INFO 140141778972288 main.py[line:124] Input Operation: 0
+2026-03-06 14:57:59,589 INFO 140141778972288 main.py[line:124] Input ChooseNE: 0
+2026-03-06 14:57:59,589 INFO 140141778972288 main.py[line:151] Operation: 参数核查
+2026-03-06 14:57:59,590 INFO 140141778972288 step.py[line:104] Run the step step2.
+2026-03-06 14:57:59,590 INFO 140141778972288 step.py[line:118] ###step###{"currentStep": {"name": "step2", "number": "2", "status": 1, "detail": {"zh": "", "en": ""}, "filePaths": []}}
+2026-03-06 14:57:59,593 INFO 140141778972288 checkflow.py[line:1335] Read parafile
+2026-03-06 14:57:59,927 INFO 140141778972288 checkflow.py[line:1221] Total number of NE to be checked: 2195
+2026-03-06 14:57:59,930 INFO 140141778972288 checkflow.py[line:1245] Number of NE satisfy MEIDList.mimVersionList: SDR: 926, ITBBU: 1269
+2026-03-06 14:58:01,370 INFO 140141778972288 nrparacheck.py[line:109] Begin to check parameter
+2026-03-06 14:58:01,566 INFO 140141778972288 cellinfoexport.py[line:142] Query ITRAN scene: V5.75.10, NE num: 1257
+2026-03-06 14:58:26,107 INFO 140141778972288 common.py[line:241] Progress: 76.92%
+2026-03-06 14:58:32,371 INFO 140141778972288 common.py[line:241] Progress: 100.00%
+2026-03-06 14:58:32,373 INFO 140141778972288 cellinfoexport.py[line:142] Query ITRAN scene: V5.75.20, NE num: 12
+2026-03-06 14:58:33,008 INFO 140141778972288 common.py[line:241] Progress: 100.00%
+2026-03-06 14:58:35,494 INFO 140141778972288 cellinfoexport.py[line:256] Query SDR FDD scene, NE num: 867
+2026-03-06 14:58:35,938 INFO 140141778972288 cellinfoexport.py[line:267] Progress: 23.07%
+2026-03-06 14:58:36,302 INFO 140141778972288 cellinfoexport.py[line:267] Progress: 46.14%
+2026-03-06 14:58:36,710 INFO 140141778972288 cellinfoexport.py[line:267] Progress: 69.20%
+2026-03-06 14:58:37,159 INFO 140141778972288 cellinfoexport.py[line:267] Progress: 92.27%
+2026-03-06 14:58:37,361 INFO 140141778972288 cellinfoexport.py[line:267] Progress: 100.00%
+2026-03-06 14:58:37,520 INFO 140141778972288 cellinfoexport.py[line:279] Query SDR NB scene, NE num: 249
+2026-03-06 14:58:37,993 INFO 140141778972288 common.py[line:241] Progress: 100.00%
+2026-03-06 14:58:40,977 INFO 140141778972288 cellinfoexport.py[line:244] Export cell information completely
+2026-03-06 14:58:40,984 INFO 140141778972288 checkflow.py[line:1386] Check parameter completely
+2026-03-06 14:58:40,985 INFO 140141778972288 common.py[line:302] ************************************************************
+2026-03-06 14:58:40,986 INFO 140141778972288 common.py[line:303] *                                                          *
+2026-03-06 14:58:40,986 INFO 140141778972288 common.py[line:304] *            execute successfully                          *
+2026-03-06 14:58:40,987 INFO 140141778972288 common.py[line:307] *                                                          *
+2026-03-06 14:58:40,987 INFO 140141778972288 common.py[line:308] ************************************************************

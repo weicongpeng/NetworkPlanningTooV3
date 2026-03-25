@@ -149,6 +149,35 @@ class PCIPlanningService:
         """计算两点之间的距离（公里）"""
         return DistanceCalculator.calculate_distance(lon1, lat1, lon2, lat2)
 
+    def get_same_site_sectors(
+        self,
+        target_lat: float,
+        target_lon: float,
+        exclude_sector_id: str,
+        all_sectors: List[SiteSectorInfo],
+    ) -> List[SiteSectorInfo]:
+        """获取同站点的其他小区
+
+        Args:
+            target_lat: 目标小区纬度
+            target_lon: 目标小区经度
+            exclude_sector_id: 排除的小区ID（通常为当前规划的小区）
+            all_sectors: 所有小区列表
+
+        Returns:
+            同站点的小区列表（排除指定小区）
+        """
+        tolerance = 0.0005  # 约50米精度
+        same_site = []
+        for sector in all_sectors:
+            if sector.id == exclude_sector_id:
+                continue
+            if (
+                abs(sector.latitude - target_lat) < tolerance
+                and abs(sector.longitude - target_lon) < tolerance
+            ):
+                same_site.append(sector)
+        return same_site
 
     def check_same_site_mod_conflict(
         self,
@@ -179,7 +208,7 @@ class PCIPlanningService:
         for assigned in self.assigned_pcis:
             assigned_pci, assigned_lat, assigned_lon, assigned_earfcn = assigned
             # 检查是否是同站小区
-            if abs(assigned_lat - target_lat) < 0.0001 and abs(assigned_lon - target_lon) < 0.0001:
+            if abs(assigned_lat - target_lat) < 0.0005 and abs(assigned_lon - target_lon) < 0.0005:
                 # 这是同站小区，强制使用不同的PCI
                 all_existing_pcis.add(assigned_pci)
                 # 检查是否同频，计算模值
@@ -299,33 +328,47 @@ class PCIPlanningService:
     ) -> Tuple[bool, float]:
         """验证PCI是否满足复用距离要求
 
-        只检查同频同PCI的小区
+        检查以下三部分PCI：
+        1. 已分配的PCI列表 (self.assigned_pcis)
+        2. 背景小区PCI (self.background_assigned_pcis)
+        3. 原始工参数据中的PCI (all_sectors) - 包含本站PCI
         """
         min_distance = float("inf")
 
+        # 1. 检查已分配的PCI
         for assigned in self.assigned_pcis:
             pci, lat, lon, earfcn = assigned
             if pci != candidate_pci:
                 continue
-            # 只检查同频小区（使用改进的频点判断逻辑）
+            # 只检查同频小区
             if not self._is_same_frequency(target_earfcn, earfcn):
-                continue  # 不同频，跳过
-            # 计算距离
+                continue
             dist = self.calculate_distance(target_lat, target_lon, lat, lon)
             if dist < min_distance:
                 min_distance = dist
 
-        # 检查背景小区（存量干扰）
+        # 2. 检查背景小区（存量干扰）
         for bg in self.background_assigned_pcis:
             pci, lat, lon, earfcn = bg
             if pci != candidate_pci:
                 continue
-            # 只检查同频小区（使用改进的频点判断逻辑）
+            # 只检查同频小区
             if not self._is_same_frequency(target_earfcn, earfcn):
-                continue  # 不同频，跳过
-
-            # 计算距离
+                continue
             dist = self.calculate_distance(target_lat, target_lon, lat, lon)
+            if dist < min_distance:
+                min_distance = dist
+
+        # 3. 检查原始工参数据中的PCI（包括本站PCI）
+        for sector in all_sectors:
+            if sector.id == exclude_sector_id:
+                continue
+            if sector.pci != candidate_pci:
+                continue
+            # 只检查同频小区
+            if not self._is_same_frequency(target_earfcn, sector.earfcn):
+                continue
+            dist = self.calculate_distance(target_lat, target_lon, sector.latitude, sector.longitude)
             if dist < min_distance:
                 min_distance = dist
 
@@ -371,7 +414,7 @@ class PCIPlanningService:
         for assigned in self.assigned_pcis:
             assigned_pci, assigned_lat, assigned_lon, assigned_earfcn = assigned
             # 检查是否是同站小区
-            if abs(assigned_lat - target_lat) < 0.0001 and abs(assigned_lon - target_lon) < 0.0001:
+            if abs(assigned_lat - target_lat) < 0.0005 and abs(assigned_lon - target_lon) < 0.0005:
                 print(f"[DEBUG] 同站小区(assigned): pci={assigned_pci}, earfcn={assigned_earfcn}")
                 # 这是同站小区，强制使用不同的PCI
                 same_site_all_pcis.add(assigned_pci)
@@ -581,7 +624,7 @@ class PCIPlanningService:
         for assigned in self.assigned_pcis:
             assigned_pci, assigned_lat, assigned_lon, _ = assigned
             # 检查是否是同站小区
-            if abs(assigned_lat - sector.latitude) < 0.0001 and abs(assigned_lon - sector.longitude) < 0.0001:
+            if abs(assigned_lat - sector.latitude) < 0.0005 and abs(assigned_lon - sector.longitude) < 0.0005:
                 same_site_all_pcis_fallback.add(assigned_pci)
         
         # 从原始数据中获取同站小区的PCI

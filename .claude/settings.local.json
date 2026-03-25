@@ -67,7 +67,16 @@
       "Bash(../venv/Scripts/python.exe:*)",
       "Bash(\"d:/mycode/NetworkPlanningTooV3/backend/.env.example\":*)",
       "Bash(/d/mycode/NetworkPlanningTooV3/backend/venv/Scripts/python.exe:*)",
-      "Bash(cp:*)"
+      "Bash(cp:*)",
+      "Bash(PYTHONPATH=/d/mycode/NetworkPlanningTooV3/backend /d/mycode/NetworkPlanningTooV2/backend/venv/Scripts/python.exe -m pytest tests/test_tac_strtree.py -v -s)",
+      "Bash(PYTHONPATH=/d/mycode/NetworkPlanningTooV3/backend /d/mycode/NetworkPlanningTooV2/backend/venv/Scripts/python.exe -m pytest tests/test_task_manager_data_prep.py -v -s)",
+      "Bash(PYTHONPATH=/d/mycode/NetworkPlanningTooV3/backend /d/mycode/NetworkPlanningTooV2/backend/venv/Scripts/python.exe -m pytest tests/test_task_manager_data_prep.py::TestTaskManagerDataPrep::test_match_cells_with_index_no_mutation -v)",
+      "Bash(PYTHONPATH=/d/mycode/NetworkPlanningTooV3/backend /d/mycode/NetworkPlanningTooV2/backend/venv/Scripts/python.exe -m pytest tests/test_task_manager_data_prep.py -v -k \"mutation\")",
+      "Bash(PYTHONPATH=/d/mycode/NetworkPlanningTooV3/backend /d/mycode/NetworkPlanningTooV2/backend/venv/Scripts/python.exe -c \":*)",
+      "Bash(grep -rn \"def get_same_site_sectors\" \"d:\\\\mycode\\\\NetworkPlanningTooV3\\\\backend\\\\app\\\\algorithms\"\" --include=\"*.py\" | grep -v \".bak \")",
+      "mcp__serena__onboarding",
+      "mcp__serena__list_dir",
+      "Bash(npm run lint:*)"
     ]
   }
 }

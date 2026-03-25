@@ -13,14 +13,6 @@
 import { mapDataService, RenderSectorData } from './mapDataService'
 
 /**
- * 扇区唯一标识
- */
-interface SectorKey {
-  siteId: string
-  sectorId: string
-}
-
-/**
  * PCI规划结果中的扇区数据
  */
 interface PCIResultSector {
@@ -54,15 +46,6 @@ interface SyncedSectorData extends RenderSectorData {
   syncedPCI?: number
   /** 是否是规划结果中的扇区 */
   isPlannedSector: boolean
-}
-
-/**
- * 同频同PCI分组
- */
-interface SamePCIGroup {
-  pci: number
-  frequency: number
-  sectors: SyncedSectorData[]
 }
 
 /**
@@ -185,7 +168,7 @@ export class PCIDataSyncService {
     // 需要统一处理为 siteId_sectorId 格式
     let key: string
     const sectorIdStr = String(sectorId).trim()
-    
+
     // 如果sectorId已经包含siteId（组合格式），直接使用
     if (sectorIdStr.includes('_') && sectorIdStr.startsWith(String(siteId))) {
       key = sectorIdStr
@@ -193,7 +176,7 @@ export class PCIDataSyncService {
       // 否则拼接为 siteId_sectorId 格式
       key = this.getSectorKey(siteId, sectorId)
     }
-    
+
     const pciResult = this.pciResultsMap.get(key)
 
     if (!this.syncedData) {
@@ -229,6 +212,7 @@ export class PCIDataSyncService {
       })
 
       if (sector) {
+        const oldPCI = sector.syncedPCI
         sector.syncedPCI = newPCI
         sector.isPlannedSector = true
         synced = true
@@ -236,9 +220,11 @@ export class PCIDataSyncService {
           siteId,
           inputSectorId: sectorId,
           key,
+          oldPCI,
           newPCI,
           matchedSectorId: sector.id,
-          sectorName: sector.name
+          sectorName: sector.name,
+          isPlannedSector: sector.isPlannedSector
         })
       }
     }
@@ -256,7 +242,9 @@ export class PCIDataSyncService {
       console.warn('[PCIDataSyncService] 未找到匹配的扇区，同步失败', {
         siteId,
         sectorId,
-        key
+        key,
+        availableLTE: this.syncedData.lte.slice(0, 3).map(s => ({ id: s.id, name: s.name })),
+        availableNR: this.syncedData.nr.slice(0, 3).map(s => ({ id: s.id, name: s.name }))
       })
     }
 
@@ -272,7 +260,15 @@ export class PCIDataSyncService {
       return
     }
 
-    console.log('[PCIDataSyncService] 开始重新同步所有数据')
+    console.log('[PCIDataSyncService] 开始重新同步所有数据', {
+      pciResultsCount: this.pciResultsMap.size,
+      results: Array.from(this.pciResultsMap.entries()).slice(0, 5).map(([key, v]) => ({
+        key,
+        siteId: v.siteId,
+        sectorId: v.sectorId,
+        newPCI: v.newPCI
+      }))
+    })
 
     // 重置同步数据
     this.syncedData.lte = this.fullParamsData.lte.map(s => ({
@@ -293,35 +289,104 @@ export class PCIDataSyncService {
 
     // 应用所有PCI规划结果
     let appliedCount = 0
+    let failedCount = 0
+    const failedKeys: string[] = []
+
     for (const [key, pciResult] of this.pciResultsMap) {
       const success = this.syncSectorPCI(pciResult.siteId, pciResult.sectorId, pciResult.newPCI)
       if (success) {
         appliedCount++
+      } else {
+        failedCount++
+        failedKeys.push(key)
       }
     }
 
     console.log('[PCIDataSyncService] 重新同步完成', {
       totalResults: this.pciResultsMap.size,
-      appliedCount: appliedCount
+      appliedCount,
+      failedCount,
+      failedKeys: failedKeys.slice(0, 10)
     })
+
+    // 验证同步结果
+    this.verifySyncResults()
   }
 
   /**
-   * 查找同频同PCI的所有扇区（排除规划结果中的扇区）
-   * 
-   * 应用到工参后的关键变化：
-   * - 应用前：全量工参中规划结果扇区的PCI是originalPCI，syncedPCI更新为newPCI后，查找newPCI只找到规划结果扇区
-   * - 应用后：全量工参中规划结果扇区的PCI已更新为newPCI，查找newPCI会找到规划结果扇区+背景工参中原本PCI就是newPCI的扇区
-   * 
-   * 解决方案：排除规划结果中的扇区（isPlannedSector === true），只返回背景工参中的同频同PCI扇区
-   * 
-   * @param pci PCI值
+   * 验证同步结果的数据一致性
+   */
+  private verifySyncResults(): void {
+    if (!this.syncedData) {
+      console.warn('[PCIDataSyncService] 数据未初始化，跳过验证')
+      return
+    }
+
+    // 统计规划扇区数量
+    const plannedSectors = [
+      ...this.syncedData.lte.filter(s => s.isPlannedSector),
+      ...this.syncedData.nr.filter(s => s.isPlannedSector)
+    ]
+
+    // 验证规划扇区的syncedPCI是否被正确更新
+    let mismatchCount = 0
+    const mismatches: Array<{
+      id: string
+      name: string
+      originalPCI?: number
+      syncedPCI?: number
+      isPlannedSector: boolean
+    }> = []
+
+    for (const sector of plannedSectors) {
+      if (sector.syncedPCI === undefined || sector.syncedPCI === sector.pci) {
+        mismatchCount++
+        mismatches.push({
+          id: sector.id,
+          name: sector.name,
+          originalPCI: sector.pci,
+          syncedPCI: sector.syncedPCI,
+          isPlannedSector: sector.isPlannedSector
+        })
+      }
+    }
+
+    console.log('[PCIDataSyncService] 验证同步结果', {
+      totalPlannedSectors: plannedSectors.length,
+      mismatchCount,
+      mismatches: mismatches.slice(0, 5)
+    })
+
+    // 如果有不匹配，输出警告
+    if (mismatchCount > 0) {
+      console.error('[PCIDataSyncService] 发现规划扇区的PCI未正确更新！', {
+        mismatchCount,
+        mismatches
+      })
+    }
+  }
+
+  /**
+   * 查找同频同PCI的所有扇区（使用规划后的PCI，只返回未规划的小区）
+   *
+   * 查找逻辑：
+   * 1. 遍历所有扇区
+   * 2. 排除规划结果中的扇区（isPlannedSector === true）
+   * 3. 排除当前选中的扇区
+   * 4. 使用同步后的PCI（syncedPCI）进行匹配
+   *
+   * 这样可以正确显示：
+   * - 点击规划结果中的小区（规划后PCI=100）
+   * - 蓝色高亮显示：全量工参中**未规划**但原本PCI=100的小区
+   * - 不会高亮：规划结果中其他被规划为PCI=100的小区
+   *
+   * @param pci PCI值（规划后的PCI）
    * @param frequency 频点值
-   * @param siteId 可选，用于从规划结果中获取频点
-   * @param sectorId 可选，用于从规划结果中获取频点
+   * @param excludeSiteId 排除的站点ID（当前选中的小区）
+   * @param excludeSectorId 排除的扇区ID（当前选中的小区）
    * @param networkType 可选，按网络类型过滤（'LTE' 或 'NR'）
    */
-  findSameFrequencyPCI(pci: number, frequency: number | null, siteId?: string, sectorId?: string, networkType?: string): SyncedSectorData[] {
+  findSameFrequencyPCI(pci: number, frequency: number | null, excludeSiteId?: string, excludeSectorId?: string, networkType?: string): SyncedSectorData[] {
     if (!this.syncedData) {
       console.warn('[PCIDataSyncService] 数据未初始化')
       return []
@@ -337,7 +402,7 @@ export class PCIDataSyncService {
       // 未指定网络类型，搜索所有扇区
       allSectors = [...this.syncedData.lte, ...this.syncedData.nr]
     }
-    
+
     console.log('[PCIDataSyncService] 按网络类型过滤查找同频同PCI扇区', {
       networkType,
       totalSectorsToSearch: allSectors.length,
@@ -347,41 +412,62 @@ export class PCIDataSyncService {
 
     // 如果frequency为null，尝试从规划结果中获取
     let effectiveFrequency = frequency
-    if (frequency === null && siteId && sectorId) {
+    if (frequency === null && excludeSiteId && excludeSectorId) {
       // sectorId可能是组合格式（如"540951_0"）或纯数字格式（如"0"）
       // 需要统一处理为 siteId_sectorId 格式
       let key: string
-      const sectorIdStr = String(sectorId).trim()
-      
+      const sectorIdStr = String(excludeSectorId).trim()
+
       // 如果sectorId已经包含siteId（组合格式），直接使用
-      if (sectorIdStr.includes('_') && sectorIdStr.startsWith(String(siteId))) {
+      if (sectorIdStr.includes('_') && sectorIdStr.startsWith(String(excludeSiteId))) {
         key = sectorIdStr
       } else {
         // 否则拼接为 siteId_sectorId 格式
-        key = this.getSectorKey(siteId, sectorId)
+        key = this.getSectorKey(excludeSiteId, excludeSectorId)
       }
-      
+
       const pciResult = this.pciResultsMap.get(key)
       if (pciResult) {
         effectiveFrequency = pciResult.frequency || pciResult.earfcn || pciResult.ssb_frequency || null
         console.log('[PCIDataSyncService] 从规划结果中获取频点', {
-          siteId,
-          sectorId,
+          siteId: excludeSiteId,
+          sectorId: excludeSectorId,
           key,
           frequency: effectiveFrequency
         })
       }
     }
 
-    // 查找同频同PCI的扇区（排除规划结果中的扇区）
+    // 构建排除扇区的键（用于排除当前选中的扇区）
+    let excludeKey: string | null = null
+    if (excludeSiteId && excludeSectorId) {
+      const sectorIdStr = String(excludeSectorId).trim()
+      if (sectorIdStr.includes('_') && sectorIdStr.startsWith(String(excludeSiteId))) {
+        excludeKey = sectorIdStr
+      } else {
+        excludeKey = this.getSectorKey(excludeSiteId, excludeSectorId)
+      }
+    }
+
+    // 查找所有同频同PCI的扇区（只排除规划结果中的扇区和当前选中扇区）
     const result = allSectors.filter(sector => {
-      // 关键：排除规划结果中的扇区，只查找背景工参中的扇区
-      // 这样可以确保应用到工参前后的行为一致
+      // 关键：只查找全量工参中**未规划**的小区
+      // 排除规划结果中的扇区（isPlannedSector === true）
       if (sector.isPlannedSector) {
         return false
       }
 
-      // 使用同步后的PCI
+      // 排除当前选中的扇区（以防万一）
+      if (excludeKey) {
+        const sectorKey = this.getSectorKey(sector.siteId || '', sector.sectorId || '')
+        if (sectorKey === excludeKey || sector.id === excludeKey) {
+          return false
+        }
+      }
+
+      // 使用同步后的PCI进行匹配
+      // 注意：对于未规划的小区，syncedPCI 等于原始 pci
+      // 这样可以正确匹配：规划后PCI=100 与 全量工参中原本PCI=100的小区
       if (sector.syncedPCI !== pci) {
         return false
       }
@@ -401,17 +487,22 @@ export class PCIDataSyncService {
       return sectorFreq === effectiveFrequency
     })
 
-    console.log('[PCIDataSyncService] 查找同频同PCI（排除规划结果扇区）', {
+    console.log('[PCIDataSyncService] 查找同频同PCI（使用规划后PCI，只返回未规划小区）', {
       pci,
       inputFrequency: frequency,
       effectiveFrequency,
+      excludeKey,
       count: result.length,
-      firstFew: result.slice(0, 5).map(s => ({ 
-        id: s.id, 
-        name: s.name, 
+      description: '全量工参中未规划但PCI相同的扇区数量',
+      firstFew: result.slice(0, 5).map(s => ({
+        id: s.id,
+        name: s.name,
+        originalPCI: s.pci,
         syncedPCI: s.syncedPCI,
-        frequency: s.frequency || s.earfcn || s.ssbFrequency,
-        isPlannedSector: s.isPlannedSector
+        isPlannedSector: s.isPlannedSector,
+        sectorFreq: s.frequency || s.earfcn || s.ssbFrequency,
+        pciMatch: s.syncedPCI === pci,
+        freqMatch: effectiveFrequency === null ? null : (s.frequency || s.earfcn || s.ssbFrequency) === effectiveFrequency
       }))
     })
 
@@ -481,24 +572,82 @@ export class PCIDataSyncService {
     // 转换同步后的数据，确保每个扇区都使用同步后的PCI值
     const updatedLTE = this.syncedData.lte.map(sector => ({
       ...sector,
-      // 优先使用同步后的PCI值，然后使用原始pci字段
+      // 关键：对于规划扇区，pci字段应设置为syncedPCI（规划后的新PCI）
+      // 对于未规划扇区，syncedPCI等于原始pci，所以直接使用syncedPCI即可
       pci: sector.syncedPCI !== undefined ? sector.syncedPCI : sector.pci
     }))
 
     const updatedNR = this.syncedData.nr.map(sector => ({
       ...sector,
-      // 优先使用同步后的PCI值，然后使用原始pci字段
       pci: sector.syncedPCI !== undefined ? sector.syncedPCI : sector.pci
     }))
 
-    console.log('[PCIDataSyncService] 获取更新后的PCI数据完成', {
-      lteCount: updatedLTE.length,
-      nrCount: updatedNR.length
-    })
+    // 验证数据一致性
+    this.verifyUpdatedPCIData(updatedLTE, updatedNR)
 
     return {
       lte: updatedLTE,
       nr: updatedNR
+    }
+  }
+
+  /**
+   * 验证更新后的PCI数据一致性
+   */
+  private verifyUpdatedPCIData(lteData: RenderSectorData[], nrData: RenderSectorData[]): void {
+    // 统计规划扇区数量
+    const plannedSectors = [
+      ...lteData.filter((s: any) => s.isPlannedSector),
+      ...nrData.filter((s: any) => s.isPlannedSector)
+    ]
+
+    // 验证规划扇区的pci字段是否等于syncedPCI
+    let mismatchCount = 0
+    const mismatches: Array<{
+      id: string
+      name: string
+      pci?: number
+      syncedPCI?: number
+    }> = []
+
+    for (const sector of plannedSectors) {
+      const syncedPCI = (sector as any).syncedPCI
+      if (syncedPCI !== undefined && sector.pci !== syncedPCI) {
+        mismatchCount++
+        mismatches.push({
+          id: sector.id,
+          name: sector.name,
+          pci: sector.pci,
+          syncedPCI
+        })
+      }
+    }
+
+    console.log('[PCIDataSyncService] 验证更新后的PCI数据', {
+      lteCount: lteData.length,
+      nrCount: nrData.length,
+      plannedSectorsCount: plannedSectors.length,
+      mismatchCount,
+      mismatches: mismatches.slice(0, 5),
+      // 显示前5个规划扇区的详细信息
+      plannedSample: lteData.concat(nrData)
+        .filter((s: any) => s.isPlannedSector)
+        .slice(0, 5)
+        .map(s => ({
+          id: s.id,
+          name: s.name,
+          originalPCI: (s as any).pci,
+          syncedPCI: (s as any).syncedPCI,
+          isPlannedSector: (s as any).isPlannedSector,
+          finalPCI: s.pci
+        }))
+    })
+
+    if (mismatchCount > 0) {
+      console.error('[PCIDataSyncService] 发现PCI数据不一致！规划扇区的pci字段未正确设置为syncedPCI', {
+        mismatchCount,
+        mismatches
+      })
     }
   }
 

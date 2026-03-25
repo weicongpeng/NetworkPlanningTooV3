@@ -10,6 +10,7 @@ import { pciDataSyncService } from '../services/pciDataSyncService'
 import { mapDataService } from '../services/mapDataService'
 import { CoordinateTransformer } from '../utils/coordinate'
 import type { RenderSectorData } from '../services/mapDataService'
+import { triggerDataRefresh, DATA_REFRESH_EVENT } from '../store/dataStore'
 
 // PCI表格列配置
 const PCI_COLUMNS = [
@@ -257,8 +258,27 @@ export function PCIPage() {
 
     initSyncService()
 
+    // 监听数据刷新事件（当在其他页面上传新工参时）
+    const handleDataRefresh = async () => {
+      console.log('[PCIPage] 收到数据刷新事件，正在重新初始化...')
+      try {
+        // 清除地图数据缓存
+        mapDataService.clearCache()
+        console.log('[PCIPage] 已清除地图数据缓存')
+
+        // 重新初始化PCI数据同步服务
+        await initSyncService()
+        console.log('[PCIPage] 数据同步服务已重新初始化')
+      } catch (error) {
+        console.warn('[PCIPage] 数据刷新失败:', error)
+      }
+    }
+
+    window.addEventListener(DATA_REFRESH_EVENT, handleDataRefresh)
+
     return () => {
       mounted = false
+      window.removeEventListener(DATA_REFRESH_EVENT, handleDataRefresh)
     }
   }, [])
 
@@ -566,10 +586,14 @@ export function PCIPage() {
 
       if (response.success && response.data) {
         const { updatedCount, newFileId, newFileName, savedToOriginal } = response.data
-        
+
+        // 触发数据刷新事件，通知其他页面（如数据管理页面）更新数据列表
+        triggerDataRefresh()
+        console.log('[PCIPage] 已触发数据刷新事件')
+
         // 显示成功状态
         setApplySuccess(true)
-        
+
         // 显示成功消息
         let successMsg = `✅ 成功将PCI规划结果应用到工参，更新了${updatedCount}个小区的PCI`
         if (newFileName) {
@@ -585,11 +609,11 @@ export function PCIPage() {
         mapDataService.clearCache()
         console.log('[PCIPage] 已清除地图数据缓存')
 
-        // 2. 重新获取数据列表，更新数据索引
+        // 2. 重新获取数据列表，更新数据索引（强制刷新，绕过缓存）
         try {
-          const listResponse = await dataApi.list()
+          const listResponse = await dataApi.list(1, 50, true)  // cacheBust=true 强制刷新
           if (listResponse.success) {
-            console.log('[PCIPage] 已重新获取数据列表，新工参ID:', newFileId)
+            console.log('[PCIPage] 已重新获取数据列表（强制刷新），新工参ID:', newFileId)
           }
         } catch (listErr) {
           console.warn('[PCIPage] 重新获取数据列表失败:', listErr)
@@ -675,8 +699,12 @@ export function PCIPage() {
       return
     }
 
-    // 查找同频同PCI扇区（按网络类型过滤，传入siteId和sectorId用于从规划结果中获取频点）
-    const samePCISectors = pciDataSyncService.findSameFrequencyPCI(newPCI, frequency, siteId, sectorId, taskNetworkType)
+    // 获取同步后的扇区的PCI和频点（规划后已更新到全量工参的数据）
+    const syncedPCI = syncedSector.syncedPCI ?? newPCI
+    const syncedFrequency = syncedSector.frequency || syncedSector.earfcn || syncedSector.ssbFrequency || frequency
+
+    // 查找同频同PCI扇区（按网络类型过滤，使用同步后的PCI和频点）
+    const samePCISectors = pciDataSyncService.findSameFrequencyPCI(syncedPCI, syncedFrequency, siteId, sectorId, taskNetworkType)
     
     // 直接从扇区的latitude/longitude获取坐标（WGS84）并转换为GCJ02
     const getSectorCoords = (sector: any): [number, number] | null => {
@@ -1066,8 +1094,8 @@ export function PCIPage() {
       return
     }
 
-    // 获取频点
-    const frequency = sector.earfcn || sector.arfcn || (syncedSector as any).frequency || null
+    // 获取频点（优先使用同步后的扇区数据）
+    const frequency = (syncedSector as any).frequency || (syncedSector as any).earfcn || (syncedSector as any).ssbFrequency || sector.earfcn || sector.arfcn || null
 
     console.log('[PCIPage] 找到匹配的同步扇区，准备进行PCI高亮', {
       syncedId: syncedSector.id,
@@ -1117,8 +1145,8 @@ export function PCIPage() {
   }
 
   return (
-    <div className="p-8 h-screen flex flex-col overflow-hidden">
-      <h1 className="text-3xl font-bold mb-8 shrink-0">PCI规划</h1>
+    <div className="h-full flex flex-col p-4 min-h-0">
+      <h1 className="text-3xl font-bold mb-6 shrink-0">PCI规划</h1>
 
       {/* 错误提示 */}
       {error && (
@@ -1336,9 +1364,9 @@ export function PCIPage() {
                 {/* 结果表格 */}
                 {currentTaskResult.results && currentTaskResult.results.length > 0 && (
                   <div className="overflow-x-auto overflow-y-auto rounded-lg border border-border flex-1 min-h-0">
-                    <table className="w-full text-[0.6rem] text-left border-collapse">
-                      <thead className="sticky top-0 z-20 bg-muted text-muted-foreground uppercase text-[0.55rem] shadow-sm">
-                        <tr className="border-b">
+                    <table className="w-full text-xs text-left border-collapse table-fixed">
+                      <thead className="sticky top-0 z-20 bg-background border-b border-border shadow-sm">
+                        <tr>
                           {PCI_COLUMNS.map((column) => (
                             <th
                               key={column.key}
@@ -1352,7 +1380,7 @@ export function PCIPage() {
                                   value={resultSearchFilters[column.key as keyof typeof resultSearchFilters]}
                                   onChange={(e) => handleResultSearchChange(column.key, e.target.value)}
                                   placeholder="搜索"
-                                  className="mt-1 w-full p-1 border border-border rounded text-[0.5rem] bg-white dark:bg-slate-800"
+                                  className="mt-1 w-full p-1 border border-border rounded text-[10px] bg-white dark:bg-slate-800"
                                 />
                               )}
                               <div

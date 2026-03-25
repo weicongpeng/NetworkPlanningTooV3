@@ -7,6 +7,14 @@ import { indexedDBService } from '../services/indexedDBService'
 const DATA_LIST_CACHE_KEY = 'data_list_cache'
 const DATA_LIST_CACHE_TTL = 5 * 60 * 1000 // 5分钟缓存
 
+// 全局数据更新事件名称
+export const DATA_REFRESH_EVENT = 'data-list-refresh'
+
+// 触发数据刷新事件（用于跨页面通信）
+export function triggerDataRefresh() {
+  window.dispatchEvent(new CustomEvent(DATA_REFRESH_EVENT))
+}
+
 interface DataListCache {
   items: DataItem[]
   total: number
@@ -71,7 +79,7 @@ export const useDataStore = create<DataState>((set, get) => ({
     }
 
     try {
-      const response: ApiResponse<DataItem[]> & { total?: number } = await dataApi.list(page, pageSize)
+      const response: ApiResponse<DataItem[]> & { total?: number } = await dataApi.list(page, pageSize, forceRefresh)
       const items = response.data || []
       const total = response.total || items.length
 

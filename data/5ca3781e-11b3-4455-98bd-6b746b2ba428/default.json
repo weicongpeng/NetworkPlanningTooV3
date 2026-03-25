@@ -1,0 +1,717 @@
+[
+  {
+    "longitude": 114.7449,
+    "latitude": 23.79674,
+    "displayLng": 114.74964898486968,
+    "displayLat": 23.794117666935605,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源东源_滨江花园基站01RRU1",
+      "Longitude": 114.7449,
+      "Latitude": 23.79674,
+      "CGI": "936292-22"
+    },
+    "name": "GO_N5_4G河源东源_滨江花园基站01RRU1"
+  },
+  {
+    "longitude": 114.7449,
+    "latitude": 23.79674,
+    "displayLng": 114.74964898486968,
+    "displayLat": 23.794117666935605,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源东源_滨江花园基站01RRU2",
+      "Longitude": 114.7449,
+      "Latitude": 23.79674,
+      "CGI": "936292-23"
+    },
+    "name": "GO_N5_4G河源东源_滨江花园基站01RRU2"
+  },
+  {
+    "longitude": 114.7449,
+    "latitude": 23.79674,
+    "displayLng": 114.74964898486968,
+    "displayLat": 23.794117666935605,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源东源_滨江花园基站01RRU3",
+      "Longitude": 114.7449,
+      "Latitude": 23.79674,
+      "CGI": "936292-24"
+    },
+    "name": "GO_N5_4G河源东源_滨江花园基站01RRU3"
+  },
+  {
+    "longitude": 114.7369,
+    "latitude": 23.7928,
+    "displayLng": 114.74164574629138,
+    "displayLat": 23.79017605451348,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源东源_电视塔LRRU1",
+      "Longitude": 114.7369,
+      "Latitude": 23.7928,
+      "CGI": "936373-16"
+    },
+    "name": "GO_N5_4G河源东源_电视塔LRRU1"
+  },
+  {
+    "longitude": 114.7369,
+    "latitude": 23.7928,
+    "displayLng": 114.74164574629138,
+    "displayLat": 23.79017605451348,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源东源_电视塔LRRU2",
+      "Longitude": 114.7369,
+      "Latitude": 23.7928,
+      "CGI": "936373-17"
+    },
+    "name": "GO_N5_4G河源东源_电视塔LRRU2"
+  },
+  {
+    "longitude": 114.7369,
+    "latitude": 23.7928,
+    "displayLng": 114.74164574629138,
+    "displayLat": 23.79017605451348,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源东源_电视塔LRRU3",
+      "Longitude": 114.7369,
+      "Latitude": 23.7928,
+      "CGI": "936373-18"
+    },
+    "name": "GO_N5_4G河源东源_电视塔LRRU3"
+  },
+  {
+    "longitude": 114.737541,
+    "latitude": 23.784716,
+    "displayLng": 114.74228654852858,
+    "displayLat": 23.78209479405314,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源东源_东源中学基站01RRU1",
+      "Longitude": 114.737541,
+      "Latitude": 23.784716,
+      "CGI": "936292-19"
+    },
+    "name": "GO_N5_4G河源东源_东源中学基站01RRU1"
+  },
+  {
+    "longitude": 114.737541,
+    "latitude": 23.784716,
+    "displayLng": 114.74228654852858,
+    "displayLat": 23.78209479405314,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源东源_东源中学基站01RRU2",
+      "Longitude": 114.737541,
+      "Latitude": 23.784716,
+      "CGI": "936292-20"
+    },
+    "name": "GO_N5_4G河源东源_东源中学基站01RRU2"
+  },
+  {
+    "longitude": 114.737541,
+    "latitude": 23.784716,
+    "displayLng": 114.74228654852858,
+    "displayLat": 23.78209479405314,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源东源_东源中学基站01RRU3",
+      "Longitude": 114.737541,
+      "Latitude": 23.784716,
+      "CGI": "936292-21"
+    },
+    "name": "GO_N5_4G河源东源_东源中学基站01RRU3"
+  },
+  {
+    "longitude": 114.748628,
+    "latitude": 23.790655,
+    "displayLng": 114.75337710395684,
+    "displayLat": 23.788035008574365,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源东源_龙利RRU1",
+      "Longitude": 114.748628,
+      "Latitude": 23.790655,
+      "CGI": "936291-16"
+    },
+    "name": "GO_N5_4G河源东源_龙利RRU1"
+  },
+  {
+    "longitude": 114.748628,
+    "latitude": 23.790655,
+    "displayLng": 114.75337710395684,
+    "displayLat": 23.788035008574365,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源东源_龙利RRU2",
+      "Longitude": 114.748628,
+      "Latitude": 23.790655,
+      "CGI": "936291-17"
+    },
+    "name": "GO_N5_4G河源东源_龙利RRU2"
+  },
+  {
+    "longitude": 114.748628,
+    "latitude": 23.790655,
+    "displayLng": 114.75337710395684,
+    "displayLat": 23.788035008574365,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源东源_龙利RRU3",
+      "Longitude": 114.748628,
+      "Latitude": 23.790655,
+      "CGI": "936291-18"
+    },
+    "name": "GO_N5_4G河源东源_龙利RRU3"
+  },
+  {
+    "longitude": 114.748876,
+    "latitude": 23.78783,
+    "displayLng": 114.7536249334877,
+    "displayLat": 23.785210871421327,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源东源_木京RRU1",
+      "Longitude": 114.748876,
+      "Latitude": 23.78783,
+      "CGI": "936373-19"
+    },
+    "name": "GO_N5_4G河源东源_木京RRU1"
+  },
+  {
+    "longitude": 114.748876,
+    "latitude": 23.78783,
+    "displayLng": 114.7536249334877,
+    "displayLat": 23.785210871421327,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源东源_木京RRU2",
+      "Longitude": 114.748876,
+      "Latitude": 23.78783,
+      "CGI": "936373-20"
+    },
+    "name": "GO_N5_4G河源东源_木京RRU2"
+  },
+  {
+    "longitude": 114.748876,
+    "latitude": 23.78783,
+    "displayLng": 114.7536249334877,
+    "displayLat": 23.785210871421327,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源东源_木京RRU3",
+      "Longitude": 114.748876,
+      "Latitude": 23.78783,
+      "CGI": "936373-21"
+    },
+    "name": "GO_N5_4G河源东源_木京RRU3"
+  },
+  {
+    "longitude": 114.74249,
+    "latitude": 23.77323,
+    "displayLng": 114.74723681400317,
+    "displayLat": 23.770614045966926,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源东源_仙塘洋潭接入网RRU1",
+      "Longitude": 114.74249,
+      "Latitude": 23.77323,
+      "CGI": "936329-25"
+    },
+    "name": "GO_N5_4G河源东源_仙塘洋潭接入网RRU1"
+  },
+  {
+    "longitude": 114.74249,
+    "latitude": 23.77323,
+    "displayLng": 114.74723681400317,
+    "displayLat": 23.770614045966926,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源东源_仙塘洋潭接入网RRU2",
+      "Longitude": 114.74249,
+      "Latitude": 23.77323,
+      "CGI": "936329-26"
+    },
+    "name": "GO_N5_4G河源东源_仙塘洋潭接入网RRU2"
+  },
+  {
+    "longitude": 114.74249,
+    "latitude": 23.77323,
+    "displayLng": 114.74723681400317,
+    "displayLat": 23.770614045966926,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源东源_仙塘洋潭接入网RRU3",
+      "Longitude": 114.74249,
+      "Latitude": 23.77323,
+      "CGI": "936329-27"
+    },
+    "name": "GO_N5_4G河源东源_仙塘洋潭接入网RRU3"
+  },
+  {
+    "longitude": 114.740261,
+    "latitude": 23.77744,
+    "displayLng": 114.74500730049711,
+    "displayLat": 23.774822088172286,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源东源_新河大道RRU1",
+      "Longitude": 114.740261,
+      "Latitude": 23.77744,
+      "CGI": "936291-19"
+    },
+    "name": "GO_N5_4G河源东源_新河大道RRU1"
+  },
+  {
+    "longitude": 114.740261,
+    "latitude": 23.77744,
+    "displayLng": 114.74500730049711,
+    "displayLat": 23.774822088172286,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源东源_新河大道RRU2",
+      "Longitude": 114.740261,
+      "Latitude": 23.77744,
+      "CGI": "936291-20"
+    },
+    "name": "GO_N5_4G河源东源_新河大道RRU2"
+  },
+  {
+    "longitude": 114.740261,
+    "latitude": 23.77744,
+    "displayLng": 114.74500730049711,
+    "displayLat": 23.774822088172286,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源东源_新河大道RRU3",
+      "Longitude": 114.740261,
+      "Latitude": 23.77744,
+      "CGI": "936291-21"
+    },
+    "name": "GO_N5_4G河源东源_新河大道RRU3"
+  },
+  {
+    "longitude": 114.73808,
+    "latitude": 23.758269,
+    "displayLng": 114.74282408411827,
+    "displayLat": 23.755655564415758,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源市区_大学城技校宿舍基站01RRU1",
+      "Longitude": 114.73808,
+      "Latitude": 23.758269,
+      "CGI": "936364-16"
+    },
+    "name": "GO_N5_4G河源市区_大学城技校宿舍基站01RRU1"
+  },
+  {
+    "longitude": 114.73808,
+    "latitude": 23.758269,
+    "displayLng": 114.74282408411827,
+    "displayLat": 23.755655564415758,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源市区_大学城技校宿舍基站01RRU2",
+      "Longitude": 114.73808,
+      "Latitude": 23.758269,
+      "CGI": "936364-17"
+    },
+    "name": "GO_N5_4G河源市区_大学城技校宿舍基站01RRU2"
+  },
+  {
+    "longitude": 114.73808,
+    "latitude": 23.758269,
+    "displayLng": 114.74282408411827,
+    "displayLat": 23.755655564415758,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源市区_大学城技校宿舍基站01RRU3",
+      "Longitude": 114.73808,
+      "Latitude": 23.758269,
+      "CGI": "936364-18"
+    },
+    "name": "GO_N5_4G河源市区_大学城技校宿舍基站01RRU3"
+  },
+  {
+    "longitude": 114.73705,
+    "latitude": 23.76138,
+    "displayLng": 114.74179376873434,
+    "displayLat": 23.758765223820305,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源市区_大学城接入网RRU1",
+      "Longitude": 114.73705,
+      "Latitude": 23.76138,
+      "CGI": "936363-25"
+    },
+    "name": "GO_N5_4G河源市区_大学城接入网RRU1"
+  },
+  {
+    "longitude": 114.73705,
+    "latitude": 23.76138,
+    "displayLng": 114.74179376873434,
+    "displayLat": 23.758765223820305,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源市区_大学城接入网RRU2",
+      "Longitude": 114.73705,
+      "Latitude": 23.76138,
+      "CGI": "936363-26"
+    },
+    "name": "GO_N5_4G河源市区_大学城接入网RRU2"
+  },
+  {
+    "longitude": 114.73705,
+    "latitude": 23.76138,
+    "displayLng": 114.74179376873434,
+    "displayLat": 23.758765223820305,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源市区_大学城接入网RRU3",
+      "Longitude": 114.73705,
+      "Latitude": 23.76138,
+      "CGI": "936363-27"
+    },
+    "name": "GO_N5_4G河源市区_大学城接入网RRU3"
+  },
+  {
+    "longitude": 114.729004,
+    "latitude": 23.749328,
+    "displayLng": 114.7337415298421,
+    "displayLat": 23.74671130988041,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源市区_东江海鲜城RRU1",
+      "Longitude": 114.729004,
+      "Latitude": 23.749328,
+      "CGI": "936329-19"
+    },
+    "name": "GO_N5_4G河源市区_东江海鲜城RRU1"
+  },
+  {
+    "longitude": 114.729004,
+    "latitude": 23.749328,
+    "displayLng": 114.7337415298421,
+    "displayLat": 23.74671130988041,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源市区_东江海鲜城RRU2",
+      "Longitude": 114.729004,
+      "Latitude": 23.749328,
+      "CGI": "936329-20"
+    },
+    "name": "GO_N5_4G河源市区_东江海鲜城RRU2"
+  },
+  {
+    "longitude": 114.729004,
+    "latitude": 23.749328,
+    "displayLng": 114.7337415298421,
+    "displayLat": 23.74671130988041,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源市区_东江海鲜城RRU3",
+      "Longitude": 114.729004,
+      "Latitude": 23.749328,
+      "CGI": "936329-21"
+    },
+    "name": "GO_N5_4G河源市区_东江海鲜城RRU3"
+  },
+  {
+    "longitude": 114.73006,
+    "latitude": 23.7543,
+    "displayLng": 114.73479870879457,
+    "displayLat": 23.751682797996384,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源市区_河职院实训楼RRU1",
+      "Longitude": 114.73006,
+      "Latitude": 23.7543,
+      "CGI": "936363-16"
+    },
+    "name": "GO_N5_4G河源市区_河职院实训楼RRU1"
+  },
+  {
+    "longitude": 114.73006,
+    "latitude": 23.7543,
+    "displayLng": 114.73479870879457,
+    "displayLat": 23.751682797996384,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源市区_河职院实训楼RRU2",
+      "Longitude": 114.73006,
+      "Latitude": 23.7543,
+      "CGI": "936363-17"
+    },
+    "name": "GO_N5_4G河源市区_河职院实训楼RRU2"
+  },
+  {
+    "longitude": 114.73006,
+    "latitude": 23.7543,
+    "displayLng": 114.73479870879457,
+    "displayLat": 23.751682797996384,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源市区_河职院实训楼RRU3",
+      "Longitude": 114.73006,
+      "Latitude": 23.7543,
+      "CGI": "936363-18"
+    },
+    "name": "GO_N5_4G河源市区_河职院实训楼RRU3"
+  },
+  {
+    "longitude": 114.73463,
+    "latitude": 23.75759,
+    "displayLng": 114.73937213995522,
+    "displayLat": 23.75497495281234,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源市区_河职院宿舍D1RRU1",
+      "Longitude": 114.73463,
+      "Latitude": 23.75759,
+      "CGI": "936364-22"
+    },
+    "name": "GO_N5_4G河源市区_河职院宿舍D1RRU1"
+  },
+  {
+    "longitude": 114.73463,
+    "latitude": 23.75759,
+    "displayLng": 114.73937213995522,
+    "displayLat": 23.75497495281234,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源市区_河职院宿舍D1RRU2",
+      "Longitude": 114.73463,
+      "Latitude": 23.75759,
+      "CGI": "936364-23"
+    },
+    "name": "GO_N5_4G河源市区_河职院宿舍D1RRU2"
+  },
+  {
+    "longitude": 114.73463,
+    "latitude": 23.75759,
+    "displayLng": 114.73937213995522,
+    "displayLat": 23.75497495281234,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源市区_河职院宿舍D1RRU3",
+      "Longitude": 114.73463,
+      "Latitude": 23.75759,
+      "CGI": "936364-24"
+    },
+    "name": "GO_N5_4G河源市区_河职院宿舍D1RRU3"
+  },
+  {
+    "longitude": 114.730059,
+    "latitude": 23.758692,
+    "displayLng": 114.73479799507781,
+    "displayLat": 23.75607361122776,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源市区_河职院行政楼RRU1",
+      "Longitude": 114.730059,
+      "Latitude": 23.758692,
+      "CGI": "936364-25"
+    },
+    "name": "GO_N5_4G河源市区_河职院行政楼RRU1"
+  },
+  {
+    "longitude": 114.730059,
+    "latitude": 23.758692,
+    "displayLng": 114.73479799507781,
+    "displayLat": 23.75607361122776,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源市区_河职院行政楼RRU2",
+      "Longitude": 114.730059,
+      "Latitude": 23.758692,
+      "CGI": "936364-26"
+    },
+    "name": "GO_N5_4G河源市区_河职院行政楼RRU2"
+  },
+  {
+    "longitude": 114.730059,
+    "latitude": 23.758692,
+    "displayLng": 114.73479799507781,
+    "displayLat": 23.75607361122776,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源市区_河职院行政楼RRU3",
+      "Longitude": 114.730059,
+      "Latitude": 23.758692,
+      "CGI": "936364-27"
+    },
+    "name": "GO_N5_4G河源市区_河职院行政楼RRU3"
+  },
+  {
+    "longitude": 114.735662,
+    "latitude": 23.752894,
+    "displayLng": 114.74040444935265,
+    "displayLat": 23.750280798005996,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源市区_阳光公寓RRU1",
+      "Longitude": 114.735662,
+      "Latitude": 23.752894,
+      "CGI": "936363-19"
+    },
+    "name": "GO_N5_4G河源市区_阳光公寓RRU1"
+  },
+  {
+    "longitude": 114.735662,
+    "latitude": 23.752894,
+    "displayLng": 114.74040444935265,
+    "displayLat": 23.750280798005996,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源市区_阳光公寓RRU2",
+      "Longitude": 114.735662,
+      "Latitude": 23.752894,
+      "CGI": "936363-20"
+    },
+    "name": "GO_N5_4G河源市区_阳光公寓RRU2"
+  },
+  {
+    "longitude": 114.735662,
+    "latitude": 23.752894,
+    "displayLng": 114.74040444935265,
+    "displayLat": 23.750280798005996,
+    "properties": {
+      "4G小区名": "GO_N5_4G河源市区_阳光公寓RRU3",
+      "Longitude": 114.735662,
+      "Latitude": 23.752894,
+      "CGI": "936363-21"
+    },
+    "name": "GO_N5_4G河源市区_阳光公寓RRU3"
+  },
+  {
+    "longitude": 114.73383,
+    "latitude": 23.75296,
+    "displayLng": 114.73857133125371,
+    "displayLat": 23.75034571916506,
+    "properties": {
+      "4G小区名": "市区大学城2F_800M_0（工程）",
+      "Longitude": 114.73383,
+      "Latitude": 23.75296,
+      "CGI": "540680-16"
+    },
+    "name": "市区大学城2F_800M_0（工程）"
+  },
+  {
+    "longitude": 114.73383,
+    "latitude": 23.75296,
+    "displayLng": 114.73857133125371,
+    "displayLat": 23.75034571916506,
+    "properties": {
+      "4G小区名": "市区大学城2F_800M_1（工程）",
+      "Longitude": 114.73383,
+      "Latitude": 23.75296,
+      "CGI": "540680-17"
+    },
+    "name": "市区大学城2F_800M_1（工程）"
+  },
+  {
+    "longitude": 114.73383,
+    "latitude": 23.75296,
+    "displayLng": 114.73857133125371,
+    "displayLat": 23.75034571916506,
+    "properties": {
+      "4G小区名": "市区大学城2F_800M_2（工程）",
+      "Longitude": 114.73383,
+      "Latitude": 23.75296,
+      "CGI": "540680-18"
+    },
+    "name": "市区大学城2F_800M_2（工程）"
+  },
+  {
+    "longitude": 114.736145,
+    "latitude": 23.757153,
+    "displayLng": 114.74088800230918,
+    "displayLat": 23.754538913494503,
+    "properties": {
+      "4G小区名": "市区大学城LF_800M_0（工程）",
+      "Longitude": 114.736145,
+      "Latitude": 23.757153,
+      "CGI": "540679-16"
+    },
+    "name": "市区大学城LF_800M_0（工程）"
+  },
+  {
+    "longitude": 114.736145,
+    "latitude": 23.757153,
+    "displayLng": 114.74088800230918,
+    "displayLat": 23.754538913494503,
+    "properties": {
+      "4G小区名": "市区大学城LF_800M_1（工程）",
+      "Longitude": 114.736145,
+      "Latitude": 23.757153,
+      "CGI": "540679-17"
+    },
+    "name": "市区大学城LF_800M_1（工程）"
+  },
+  {
+    "longitude": 114.736145,
+    "latitude": 23.757153,
+    "displayLng": 114.74088800230918,
+    "displayLat": 23.754538913494503,
+    "properties": {
+      "4G小区名": "市区大学城LF_800M_2（工程）",
+      "Longitude": 114.736145,
+      "Latitude": 23.757153,
+      "CGI": "540679-18"
+    },
+    "name": "市区大学城LF_800M_2（工程）"
+  },
+  {
+    "longitude": 114.670181,
+    "latitude": 23.732581,
+    "displayLng": 114.67482323987524,
+    "displayLat": 23.72987876114378,
+    "properties": {
+      "4G小区名": "市区技术学校T_800M_0",
+      "Longitude": 114.670181,
+      "Latitude": 23.732581,
+      "CGI": "541215-19"
+    },
+    "name": "市区技术学校T_800M_0"
+  },
+  {
+    "longitude": 114.670181,
+    "latitude": 23.732581,
+    "displayLng": 114.67482323987524,
+    "displayLat": 23.72987876114378,
+    "properties": {
+      "4G小区名": "市区技术学校T_800M_1",
+      "Longitude": 114.670181,
+      "Latitude": 23.732581,
+      "CGI": "541215-20"
+    },
+    "name": "市区技术学校T_800M_1"
+  },
+  {
+    "longitude": 114.670181,
+    "latitude": 23.732581,
+    "displayLng": 114.67482323987524,
+    "displayLat": 23.72987876114378,
+    "properties": {
+      "4G小区名": "市区技术学校T_800M_2",
+      "Longitude": 114.670181,
+      "Latitude": 23.732581,
+      "CGI": "541215-21"
+    },
+    "name": "市区技术学校T_800M_2"
+  },
+  {
+    "longitude": 114.699263,
+    "latitude": 23.748953,
+    "displayLng": 114.70396160380108,
+    "displayLat": 23.74629950595458,
+    "properties": {
+      "4G小区名": "市区无线中心F_800M_0（工程）",
+      "Longitude": 114.699263,
+      "Latitude": 23.748953,
+      "CGI": "540890-16"
+    },
+    "name": "市区无线中心F_800M_0（工程）"
+  },
+  {
+    "longitude": 114.72119,
+    "latitude": 23.77999,
+    "displayLng": 114.72592197155899,
+    "displayLat": 23.77735763456054,
+    "properties": {
+      "4G小区名": "源城枫树松_800M_0",
+      "Longitude": 114.72119,
+      "Latitude": 23.77999,
+      "CGI": "540742-16"
+    },
+    "name": "源城枫树松_800M_0"
+  },
+  {
+    "longitude": 114.72119,
+    "latitude": 23.77999,
+    "displayLng": 114.72592197155899,
+    "displayLat": 23.77735763456054,
+    "properties": {
+      "4G小区名": "源城枫树松_800M_1",
+      "Longitude": 114.72119,
+      "Latitude": 23.77999,
+      "CGI": "540742-17"
+    },
+    "name": "源城枫树松_800M_1"
+  },
+  {
+    "longitude": 114.72119,
+    "latitude": 23.77999,
+    "displayLng": 114.72592197155899,
+    "displayLat": 23.77735763456054,
+    "properties": {
+      "4G小区名": "源城枫树松_800M_2",
+      "Longitude": 114.72119,
+      "Latitude": 23.77999,
+      "CGI": "540742-18"
+    },
+    "name": "源城枫树松_800M_2"
+  }
+]

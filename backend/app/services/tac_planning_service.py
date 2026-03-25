@@ -15,6 +15,14 @@ import numpy as np
 from shapely.geometry import Point, Polygon, MultiPolygon
 from shapely.wkt import loads as wkt_loads
 
+# 尝试导入 STRtree，如果不可用则使用线性搜索
+try:
+    from shapely.strtree import STRtree
+    STRTREE_AVAILABLE = True
+except ImportError:
+    STRTREE_AVAILABLE = False
+    logger.warning("STRtree 不可用，将使用线性搜索（性能较慢）")
+
 logger = logging.getLogger(__name__)
 
 
@@ -78,6 +86,8 @@ class TACPlanningService:
         # 使用LRU缓存替代普通字典，默认最大缓存100个TAC区域
         self.tac_zones = LRUCache(capacity=100)
         self._seen_cells = {}  # 用于NR网络去重的字典
+        # STRtree 空间索引缓存 {network_type: (tree, tac_id_map)}
+        self._strtree_cache: Dict[str, tuple] = {}
 
     def load_tac_layers(self, network_type: str) -> Dict[str, Tuple[Polygon, str]]:
         """
@@ -238,6 +248,11 @@ class TACPlanningService:
                 raise ValueError("未能从TAC图层文件中加载任何TAC区域数据")
 
             logger.info(f"成功加载 {len(tac_zones)} 个{network_type} TAC区域")
+
+            # 构建 STRtree 空间索引（如果可用）
+            if STRTREE_AVAILABLE:
+                self._build_strtree_index(network_type, tac_zones)
+
             return tac_zones
 
         except Exception as e:
@@ -264,89 +279,111 @@ class TACPlanningService:
             self._seen_cells = {}
             logger.info(f"从全量工参文件加载待规划{network_type}小区...")
 
-            for data_id_dir in self.data_dir.iterdir():
-                if not data_id_dir.is_dir():
-                    continue
+            # 读取索引文件，找到最新的全量工参文件
+            # 索引文件在 data/index.json，而不是 uploads/index.json
+            index_path = self.data_dir / "index.json"
+            if not index_path.exists():
+                logger.warning(f"未找到索引文件: {index_path}")
+                return cells
 
-                data_json_path = data_id_dir / "data.json"
-                if not data_json_path.exists():
-                    continue
+            with open(index_path, "r", encoding="utf-8") as f:
+                index = json.load(f)
 
-                # 检查是否是全量工参文件（通过文件名判断）
-                index_path = self.data_dir.parent / "uploads" / "index.json"
-                if index_path.exists():
-                    with open(index_path, "r", encoding="utf-8") as f:
-                        index = json.load(f)
-                    file_info = index.get(str(data_id_dir.name), {})
-                    file_name = file_info.get("name", "")
+            # 收集所有全量工参文件并按上传时间降序排序（最新的在前）
+            full_params_files = []
+            for data_id, data_info in index.items():
+                file_type = data_info.get("type", "")
+                file_name = data_info.get("name", "")
+                upload_date = data_info.get("uploadDate", "")
 
-                    # 只处理包含ProjectParameter的工参文件
-                    if "projectparameter" not in file_name.lower():
+                # 只处理excel类型且文件名包含projectparameter的全量工参文件
+                if file_type == "excel" and "projectparameter" in file_name.lower():
+                    full_params_files.append({
+                        "data_id": data_id,
+                        "name": file_name,
+                        "upload_date": upload_date
+                    })
+
+            # 按上传时间降序排序
+            full_params_files.sort(key=lambda x: x["upload_date"], reverse=True)
+
+            if not full_params_files:
+                logger.warning(f"未找到全量工参文件（包含projectparameter）")
+                return cells
+
+            # 只读取最新的全量工参文件
+            latest_file = full_params_files[0]
+            data_id = latest_file["data_id"]
+            file_name = latest_file["name"]
+
+            logger.info(f"正在读取最新全量工参文件: {file_name} (上传时间: {latest_file['upload_date']})")
+
+            data_json_path = self.data_dir / data_id / "data.json"
+            if not data_json_path.exists():
+                logger.warning(f"数据文件不存在: {data_json_path}")
+                return cells
+
+            # 读取数据
+            with open(data_json_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            # 提取指定网络类型的小区
+            network_data = data.get(network_type, [])
+            logger.info(f"从该文件中找到 {len(network_data)} 个{network_type}基站")
+
+            for site in network_data:
+                site_id = site.get("id", "")
+                site_name = site.get("name", "")
+
+                for sector in site.get("sectors", []):
+                    sector_id = sector.get("id", "")
+                    sector_name = sector.get("name", "")
+
+                    if not site_id or not sector_id:
                         continue
 
-                    logger.info(f"正在读取工参文件: {file_name}")
+                    # 获取经纬度
+                    longitude = sector.get("longitude", 0)
+                    latitude = sector.get("latitude", 0)
 
-                # 读取数据
-                with open(data_json_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
+                    # 只保留有经纬度的小区
+                    if not longitude or not latitude:
+                        logger.debug(
+                            f"跳过无经纬度的小区: site={site_id}, sector={sector_id}"
+                        )
+                        continue
 
-                # 提取指定网络类型的小区
-                network_data = data.get(network_type, [])
-                logger.info(f"从该文件中找到 {len(network_data)} 个{network_type}基站")
+                    # 对所有网络类型使用"站点ID&小区ID"进行去重
+                    # 构建唯一键
+                    unique_key = f"{site_id}&{sector_id}"
+                    # 使用字典去重
+                    if unique_key not in self._seen_cells:
+                        self._seen_cells[unique_key] = True
+                    else:
+                        logger.debug(f"{network_type}网络：跳过重复小区: {unique_key}")
+                        continue
 
-                for site in network_data:
-                    site_id = site.get("id", "")
-                    site_name = site.get("name", "")
+                    # 获取现网TAC并标准化（去除前导零）
+                    existing_tac_raw = sector.get("tac", None)
+                    existing_tac = None
+                    if existing_tac_raw is not None and pd.notna(existing_tac_raw):
+                        existing_tac = str(existing_tac_raw).strip()
+                        # 去除前导零（但保留单个0）
+                        existing_tac = existing_tac.lstrip("0") or "0"
 
-                    for sector in site.get("sectors", []):
-                        sector_id = sector.get("id", "")
-                        sector_name = sector.get("name", "")
-
-                        if not site_id or not sector_id:
-                            continue
-
-                        # 获取经纬度
-                        longitude = sector.get("longitude", 0)
-                        latitude = sector.get("latitude", 0)
-
-                        # 只保留有经纬度的小区
-                        if not longitude or not latitude:
-                            logger.debug(
-                                f"跳过无经纬度的小区: site={site_id}, sector={sector_id}"
-                            )
-                            continue
-
-                        # 对所有网络类型使用"站点ID&小区ID"进行去重
-                        # 构建唯一键
-                        unique_key = f"{site_id}&{sector_id}"
-                        # 使用字典去重
-                        if unique_key not in self._seen_cells:
-                            self._seen_cells[unique_key] = True
-                        else:
-                            logger.debug(f"{network_type}网络：跳过重复小区: {unique_key}")
-                            continue
-
-                        # 获取现网TAC并标准化（去除前导零）
-                        existing_tac_raw = sector.get("tac", None)
-                        existing_tac = None
-                        if existing_tac_raw is not None and pd.notna(existing_tac_raw):
-                            existing_tac = str(existing_tac_raw).strip()
-                            # 去除前导零（但保留单个0）
-                            existing_tac = existing_tac.lstrip("0") or "0"
-
-                        cell = {
-                            "sectorId": sector_id,
-                            "sectorName": sector_name,
-                            "siteId": site_id,
-                            "siteName": site_name,
-                            "networkType": network_type,
-                            "longitude": longitude,
-                            "latitude": latitude,
-                            "existingTac": existing_tac,
-                            "firstGroup": sector.get("first_group", None),
-                            "azimuth": sector.get("azimuth", 0),  # 方向角（用于TAC插花检测）
-                        }
-                        cells.append(cell)
+                    cell = {
+                        "sectorId": sector_id,
+                        "sectorName": sector_name,
+                        "siteId": site_id,
+                        "siteName": site_name,
+                        "networkType": network_type,
+                        "longitude": longitude,
+                        "latitude": latitude,
+                        "existingTac": existing_tac,
+                        "firstGroup": sector.get("first_group", None),
+                        "azimuth": sector.get("azimuth", 0),  # 方向角（用于TAC插花检测）
+                    }
+                    cells.append(cell)
 
             if not cells:
                 raise ValueError(
@@ -365,15 +402,48 @@ class TACPlanningService:
             traceback.print_exc()
             raise ValueError(f"加载小区数据失败: {str(e)}")
 
+    def _build_strtree_index(
+        self, network_type: str, tac_zones: Dict[str, Tuple[Polygon, str]]
+    ) -> None:
+        """
+        构建 STRtree 空间索引
+
+        Args:
+            network_type: 网络类型 ('LTE' 或 'NR')
+            tac_zones: TAC区域字典 {tac_id: (geometry, area_name)}
+        """
+        try:
+            geometries = []
+            tac_id_map = []  # 将几何对象索引映射到 TAC ID
+
+            for tac_id, (geometry, area_name) in tac_zones.items():
+                geometries.append(geometry)
+                tac_id_map.append(tac_id)
+
+            # 创建 STRtree
+            tree = STRtree(geometries)
+            self._strtree_cache[network_type] = (tree, tac_id_map, tac_zones)
+
+            logger.info(
+                f"成功构建 {network_type} TAC 空间索引，包含 {len(geometries)} 个多边形"
+            )
+
+        except Exception as e:
+            logger.warning(f"构建 STRtree 索引失败: {e}，将使用线性搜索")
+            self._strtree_cache.pop(network_type, None)
+
     def match_cell_to_tac(
-        self, cell: Dict, tac_zones: Dict[str, Tuple[Polygon, str]]
+        self, cell: Dict, tac_zones: Dict[str, Tuple[Polygon, str]], network_type: Optional[str] = None
     ) -> Optional[str]:
         """
         将小区匹配到TAC区域
 
+        使用 STRtree 空间索引优化查询性能（如果可用且提供了 network_type）。
+
         Args:
             cell: 小区数据
             tac_zones: TAC区域字典 {tac_id: (geometry, area_name)}
+            network_type: 网络类型 ('LTE' 或 'NR')，可选。提供时使用STRtree索引。
 
         Returns:
             TAC ID，如果不匹配则返回None
@@ -381,19 +451,58 @@ class TACPlanningService:
         try:
             point = Point(cell["longitude"], cell["latitude"])
 
-            for tac_id, (geometry, area_name) in tac_zones.items():
-                # 检查点是否在多边形内
-                if geometry.contains(point) or geometry.touches(point):
-                    logger.debug(
-                        f"小区 {cell['sectorId']} 匹配到TAC: {tac_id} ({area_name})"
-                    )
-                    return tac_id
+            # 如果提供了 network_type 且有 STRtree 索引，使用索引查询
+            if network_type and STRTREE_AVAILABLE and network_type in self._strtree_cache:
+                return self._match_with_strtree(cell, point, network_type)
 
-            return None
+            # 否则使用线性搜索（向后兼容）
+            return self._match_linear(cell, point, tac_zones)
 
         except Exception as e:
             logger.error(f"匹配小区 {cell.get('sectorId')} 到TAC失败: {e}")
             return None
+
+    def _match_with_strtree(self, cell: Dict, point: Point, network_type: str) -> Optional[str]:
+        """使用 STRtree 索引进行匹配"""
+        try:
+            tree, tac_id_map, tac_zones = self._strtree_cache[network_type]
+
+            # 使用 STRtree 查询候选多边形
+            # query 返回的是 numpy 数组，包含与查询几何相交的几何对象的索引
+            candidate_indices = tree.query(point)
+
+            # 处理返回的索引数组
+            for idx in candidate_indices:
+                # 将索引转换为整数（numpy.int64 -> int）
+                idx = int(idx)
+
+                # 使用索引获取 TAC ID 和几何对象
+                if 0 <= idx < len(tac_id_map):
+                    tac_id = tac_id_map[idx]
+                    geometry, area_name = tac_zones[tac_id]
+
+                    # 精确检查：点是否在多边形内或接触边界
+                    if geometry.contains(point) or geometry.touches(point):
+                        logger.debug(
+                            f"小区 {cell['sectorId']} 匹配到TAC: {tac_id} ({area_name}) [STRtree]"
+                        )
+                        return tac_id
+
+            return None
+
+        except Exception as e:
+            logger.warning(f"STRtree 匹配失败，回退到线性搜索: {e}")
+            return None
+
+    def _match_linear(self, cell: Dict, point: Point, tac_zones: Dict[str, Tuple[Polygon, str]]) -> Optional[str]:
+        """使用线性搜索进行匹配（原始方法）"""
+        for tac_id, (geometry, area_name) in tac_zones.items():
+            if geometry.contains(point) or geometry.touches(point):
+                logger.debug(
+                    f"小区 {cell['sectorId']} 匹配到TAC: {tac_id} ({area_name}) [线性]"
+                )
+                return tac_id
+        return None
 
     def plan_tac(
         self,
@@ -814,6 +923,8 @@ class TACPlanningService:
         """
         try:
             cells = []
+            # 添加去重字典，确保小区唯一性
+            seen_cells = {}
             logger.info("准备待规划小区列表...")
 
             for site in cells_data:
@@ -834,6 +945,14 @@ class TACPlanningService:
                     if not lon or not lat:
                         continue
 
+                    # 构建唯一键进行去重（站点ID & 小区ID）
+                    unique_key = f"{site_id}&{sector_id}"
+                    if unique_key in seen_cells:
+                        logger.debug(f"跳过重复小区: {unique_key}")
+                        continue
+
+                    seen_cells[unique_key] = True
+
                     cell = {
                         **sector,
                         "siteId": str(site_id),
@@ -847,6 +966,7 @@ class TACPlanningService:
                     }
                     cells.append(cell)
 
+            logger.info(f"成功加载 {len(cells)} 个待规划小区（去重后，唯一键数: {len(seen_cells)}）")
             return cells
 
         except Exception as e:

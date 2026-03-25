@@ -10,7 +10,7 @@
  * - 右键菜单支持标签设置
  */
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { ChevronDown, ChevronRight, Map, Folder, File, X, Satellite } from 'lucide-react'
+import { ChevronDown, ChevronRight, ChevronLeft, Map, Folder, File, X, Satellite } from 'lucide-react'
 import { NetworkType } from '../../config/sector-config'
 import { LabelSettingsModal, LabelSettings, FieldOption } from './LabelSettingsModal'
 import { layerApi } from '../../services/api'
@@ -438,7 +438,7 @@ export function LayerControl({
       {
         id: 'root',
         type: 'root',
-        label: '图层控制',
+        label: '',
         expanded: isExpanded('root', true),
         children: [
           // 基站分组
@@ -602,8 +602,7 @@ export function LayerControl({
   const startX = useRef(0)
   const startWidth = useRef(0)
 
-  // 计算控件的水平位置 - 控件右侧与面板左侧对齐
-  const controlRight = isVisible ? `${panelWidth}px` : '0px' // 面板显示时在面板外侧对齐，隐藏时贴窗口右边缘
+  // 按钮现在在面板容器内部，使用 left: -40px 相对于面板定位
 
   // 开始调整大小
   const startResize = (e: React.MouseEvent) => {
@@ -881,70 +880,84 @@ export function LayerControl({
           display: block;
         }
       `}</style>
-      {/* 显示/隐藏控件 - 贴合面板边缘 */}
-      <div
-        onClick={() => setIsVisible(!isVisible)}
-        onMouseEnter={() => setIsControlHovered(true)}
-        onMouseLeave={() => setIsControlHovered(false)}
-        style={{
-          position: 'absolute',
-          top: '50%',
-          transform: isControlHovered ? 'translateY(-50%) scale(1.2)' : 'translateY(-50%)',
-          right: controlRight,
-          zIndex: 1001,
-          backgroundColor: isControlHovered ? '#3b82f6' : 'rgba(255, 255, 255, 0.95)',
-          backdropFilter: 'blur(12px)',
-          borderRadius: '8px',
-          boxShadow: isControlHovered
-            ? '0 6px 20px rgba(59, 130, 246, 0.4)'
-            : '0 4px 12px rgba(0, 0, 0, 0.15)',
-          width: '32px',
-          height: '32px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          fontSize: '16px',
-          color: isControlHovered ? '#ffffff' : '#3b82f6',
-          fontWeight: 'bold',
-          border: '1px solid rgba(0, 0, 0, 0.1)',
-          transition: isResizing.current ? 'none' : 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        }}
-      >
-        {isVisible ? '‹' : '›'}
-      </div>
 
-      {/* 图层控制面板 - 直角设计 */}
+      {/* 图层控制面板容器 - 包含面板和切换按钮 */}
       <div
-        ref={panelRef}
-        className="layer-control"
         style={{
           position: 'absolute',
-          top: '0px',
-          right: isVisible ? '0px' : `-${panelWidth}px`,
-          zIndex: 1000,
-          backgroundColor: 'rgba(255, 255, 255, 0.98)',
-          backdropFilter: 'blur(12px)',
-          borderRadius: '0',
-          boxShadow: '-4px 0 20px rgba(0, 0, 0, 0.15)',
-          width: `${panelWidth}px`,
-          minWidth: '240px',
+          top: 0,
+          right: 0,
           height: '100vh',
-          maxHeight: '100vh',
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          fontSize: '14px',
-          border: '1px solid rgba(0, 0, 0, 0.1)',
-          borderRight: 'none',
-          borderTop: 'none',
-          paddingTop: '8px',
-          paddingLeft: '8px',
-          paddingRight: '8px',
-          paddingBottom: '24px', // 增加底部内边距，确保最后的内容可见
-          transition: isResizing.current ? 'none' : 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          boxSizing: 'border-box', // 确保 padding 包含在高度计算内
-        }}
+          // 设置 CSS 变量供子元素使用
+          '--panel-width': `${panelWidth}px`,
+        } as React.CSSProperties}
       >
+        {/* 显示/隐藏控件 - 独立于面板 */}
+        <div
+          onClick={() => setIsVisible(!isVisible)}
+          onMouseEnter={() => setIsControlHovered(true)}
+          onMouseLeave={() => setIsControlHovered(false)}
+          style={{
+            position: 'absolute',
+            top: '50%',
+            // 面板显示时：使用 CSS 变量计算位置（在面板左侧边缘）
+            // 面板隐藏时：在屏幕右边缘附近
+            right: isVisible ? 'calc(var(--panel-width) + 0px)' : '8px',
+            transform: isControlHovered ? 'translateY(-50%) scale(1.1)' : 'translateY(-50%)',
+            zIndex: 1002,
+            pointerEvents: 'auto',
+            backgroundColor: isControlHovered ? '#3b82f6' : '#ffffff',
+            backdropFilter: 'blur(16px)',
+            borderRadius: '12px',
+            boxShadow: isControlHovered
+              ? '0 8px 24px rgba(59, 130, 246, 0.5)'
+              : isVisible ? '-4px 0 12px rgba(0, 0, 0, 0.15)' : '0 4px 16px rgba(0, 0, 0, 0.2)',
+            width: '40px',
+            height: '40px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            border: '1.5px solid rgba(59, 130, 246, 0.3)',
+            transition: isResizing.current ? 'none' : 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+          }}
+        >
+          {isVisible ? (
+            <ChevronLeft size={20} color={isControlHovered ? '#ffffff' : '#3b82f6'} strokeWidth={2.5} />
+          ) : (
+            <ChevronRight size={20} color={isControlHovered ? '#ffffff' : '#3b82f6'} strokeWidth={2.5} />
+          )}
+        </div>
+
+        {/* 图层控制面板 - 直角设计 */}
+        <div
+          ref={panelRef}
+          className="layer-control"
+          style={{
+            position: 'absolute',
+            top: '0px',
+            right: '0px',
+            zIndex: 1000,
+            pointerEvents: 'auto',
+            backgroundColor: 'rgba(255, 255, 255, 0.98)',
+            backdropFilter: 'blur(12px)',
+            borderRadius: '0',
+            boxShadow: '-4px 0 20px rgba(0, 0, 0, 0.15)',
+            width: `${panelWidth}px`,
+            minWidth: '240px',
+            height: '100vh',
+            maxHeight: '100vh',
+            overflow: 'visible',
+            fontSize: '14px',
+            border: '1px solid rgba(0, 0, 0, 0.1)',
+            borderRight: 'none',
+            borderTop: 'none',
+            boxSizing: 'border-box',
+            // 使用 transform 来隐藏/显示面板，确保完全移出屏幕
+            transform: isVisible ? 'translateX(0)' : 'translateX(100%)',
+            transition: isResizing.current ? 'none' : 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          }}
+        >
         {/* 拖动调整手柄 */}
         <div
           onMouseDown={startResize}
@@ -961,31 +974,42 @@ export function LayerControl({
           title="拖动调整宽度"
         />
 
-        {/* 面板标题 - 已删除，与外层重复 */}
-
-        {/* 渲染树 */}
-        {tree.map(rootNode => (
-          <TreeNodeComponent
-            key={rootNode.id}
-            node={rootNode}
-            level={0}
-            onToggle={toggleNode}
-            onSectorToggle={handleSectorToggle}
-            onSectorLabelToggle={onSectorLabelToggle}
-            onLayerFileToggle={handleLayerFileToggle}
-            onMapTypeChange={handleMapTypeChange}
-            onFrequencyToggle={onFrequencyToggle}
-            onCustomLayerToggle={onCustomLayerToggle}
-            onLayerFileRemove={onLayerFileRemove}
-            onCustomLayerRemove={onCustomLayerRemove}
-            onPointFileLabelToggle={onPointFileLabelToggle}
-            onLayerFileLabelToggle={onLayerFileLabelToggle}
-            onContextMenu={handleContextMenu}
-            mapType={mapType}
-            pointFileLabelVisibility={pointFileLabelVisibility}
-            layerFileLabelVisibility={layerFileLabelVisibility}
-          />
-        ))}
+        {/* 内容容器 - 处理滚动 */}
+        <div style={{
+          height: '100%',
+          maxHeight: '100vh',
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          paddingTop: '8px',
+          paddingLeft: '8px',
+          paddingRight: '8px',
+          paddingBottom: '24px',
+        }}>
+          {/* 渲染树 */}
+          {tree.map(rootNode => (
+            <TreeNodeComponent
+              key={rootNode.id}
+              node={rootNode}
+              level={0}
+              onToggle={toggleNode}
+              onSectorToggle={handleSectorToggle}
+              onSectorLabelToggle={onSectorLabelToggle}
+              onLayerFileToggle={handleLayerFileToggle}
+              onMapTypeChange={handleMapTypeChange}
+              onFrequencyToggle={onFrequencyToggle}
+              onCustomLayerToggle={onCustomLayerToggle}
+              onLayerFileRemove={onLayerFileRemove}
+              onCustomLayerRemove={onCustomLayerRemove}
+              onPointFileLabelToggle={onPointFileLabelToggle}
+              onLayerFileLabelToggle={onLayerFileLabelToggle}
+              onContextMenu={handleContextMenu}
+              mapType={mapType}
+              pointFileLabelVisibility={pointFileLabelVisibility}
+              layerFileLabelVisibility={layerFileLabelVisibility}
+            />
+          ))}
+        </div>
+        </div>
       </div>
 
       {/* 右键菜单 - 放在面板外部以避免被裁剪或出现滚动条 */}

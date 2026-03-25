@@ -784,23 +784,38 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
       if (whitelist !== null) {
         if (mode === 'pci-planning') {
           // PCI模式：使用PCI数据同步服务，只加载指定网络类型的数据
-          const syncedData = pciDataSyncService.getSyncedData()
-          if (syncedData) {
+          // 关键修复：使用 getUpdatedPCIData() 而不是 getSyncedData()
+          // getUpdatedPCIData() 会将 syncedPCI 正确赋值给 pci 字段
+          const updatedData = pciDataSyncService.getUpdatedPCIData()
+          if (updatedData) {
             // 如果指定了网络类型，只加载该类型的数据；否则加载所有数据
             const loadLTE = !networkType || networkType === 'LTE'
             const loadNR = !networkType || networkType === 'NR'
 
+            // 坐标转换（数据已经是更新后的PCI）
             const sectorData = {
-              lte: loadLTE ? syncedData.lte.map(s => {
+              lte: loadLTE ? updatedData.lte.map(s => {
                 const [displayLat, displayLng] = CoordinateTransformer.wgs84ToGcj02(s.latitude || 0, s.longitude || 0)
                 return { ...s, displayLat, displayLng }
               }) : [],
-              nr: loadNR ? syncedData.nr.map(s => {
+              nr: loadNR ? updatedData.nr.map(s => {
                 const [displayLat, displayLng] = CoordinateTransformer.wgs84ToGcj02(s.latitude || 0, s.longitude || 0)
                 return { ...s, displayLat, displayLng }
               }) : []
             }
-            console.log('[OnlineMap] PCI模式加载扇区数据', { loadLTE, loadNR, lteCount: sectorData.lte.length, nrCount: sectorData.nr.length })
+            // 记录数据验证信息
+            const sectorIdsInData = {
+              lte: sectorData.lte.map(s => s.id),
+              nr: sectorData.nr.map(s => s.id)
+            }
+            console.log('[OnlineMap] PCI模式加载扇区数据（使用更新后的PCI）', {
+              loadLTE, loadNR,
+              lteCount: sectorData.lte.length,
+              nrCount: sectorData.nr.length,
+              networkType,
+              sampleLteIds: sectorIdsInData.lte.slice(0, 5),
+              sampleNrIds: sectorIdsInData.nr.slice(0, 5)
+            })
             setSectorData(sectorData)
 
             // 延迟应用高亮，只对加载的图层应用
@@ -1577,14 +1592,17 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
           console.log('[OnlineMap] 过滤后的点数据数量:', pointData.length)
           pointFileDataRef.current.set(layerFile.id, pointData)
 
-          // 转换Excel数据为GeoJSON，并进行坐标纠偏 (WGS84 -> GCJ02)
+          // 转换Excel数据为GeoJSON
+          // 注意：这里使用原始 WGS84 坐标，不进行前端转换
+          // MapInfoLayer.fromGeoJSON 会通过 transformFeatureCoordinates 进行 WGS84 -> GCJ02 转换
+          // 这样确保只有一次坐标转换，避免双重纠偏导致位置偏移
           const features = pointData.map((item: any) => {
-            const [lat, lng] = CoordinateTransformer.wgs84ToGcj02(item.latitude, item.longitude)
             return {
               type: 'Feature',
               geometry: {
                 type: 'Point',
-                coordinates: [lng, lat]
+                // GeoJSON 坐标格式: [longitude, latitude] (原始 WGS84)
+                coordinates: [item.longitude || 0, item.latitude || 0]
               },
               properties: item
             }
@@ -2923,10 +2941,10 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
         leafletLayer = L.layerGroup()
         layer.data.forEach((p: any) => {
           if (p.latitude && p.longitude) {
-            // 纠偏处理: WGS84 -> GCJ02
-            const [gcjLat, gcjLng] = CoordinateTransformer.wgs84ToGcj02(p.latitude, p.longitude)
+            // 与扇区数据处理方式一致：在前端进行坐标转换
+            const [displayLat, displayLng] = CoordinateTransformer.wgs84ToGcj02(p.latitude || 0, p.longitude || 0)
 
-            L.circleMarker([gcjLat, gcjLng], {
+            L.circleMarker([displayLat, displayLng], {
               radius: 5,
               fillColor: '#ef4444',
               color: '#fff',
@@ -3022,8 +3040,10 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
         for (const point of pointData) {
           if (!point.longitude || !point.latitude) continue
 
-          // 应用坐标纠偏
-          const [gcjLat, gcjLng] = CoordinateTransformer.wgs84ToGcj02(point.latitude, point.longitude)
+          // 与扇区数据处理方式一致：在前端进行坐标转换
+          const [displayLat, displayLng] = CoordinateTransformer.wgs84ToGcj02(point.latitude || 0, point.longitude || 0)
+          const gcjLat = displayLat
+          const gcjLng = displayLng
 
           // 获取标签字段值
           const attributes = point.attributes || {}

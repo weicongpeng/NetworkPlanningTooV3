@@ -17,39 +17,53 @@ declare const __dirname: string
 let mainWindow: electron.BrowserWindow | null = null
 let backendProcess: ChildProcess | null = null
 
+// 隐藏菜单栏
+try {
+  // 隐藏默认菜单栏
+  if (app.setAboutPanelOptions) {
+    app.setAboutPanelOptions({})
+  }
+} catch (e) {
+  console.log('Could not set app options')
+}
+
 // 开发环境检测 - 使用更可靠的方法
 // 在生产环境中，src 目录不会被包含，所以可以通过检查它来判断
 const isDev = fs.existsSync(path.join(__dirname, '../../src/renderer')) || process.env.NODE_ENV !== 'production'
 
-console.log('Electron main process starting...')
-console.log('isDev:', isDev)
-console.log('__dirname:', __dirname)
+const devLog = (...args: any[]) => {
+  if (isDev) console.log(...args)
+}
+
+devLog('Electron main process starting...')
+devLog('isDev:', isDev)
+devLog('__dirname:', __dirname)
 
 // 安全地访问 app 属性
 try {
-  console.log('app.isPackaged:', app.isPackaged)
+  devLog('app.isPackaged:', app.isPackaged)
 } catch (e) {
-  console.log('app.isPackaged: not available')
+  devLog('app.isPackaged: not available')
 }
 
 // 创建浏览器窗口
 function createWindow() {
-  console.log('Creating browser window...')
+  devLog('Creating browser window...')
   try {
-    console.log('app.getAppPath():', app.getAppPath())
+    devLog('app.getAppPath():', app.getAppPath())
   } catch (e) {
-    console.log('app.getAppPath(): not available')
+    devLog('app.getAppPath(): not available')
   }
   try {
-    console.log('app.isPackaged:', app.isPackaged)
+    devLog('app.isPackaged:', app.isPackaged)
   } catch (e) {
-    console.log('app.isPackaged: not available')
+    devLog('app.isPackaged: not available')
   }
-  console.log('__dirname:', __dirname)
-  console.log('process.resourcesPath:', process.resourcesPath)
+  devLog('__dirname:', __dirname)
+  devLog('process.resourcesPath:', process.resourcesPath)
 
   const preloadPath = path.join(__dirname, 'preload.js')
-  console.log('Preload path:', preloadPath)
+  devLog('Preload path:', preloadPath)
 
   // 检查 preload.js 是否存在
   if (!fs.existsSync(preloadPath)) {
@@ -61,6 +75,7 @@ function createWindow() {
     height: 900,
     minWidth: 1000,
     minHeight: 600,
+    autoHideMenuBar: true,
     webPreferences: {
       preload: preloadPath,
       nodeIntegration: false,
@@ -73,13 +88,13 @@ function createWindow() {
 
   // 窗口准备好后显示
   mainWindow.once('ready-to-show', () => {
-    console.log('Window ready to show')
+    devLog('Window ready to show')
     mainWindow?.show()
   })
 
   // 加载应用
   if (isDev) {
-    console.log('Loading development URL: http://localhost:5173')
+    devLog('Loading development URL: http://localhost:5173')
     mainWindow.loadURL('http://localhost:5173')
     mainWindow.webContents.openDevTools()
 
@@ -90,7 +105,7 @@ function createWindow() {
     mainWindow.webContents.on('did-fail-load', () => {
       if (retryCount < maxRetries && mainWindow) {
         retryCount++
-        console.log(`Retrying to load Vite(attempt ${retryCount} / ${maxRetries})...`)
+        devLog(`Retrying to load Vite(attempt ${retryCount} / ${maxRetries})...`)
         setTimeout(() => {
           if (mainWindow) {
             mainWindow.loadURL('http://localhost:5173')
@@ -111,18 +126,18 @@ function createWindow() {
       path.join(__dirname, 'dist-renderer', 'index.html')
     ]
 
-    console.log('Production mode - searching for HTML file...')
-    console.log('process.resourcesPath:', process.resourcesPath)
-    console.log('__dirname:', __dirname)
+    devLog('Production mode - searching for HTML file...')
+    devLog('process.resourcesPath:', process.resourcesPath)
+    devLog('__dirname:', __dirname)
 
     for (const testPath of possiblePaths) {
-      console.log('  Checking:', testPath)
+      devLog('  Checking:', testPath)
       if (fs.existsSync(testPath)) {
         htmlPath = testPath
-        console.log('  ✓ FOUND HTML at:', htmlPath)
+        devLog('  ✓ FOUND HTML at:', htmlPath)
         break
       } else {
-        console.log('  ✗ Not found')
+        devLog('  ✗ Not found')
       }
     }
 
@@ -132,13 +147,13 @@ function createWindow() {
       // 显示错误页面
       mainWindow.loadURL('data:text/html;charset=utf-8,<h1 style="color:white;background:#333;padding:20px;">错误：找不到 HTML 文件</h1><p style="color:white;background:#333;padding:20px;">请查看控制台获取详细信息</p>')
     } else {
-      console.log('Loading HTML file:', htmlPath)
+      devLog('Loading HTML file:', htmlPath)
       mainWindow.loadFile(htmlPath)
     }
   }
 
   mainWindow.on('closed', () => {
-    console.log('Main window closed')
+    devLog('Main window closed')
     mainWindow = null
   })
 
@@ -149,11 +164,11 @@ function createWindow() {
 
   // 使用 will-navigate 事件来处理导航失败
   mainWindow.webContents.on('did-start-loading', () => {
-    console.log('Started loading')
+    devLog('Started loading')
   })
 
   mainWindow.webContents.on('did-stop-loading', () => {
-    console.log('Finished loading')
+    devLog('Finished loading')
   })
 }
 
@@ -161,7 +176,7 @@ function createWindow() {
 function startBackend() {
   // 开发环境下，后端由 start_app.bat 启动，这里跳过以避免端口冲突
   if (isDev) {
-    console.log('Dev mode: Skipping internal backend start')
+    devLog('Dev mode: Skipping internal backend start')
     return
   }
 
@@ -172,7 +187,7 @@ function startBackend() {
 
   if (!fs.existsSync(unpackedPath) && fs.existsSync(noAsarPath)) {
     backendRelPath = 'app/backend'
-    console.log('Using no-asar backend path:', noAsarPath)
+    devLog('Using no-asar backend path:', noAsarPath)
   }
 
   const backendPath = path.join(
@@ -187,9 +202,9 @@ function startBackend() {
 
   if (venvPythonExists) {
     pythonExecutable = venvPythonPath
-    console.log('使用虚拟环境 Python:', venvPythonPath)
+    devLog('使用虚拟环境 Python:', venvPythonPath)
   } else {
-    console.log('虚拟环境未找到，使用系统 Python')
+    devLog('虚拟环境未找到，使用系统 Python')
   }
 
   backendProcess = spawn(pythonExecutable, [
@@ -204,7 +219,7 @@ function startBackend() {
   })
 
   backendProcess.on('exit', (code: number) => {
-    console.log(`后端进程退出，代码: ${code} `)
+    devLog(`后端进程退出，代码: ${code} `)
     if (code !== 0 && backendProcess && !backendProcess.killed) {
       // 尝试重启
       setTimeout(startBackend, 5000)
@@ -262,14 +277,23 @@ ipcMain.handle('read-file', async (_event, filePath: string) => {
 
 // 应用生命周期
 app.whenReady().then(() => {
-  console.log('App is ready')
+  devLog('App is ready')
+
+  // 隐藏菜单栏 - 创建空菜单
+  try {
+    const Menu = electron.Menu
+    Menu.setApplicationMenu(null)
+  } catch (e) {
+    console.log('Could not set menu')
+  }
+
   createWindow()
 
   // 启动后端服务
   startBackend()
 
   app.on('activate', () => {
-    console.log('App activated')
+    devLog('App activated')
     if (BW.getAllWindows().length === 0) {
       createWindow()
     }
@@ -277,11 +301,11 @@ app.whenReady().then(() => {
 })
 
 app.on('window-all-closed', () => {
-  console.log('All windows closed')
+  devLog('All windows closed')
   if (process.platform !== 'darwin') {
     // 停止后端服务
     if (backendProcess) {
-      console.log('Killing backend process')
+      devLog('Killing backend process')
       backendProcess.kill()
     }
     app.quit()
@@ -289,10 +313,10 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', () => {
-  console.log('App about to quit')
+  devLog('App about to quit')
   // 停止后端服务
   if (backendProcess) {
-    console.log('Killing backend process')
+    devLog('Killing backend process')
     backendProcess.kill()
   }
 })

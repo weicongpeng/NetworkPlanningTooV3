@@ -182,19 +182,20 @@ async def apply_pci_to_params(task_id: str) -> Dict[str, Any]:
     if not original_excel_path.exists():
         raise HTTPException(status_code=404, detail="全量工参原始Excel文件不存在")
 
-    # 在创建新数据之前，删除所有旧的备份工参（清理旧数据）
-    deleted_backup_count = 0
+    # 在创建新数据之前，删除其他旧的全量工参（保持唯一性，但不删除当前正在使用的）
+    deleted_count = 0
     for old_id, old_info in list(data_service.index.items()):
-        if old_info.get("fileType") == "full_params_backup":
+        # 删除其他全量工参类型文件，但保留当前正在使用的 full_params_id
+        if old_id != full_params_id and (old_info.get("fileType") == "full_params" or old_info.get("fileType") == "full_params_backup"):
             try:
                 data_service.delete_data(old_id)
-                deleted_backup_count += 1
-                logger.info(f"[应用PCI到工参] 已删除旧备份工参: {old_id}")
+                deleted_count += 1
+                logger.info(f"[应用PCI到工参] 已删除旧工参: {old_id} (类型: {old_info.get('fileType')})")
             except Exception as e:
-                logger.warning(f"[应用PCI到工参] 删除旧备份工参失败: {old_id}, 错误: {e}")
-    
-    if deleted_backup_count > 0:
-        logger.info(f"[应用PCI到工参] 共删除 {deleted_backup_count} 个旧备份工参")
+                logger.warning(f"[应用PCI到工参] 删除失败: {old_id}, 错误: {e}")
+
+    if deleted_count > 0:
+        logger.info(f"[应用PCI到工参] 共删除 {deleted_count} 个旧工参")
 
     # 创建新的数据ID和目录
     new_data_id = str(uuid.uuid4())
@@ -511,6 +512,6 @@ async def apply_pci_to_params(task_id: str) -> Dict[str, Any]:
             "newFileId": new_data_id,
             "newFileName": new_filename,
             "savedToOriginal": saved_to_original,
-            "deletedBackupCount": deleted_backup_count
+            "deletedCount": deleted_count
         }
     }

@@ -375,14 +375,27 @@ export const dataApi = {
     }
   },
 
-  // 获取数据列表（支持分页）
-  list: async (page: number = 1, pageSize: number = 50): Promise<ApiResponse<DataItem[]> & { total?: number }> => {
-    return apiClient.get(`/data/list?page=${page}&page_size=${pageSize}`)
+  // 获取数据列表（支持分页，支持绕过缓存）
+  list: async (page: number = 1, pageSize: number = 50, cacheBust: boolean = false): Promise<ApiResponse<DataItem[]> & { total?: number }> => {
+    const cacheParam = cacheBust ? `&_t=${Date.now()}` : ''
+    return apiClient.get(`/data/list?page=${page}&page_size=${pageSize}${cacheParam}`)
   },
 
   // 删除数据
-  delete: async (id: string): Promise<ApiResponse<{ success: boolean }>> => {
-    return apiClient.delete(`/data/${id}`)
+  delete: async (id: string, force: boolean = false): Promise<ApiResponse<{ success: boolean }>> => {
+    return apiClient.delete(`/data/${id}${force ? '?force=true' : ''}`)
+  },
+
+  /** 删除数据（内部方法，支持强制删除） */
+  deleteData: async (dataId: string, force: boolean = false): Promise<boolean> => {
+    try {
+      const res = await apiClient.delete<ApiResponse<{ success: boolean }>>(`/data/${dataId}${force ? '?force=true' : ''}`)
+      // Axios interceptor should have returned res.data, but to be safe:
+      return (res as any).success || (res.data as any)?.success || false
+    } catch (error) {
+      console.error('Delete data error:', error)
+      return false
+    }
   },
 
   // 获取数据详情
@@ -462,6 +475,11 @@ export const dataApi = {
   getColumns: async (dataId: string, networkType?: 'LTE' | 'NR'): Promise<ApiResponse<{ columns: string[]; networkType?: string; total: number }>> => {
     const params = networkType ? `?network_type=${networkType}` : ''
     return apiClient.get(`/data/${dataId}/columns${params}`)
+  },
+
+  // 清理无效索引
+  cleanupIndex: async (): Promise<ApiResponse<{ removed: number; items: Array<{ id: string; name: string; reason: string }> }>> => {
+    return apiClient.post('/data/cleanup/index')
   }
 }
 
@@ -597,6 +615,11 @@ export const mapApi = {
   // 获取离线地图路径
   getOfflinePath: async (): Promise<ApiResponse<{ path: string }>> => {
     return apiClient.get('/map/offline-path')
+  },
+
+  // 清除地图缓存
+  clearCache: async (): Promise<ApiResponse<any>> => {
+    return apiClient.post('/map/cache/clear')
   }
 }
 

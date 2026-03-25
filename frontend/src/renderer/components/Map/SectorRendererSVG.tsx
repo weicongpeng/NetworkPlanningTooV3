@@ -101,6 +101,7 @@ export interface SectorLayerOptions extends L.LayerOptions {
  * - zoom >= 17: 站点圆点模式，每个站点是一个 L.CircleMarker
  */
 export class SectorSVGLayer extends L.Layer {
+  private readonly _isDev = import.meta.env.DEV
   private sectors: RenderSectorData[] = []
   private onClick?: (sector: RenderSectorData, event: L.LeafletMouseEvent) => void
   private mapInstance?: L.Map
@@ -1369,17 +1370,36 @@ export class SectorSVGLayer extends L.Layer {
     const { selectedId, relatedIds } = this.pciHighlightConfig
     const relatedIdsSet = new Set(relatedIds)
 
+    // 数据验证：检查渲染数据中是否存在 relatedIds 指向的扇区
+    const renderedSectorIds = new Set<string>()
+    for (const [sectorId, cached] of this.sectorPolygons) {
+      renderedSectorIds.add(sectorId)
+    }
+    for (const [siteKey, cached] of this.siteMarkers) {
+      renderedSectorIds.add(siteKey)
+    }
+
+    // 找出缺失的 relatedIds（这些扇区在渲染数据中不存在）
+    const missingRelatedIds = relatedIds.filter(id => !renderedSectorIds.has(id))
+
     // 检查渲染模式
     console.log('[SectorRenderer] 应用PCI高亮 - 配置检查', {
       renderMode: this.renderMode,
       hasHighlightConfig: !!this.pciHighlightConfig,
       totalPolygons: this.sectorPolygons.size,
-      totalMarkers: this.siteMarkers.size
+      totalMarkers: this.siteMarkers.size,
+      totalRenderedSectors: renderedSectorIds.size,
+      relatedIdsCount: relatedIds.length,
+      relatedIdsInData: relatedIds.filter(id => renderedSectorIds.has(id)).length,
+      missingRelatedIds: missingRelatedIds.length,
+      missingRelatedIdsSample: missingRelatedIds.slice(0, 5)
     })
 
     console.log('[SectorRenderer] 应用PCI高亮', {
       selectedId,
+      selectedIdInRendered: renderedSectorIds.has(selectedId || ''),
       relatedCount: relatedIds.length,
+      relatedInDataCount: relatedIds.filter(id => renderedSectorIds.has(id)).length,
       totalPolygons: this.sectorPolygons.size,
       renderMode: this.renderMode,
       samplePolygonIds: Array.from(this.sectorPolygons.keys()).slice(0, 10)
@@ -1902,7 +1922,7 @@ export class SectorSVGLayer extends L.Layer {
       ? this.siteMarkers.size
       : this.sectorPolygons.size
 
-    if (renderTime > 100 || !this._hasLoggedOnce) {
+    if (this._isDev && (renderTime > 100 || !this._hasLoggedOnce)) {
       const mode = this._shouldUseSiteMarkerMode() ? '站点圆点' : '扇区'
       console.log(`[SectorRenderer] ${mode}模式: ${renderCount} 对象, Zoom: ${currentZoom}, 耗时: ${renderTime.toFixed(1)}ms`)
       this._hasLoggedOnce = true
@@ -1938,7 +1958,7 @@ export class SectorSVGLayer extends L.Layer {
       const isVisible = this.frequencyVisibility.get(sector.frequency)
       // 如果频点不在映射中（undefined），默认显示；只有在映射中且值为false时才过滤
       const result = isVisible !== false
-      if (!result && this.renderMode === 'neighbor-planning') {
+      if (this._isDev && !result && this.renderMode === 'neighbor-planning') {
         console.log('[SectorRenderer] 扇区被频点过滤', {
           sectorId: sector.id,
           frequency: sector.frequency,
@@ -1970,8 +1990,9 @@ export class SectorSVGLayer extends L.Layer {
       }
     }
 
-    // 添加调试日志
-    console.log(`[SectorRenderer] 圆点模式: 总扇区=${this.sectors.length}, 可见=${visibleSectors.length}, 频点过滤后=${frequencyFilteredSectors.length}, 白名单过滤后=${whitelistFilteredSectors.length}, Zoom=${currentZoom}`)
+    if (this._isDev) {
+      console.log(`[SectorRenderer] 圆点模式: 总扇区=${this.sectors.length}, 可见=${visibleSectors.length}, 频点过滤后=${frequencyFilteredSectors.length}, 白名单过滤后=${whitelistFilteredSectors.length}, Zoom=${currentZoom}`)
+    }
 
     // 标记当前应该可见的扇区ID
     const currentVisibleIds = new Set<string>()
@@ -2264,14 +2285,49 @@ export class SectorSVGLayer extends L.Layer {
       }
     }
 
-    // 添加调试日志
-    console.log(`[SectorRenderer] 扇区模式: 总扇区=${this.sectors.length}, 可见=${visibleSectors.length}, 频点过滤后=${frequencyFilteredSectors.length}, 白名单过滤后=${sectorsToRender.length}, Zoom=${currentZoom}`)
+    if (this._isDev) {
+      console.log(`[SectorRenderer] 扇区模式: 总扇区=${this.sectors.length}, 可见=${visibleSectors.length}, 频点过滤后=${frequencyFilteredSectors.length}, 白名单过滤后=${sectorsToRender.length}, Zoom=${currentZoom}`)
+    }
 
     // 按物理位置（经纬度）分组扇区 - 同一位置的扇区只显示部分标签
     const locationGroups = this._groupSectorsByLocation(sectorsToRender)
 
     // 获取当前zoom级别下每个位置最多显示的标签数
     const maxLabelsPerLocation = this._getMaxLabelsPerLocation()
+
+    // 标签碰撞检测优化：使用屏幕坐标网格分桶，避免 O(n^2) 的全量遍历
+    // gridSize 越大越保守（更少标签），越小越激进（更易重叠）
+    const fontSize = this.labelConfig.fontSize || 12
+    const gridSize = Math.max(8, fontSize * 6)
+    const occupiedGrid = new Set<string>()
+
+    const markOccupied = (latLng: L.LatLng) => {
+      if (!this.mapInstance) return
+      const p = this.mapInstance.latLngToContainerPoint(latLng)
+      const gx = Math.floor(p.x / gridSize)
+      const gy = Math.floor(p.y / gridSize)
+      occupiedGrid.add(`${gx},${gy}`)
+    }
+
+    const isGridOccupied = (latLng: L.LatLng) => {
+      if (!this.mapInstance) return false
+      const p = this.mapInstance.latLngToContainerPoint(latLng)
+      const gx = Math.floor(p.x / gridSize)
+      const gy = Math.floor(p.y / gridSize)
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          if (occupiedGrid.has(`${gx + dx},${gy + dy}`)) return true
+        }
+      }
+      return false
+    }
+
+    // 先把本轮“已存在且仍在地图上”的标签占位写入网格
+    for (const [, label] of this.sectorLabels) {
+      if (this.featureGroup && this.featureGroup.hasLayer(label)) {
+        markOccupied(label.getLatLng())
+      }
+    }
 
     // 标记当前应该可见的扇区ID
     const currentVisibleIds = new Set<string>()
@@ -2333,8 +2389,8 @@ export class SectorSVGLayer extends L.Layer {
         // 2. PCI模式标签开关开启 (this.sectorLabelsEnabled)
         const shouldShowLabel = this.showLabels || this.sectorLabelsEnabled
 
-        // 临时调试日志：只记录特定频点的扇区
-        if (sector.frequency === 100 || sector.frequency === 200) {
+        // 临时调试日志：只记录特定频点的扇区（仅开发环境）
+        if (this._isDev && (sector.frequency === 100 || sector.frequency === 200)) {
           console.log('[SectorRendererSVG] Label check:', {
             sectorName: sector.name,
             sectorFrequency: sector.frequency,
@@ -2357,25 +2413,7 @@ export class SectorSVGLayer extends L.Layer {
           if (i < maxLabelsPerLocation) {
             // 创建临时标签以获取位置
             const tempLabel = this._createSectorLabel(sector, i, locationSectors.length, false)
-
-            // 获取已显示的标签位置（仅当前渲染周期内）
-            const occupiedPositions: L.LatLng[] = []
-            for (const [id, label] of this.sectorLabels) {
-              if (this.featureGroup && this.featureGroup.hasLayer(label)) {
-                occupiedPositions.push(label.getLatLng())
-              }
-            }
-
-            // 根据zoom级别动态计算最小间距（像素）
-            const fontSize = this.labelConfig.fontSize || 12
-            const minDistance = fontSize * 6  // 约6个字符宽度的间距
-
-            // 检测碰撞
-            const isOverlapping = this._isLabelOverlapping(
-              tempLabel.getLatLng(),
-              occupiedPositions,
-              minDistance
-            )
+            const isOverlapping = isGridOccupied(tempLabel.getLatLng())
 
             if (!isOverlapping) {
               // 不重叠，显示标签
@@ -2391,6 +2429,7 @@ export class SectorSVGLayer extends L.Layer {
               // 添加标签到地图
               tempLabel.addTo(this.featureGroup!)
               this.sectorLabels.set(String(sector.id), tempLabel)
+              markOccupied(tempLabel.getLatLng())
             } else {
               // 重叠，隐藏标签
               const existingLabel = this.sectorLabels.get(String(sector.id))

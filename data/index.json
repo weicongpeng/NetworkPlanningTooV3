@@ -1,32 +1,4 @@
 {
-  "0043b00d-6be9-4943-8097-602480f94933": {
-    "id": "0043b00d-6be9-4943-8097-602480f94933",
-    "name": "爱立信.xlsx",
-    "type": "excel",
-    "fileType": "geo_data",
-    "geometryType": "point",
-    "sourceType": "excel",
-    "size": 485019,
-    "uploadDate": "2026-03-06T16:01:43.107660",
-    "status": "ready",
-    "metadata": {
-      "pointCount": 2071
-    }
-  },
-  "db6a0dd4-7b7c-4989-a8e9-22c3b9e64c1e": {
-    "id": "db6a0dd4-7b7c-4989-a8e9-22c3b9e64c1e",
-    "name": "扇区.xlsx",
-    "type": "excel",
-    "fileType": "geo_data",
-    "geometryType": "sector",
-    "sourceType": "excel",
-    "size": 3909,
-    "uploadDate": "2026-03-06T16:01:57.119708",
-    "status": "ready",
-    "metadata": {
-      "pointCount": 17
-    }
-  },
   "d0e01f30-5db2-410d-9c2e-be2d37cf042a": {
     "id": "d0e01f30-5db2-410d-9c2e-be2d37cf042a",
     "name": "4G_TAC.zip",
@@ -165,49 +137,117 @@
       ]
     }
   },
-  "d878c50e-317f-4ad7-a136-95105f64b20e": {
-    "id": "d878c50e-317f-4ad7-a136-95105f64b20e",
-    "name": "cell-tree-export-20250915204722.xlsx",
+  "5ca3781e-11b3-4455-98bd-6b746b2ba428": {
+    "id": "5ca3781e-11b3-4455-98bd-6b746b2ba428",
+    "name": "800M拆除评估.xlsx",
     "type": "excel",
-    "fileType": "target_cells",
-    "size": 10669,
-    "originalPath": "D:\\mycode\\NetworkPlanningTooV3\\待规划小区\\cell-tree-export-20250915204722.xlsx",
-    "uploadDate": "2026-03-07T10:29:25.386497",
+    "fileType": "geo_data",
+    "geometryType": "point",
+    "sourceType": "excel",
+    "size": 14632,
+    "uploadDate": "2026-03-18T11:47:16.947230",
     "status": "ready",
     "metadata": {
-      "LTESiteCount": 5,
-      "LTESectorCount": 17,
+      "pointCount": 55
+    }
+  },
+  "a3508e21-fb89-4607-9c39-a31bb438e157": {
+    "id": "a3508e21-fb89-4607-9c39-a31bb438e157",
+    "name": "爱立信.xlsx",
+    "type": "excel",
+    "fileType": "geo_data",
+    "geometryType": "point",
+    "sourceType": "excel",
+    "size": 485019,
+    "uploadDate": "2026-03-18T12:07:20.265991",
+    "status": "ready",
+    "metadata": {
+      "pointCount": 2071
+    }
+  },
+  "10bd5661-57a2-4233-9491-e4e4073611ec": {
+    "id": "10bd5661-57a2-4233-9491-e4e4073611ec",
+    "name": "位置.xlsx",
+    "type": "excel",
+    "fileType": "geo_data",
+    "geometryType": "point",
+    "sourceType": "excel",
+    "size": 129058,
+    "uploadDate": "2026-03-19T15:36:48.865016",
+    "status": "ready",
+    "metadata": {
+      "pointCount": 287
+    }
+  },
+  "f90a2f23-3530-4ae2-ac90-d7404b42453a": {
+    "id": "f90a2f23-3530-4ae2-ac90-d7404b42453a",
+    "name": "cell-tree-export.xlsx",
+    "type": "excel",
+    "fileType": "target_cells",
+    "size": 11370,
+    "originalPath": "D:\\mycode\\NetworkPlanningTooV3\\待规划小区\\cell-tree-export.xlsx",
+    "uploadDate": "2026-03-24T16:29:42.722903",
+    "status": "ready",
+    "metadata": {
+      "LTESiteCount": 38,
+      "LTESectorCount": 44,
       "NRSiteCount": 1,
       "NRSectorCount": 3
     }
   },
-  "f2b9c999-8139-4f4e-8952-3f6c7b18ae1f": {
-    "id": "f2b9c999-8139-4f4e-8952-3f6c7b18ae1f",
-    "name": "BaselineLab_172.16.34.163_1773649932_9977305.zip",
+  "c80ca37b-700b-45e4-b95c-9dc8ef03af2b": {
+    "id": "c80ca37b-700b-45e4-b95c-9dc8ef03af2b",
+    "name": "BaselineLab_172.16.34.163_1774253196_5705060.zip",
     "type": "map",
     "subType": "offline",
-    "size": 3904533,
-    "originalPath": "D:\\mycode\\NetworkPlanningTooV3\\全量工参\\BaselineLab_172.16.34.163_1773649932_9977305.zip",
-    "uploadDate": "2026-03-16T17:20:45.102461",
+    "size": 3917363,
+    "originalPath": "D:\\mycode\\NetworkPlanningTooV3\\全量工参\\BaselineLab_172.16.34.163_1774253196_5705060.zip",
+    "uploadDate": "2026-03-24T17:28:46.789126",
     "status": "ready",
     "metadata": {
       "fileCount": 9
     }
   },
-  "fc41cdaa-c646-4eef-8cb1-f5dbb47362ee": {
-    "id": "fc41cdaa-c646-4eef-8cb1-f5dbb47362ee",
-    "name": "ProjectParameter_mongoose河源电联20260316173846.xlsx",
+  "8b956a5d-118a-473d-8db2-417478b614c1": {
+    "id": "8b956a5d-118a-473d-8db2-417478b614c1",
+    "name": "ProjectParameter_mongoose河源电联20260323162012.xlsx",
     "type": "excel",
     "fileType": "full_params",
-    "size": 6657356,
-    "originalPath": "D:\\mycode\\ProjectParameter_mongoose河源电联20260316173846.xlsx",
-    "uploadDate": "2026-03-16T18:07:17.508420",
+    "size": 4347469,
+    "originalPath": "D:\\mycode\\ProjectParameter_mongoose河源电联20260323162012.xlsx",
+    "uploadDate": "2026-03-24T22:18:04.855264",
     "status": "ready",
     "metadata": {
-      "LTESiteCount": 4107,
-      "LTESectorCount": 18748,
-      "NRSiteCount": 1401,
-      "NRSectorCount": 15349
+      "LTESiteCount": 4108,
+      "LTESectorCount": 18753,
+      "NRSiteCount": 1404,
+      "NRSectorCount": 15386
+    }
+  },
+  "cb08bb92-761f-43a3-b4aa-da0f09e0cf08": {
+    "id": "cb08bb92-761f-43a3-b4aa-da0f09e0cf08",
+    "name": "gaotie_line.mif",
+    "type": "map",
+    "subType": "mapinfo",
+    "size": 2198,
+    "originalPath": "D:\\mycode\\gaotie\\gaotie_line.mif",
+    "uploadDate": "2026-03-25T09:34:40.251114",
+    "status": "ready",
+    "metadata": {
+      "fileCount": 1,
+      "layerCount": 1,
+      "layers": [
+        {
+          "id": "d9612bd5-4536-4e5e-a0b7-6d66a0f0625c",
+          "name": "gaotie_line",
+          "type": "line",
+          "feature_count": 30,
+          "metadata": {
+            "source_file": "D:\\mycode\\NetworkPlanningTooV3\\data\\cb08bb92-761f-43a3-b4aa-da0f09e0cf08\\gaotie_line.mif",
+            "feature_count": 30
+          }
+        }
+      ]
     }
   }
 }

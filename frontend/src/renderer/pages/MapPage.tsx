@@ -10,7 +10,7 @@
  * - 坐标缺失警告
  */
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { Loader2, Search, X, MapPin, AlertTriangle, Database, Table, Trash2, MousePointer2, Circle as CircleIcon, Pentagon, Hand } from 'lucide-react'
+import { Loader2, Search, X, MapPin, AlertTriangle, Database, Table, Trash2, MousePointer2, Circle as CircleIcon, Pentagon, Hand, Map as MapIcon, Satellite } from 'lucide-react'
 import { OnlineMap, OnlineMapRef, CustomLayerOption } from '../components/Map/OnlineMap'
 import { LayerControl, SectorLayerOption, LayerFileOption } from '../components/Map/LayerControl'
 import { OfflineMap, createDefaultLayers } from '../components/Map'
@@ -1350,37 +1350,33 @@ export function MapPage() {
 
         {/* 右侧地图控件 */}
         <div className="flex items-center gap-3 ml-auto">
-          {/* 地图类型切换按钮组 */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                if (onlineMapVisible) {
-                  handleMapTypeChange('roadmap')
-                }
-              }}
-              className={`px-2 py-1 text-xs rounded transition-colors ${mapType === 'roadmap'
-                ? 'bg-blue-400 text-white'
-                : 'text-muted-foreground hover:bg-muted'
-                } ${!onlineMapVisible ? 'opacity-50 cursor-not-allowed' : ''}`}
-              disabled={!onlineMapVisible}
-            >
-              平面图
-            </button>
-            <button
-              onClick={() => {
-                if (onlineMapVisible) {
-                  handleMapTypeChange('satellite')
-                }
-              }}
-              className={`px-2 py-1 text-xs rounded transition-colors ${mapType === 'satellite'
-                ? 'bg-blue-400 text-white'
-                : 'text-muted-foreground hover:bg-muted'
-                } ${!onlineMapVisible ? 'opacity-50 cursor-not-allowed' : ''}`}
-              disabled={!onlineMapVisible}
-            >
-              卫星图
-            </button>
-          </div>
+          {/* 地图类型切换按钮 */}
+          <button
+            onClick={() => {
+              if (onlineMapVisible) {
+                handleMapTypeChange(mapType === 'roadmap' ? 'satellite' : 'roadmap')
+              }
+            }}
+            className={`flex items-center gap-1.5 px-2 py-1 text-xs rounded transition-colors ${
+              onlineMapVisible
+                ? 'bg-blue-400 text-white hover:bg-blue-500'
+                : 'bg-muted text-muted-foreground opacity-50 cursor-not-allowed'
+            }`}
+            disabled={!onlineMapVisible}
+            title={mapType === 'roadmap' ? '切换到卫星图' : '切换到平面图'}
+          >
+            {mapType === 'roadmap' ? (
+              <>
+                <MapIcon size={14} />
+                <span>平面图</span>
+              </>
+            ) : (
+              <>
+                <Satellite size={14} />
+                <span>卫星图</span>
+              </>
+            )}
+          </button>
 
           {/* 在线地图开关 */}
           <div className="flex items-center">
@@ -1521,6 +1517,7 @@ export function MapPage() {
               mapDragTool={mapDragTool}
             />
 
+            {/* 图层控制面板 */}
             <LayerControl
               sectors={sectorLayers}
               layerFiles={layerFiles}

@@ -7,6 +7,8 @@ import { TACLegend } from '../components/Map/TACLegend'
 import { tacDataSyncService } from '../services/tacDataSyncService'
 import { tacColorMapper } from '../utils/tacColors'
 import type { OnlineMapRef } from '../components/Map/OnlineMap'
+import { mapDataService } from '../services/mapDataService'
+import { DATA_REFRESH_EVENT } from '../store/dataStore'
 
 // 虚拟滚动配置
 const ITEM_HEIGHT = 48 // 每行高度
@@ -180,7 +182,33 @@ export function TACPage() {
       }
     }
 
+    // 监听数据刷新事件（当在其他页面上传新工参时）
+    const handleDataRefresh = async () => {
+      console.log('[TACPage] 收到数据刷新事件，正在重新初始化...')
+      try {
+        // 1. 清除前端地图数据缓存
+        mapDataService.clearCache()
+        console.log('[TACPage] 已清除前端地图数据缓存')
+
+        // 2. 清除后端地图数据缓存
+        await mapApi.clearCache()
+        console.log('[TACPage] 已清除后端地图数据缓存')
+
+        // 3. 重新初始化TAC数据同步服务，获取最新全量工参数据
+        await initMapServices()
+        console.log('[TACPage] 数据同步服务已重新初始化')
+      } catch (error) {
+        console.warn('[TACPage] 数据刷新失败:', error)
+      }
+    }
+
+    window.addEventListener(DATA_REFRESH_EVENT, handleDataRefresh)
+
     initMapServices()
+
+    return () => {
+      window.removeEventListener(DATA_REFRESH_EVENT, handleDataRefresh)
+    }
   }, [])
 
   // TAC结果加载后同步到数据服务，并触发地图全量加载
@@ -497,12 +525,12 @@ export function TACPage() {
   }, [filteredResults])
 
   return (
-    <div className="p-8">
+    <div className="h-full flex flex-col p-4 min-h-0">
       {/* 页面标题 */}
-      <h1 className="text-2xl font-bold mb-6">TAC核查</h1>
+      <h1 className="text-3xl font-bold mb-6 shrink-0">TAC核查</h1>
 
       {/* 配置区域 */}
-      <div className="bg-card p-4 rounded-lg border border-border mb-6">
+      <div className="bg-card p-4 rounded-lg border border-border mb-6 shrink-0">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           {/* 网络类型选择 */}
           <div className="lg:col-span-3">
@@ -537,8 +565,7 @@ export function TACPage() {
 
           {/* TAC插花检测配置 - 横向布局 */}
           <div className="lg:col-span-4">
-            <label className="text-sm font-semibold text-foreground flex items-center gap-1.5 mb-2">
-              <span className="w-1 h-1 rounded-full bg-purple-500"></span>
+            <label className="text-sm font-semibold text-foreground mb-2">
               TAC插花检测
             </label>
             <div className="flex items-center gap-3">
@@ -548,7 +575,7 @@ export function TACPage() {
                   type="number"
                   value={singularityConfig.searchRadius}
                   onChange={(e) => setSingularityConfig(prev => ({ ...prev, searchRadius: Number(e.target.value) }))}
-                  className="w-16 px-2 py-1 text-sm border border-purple-200/50 rounded-md bg-purple-50/30 focus:border-purple-500 focus:ring-1 focus:ring-purple-500/20 transition-all text-center"
+                  className="w-24 px-2 py-1 text-sm border border-purple-200/50 rounded-md bg-purple-50/30 focus:border-purple-500 focus:ring-1 focus:ring-purple-500/20 transition-all text-center"
                   min={100}
                   max={5000}
                   step={100}
@@ -560,7 +587,7 @@ export function TACPage() {
                   type="number"
                   value={Math.round(singularityConfig.singularityThreshold * 100)}
                   onChange={(e) => setSingularityConfig(prev => ({ ...prev, singularityThreshold: Number(e.target.value) / 100 }))}
-                  className="w-16 px-2 py-1 text-sm border border-purple-200/50 rounded-md bg-purple-50/30 focus:border-purple-500 focus:ring-1 focus:ring-purple-500/20 transition-all text-center"
+                  className="w-24 px-2 py-1 text-sm border border-purple-200/50 rounded-md bg-purple-50/30 focus:border-purple-500 focus:ring-1 focus:ring-purple-500/20 transition-all text-center"
                   min={50}
                   max={95}
                   step={5}
@@ -612,7 +639,7 @@ export function TACPage() {
 
       {/* 错误提示 */}
       {error && (
-        <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-start gap-2">
+        <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-start gap-2 shrink-0">
           <AlertCircle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
           <div className="flex-1">
             <p className="text-red-500 text-sm font-medium">核查失败</p>
@@ -623,9 +650,9 @@ export function TACPage() {
 
       {/* 核查结果 */}
       {taskResult && (
-        <div className="bg-card p-5 rounded-lg border border-border">
+        <div className="bg-card p-5 rounded-lg border border-border flex-1 min-h-0 flex flex-col overflow-hidden">
           {/* 标题行 + 统计卡片 */}
-          <div className="mb-4">
+          <div className="mb-4 shrink-0">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 {taskResult.status === 'completed' ? (
@@ -700,7 +727,7 @@ export function TACPage() {
           </div>
 
           {/* 任务状态 */}
-          <div className="mb-4">
+          <div className="mb-4 shrink-0">
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs font-medium">核查进度</span>
               <span className="text-xs text-muted-foreground">
@@ -727,9 +754,9 @@ export function TACPage() {
           </div>
 
           {/* 两栏布局：结果表格 + 地图 */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0 overflow-hidden">
             {/* 左列：结果表格 */}
-            <div className="flex flex-col min-h-0">
+            <div className="flex flex-col flex-1 min-w-0 min-h-0 w-1/2">
               {/* 任务错误信息 */}
               {taskResult.status === 'failed' && taskResult.error && (
                 <div className="mb-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
@@ -742,8 +769,8 @@ export function TACPage() {
 
               {/* 详细结果表格 */}
               {taskResult.status === 'completed' && taskResult.results && (
-                <div className="flex-1 min-h-0 flex flex-col">
-                  <div className="flex justify-end mb-4">
+                <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                  <div className="flex justify-end mb-3 shrink-0">
                     <button
                       onClick={() => setSearchEnabled(!searchEnabled)}
                       className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-sm ${searchEnabled
@@ -759,7 +786,6 @@ export function TACPage() {
                     ref={tableContainerRef}
                     onScroll={handleScroll}
                     className="overflow-x-auto overflow-y-auto flex-1 min-h-0"
-                    style={{ maxHeight: '450px' }}
                   >
                     <table className="w-full text-xs border-collapse table-fixed">
                       <thead className="sticky top-0 z-20 bg-background border-b border-border shadow-sm">
@@ -767,7 +793,7 @@ export function TACPage() {
                           {COLUMNS.map((column) => (
                             <th
                               key={column.key}
-                              className="text-left p-3 font-medium bg-background z-20 relative group"
+                              className="text-left p-2 font-medium bg-background z-20 relative group"
                               style={{ width: `${columnWidths[column.key]}px`, minWidth: `${columnWidths[column.key]}px` }}
                             >
                               <span className="block pr-3">{column.label}</span>
@@ -777,7 +803,7 @@ export function TACPage() {
                                   value={searchFilters[column.key as keyof typeof searchFilters]}
                                   onChange={(e) => handleSearchChange(column.key, e.target.value)}
                                   placeholder="搜索"
-                                  className="mt-1 w-full p-1 border border-border rounded text-xs bg-white dark:bg-slate-800"
+                                  className="mt-1 w-full p-1 border border-border rounded text-[10px] bg-white dark:bg-slate-800"
                                 />
                               )}
                               {/* 拖拽手柄 */}
@@ -814,7 +840,7 @@ export function TACPage() {
                               {COLUMNS.map((column) => {
                                 const width = columnWidths[column.key]
                                 let cellContent: any
-                                let cellClassName = 'p-3'
+                                let cellClassName = 'p-2'
 
                                 switch (column.key) {
                                   case 'firstGroup':
@@ -839,7 +865,7 @@ export function TACPage() {
                                     break
                                   case 'networkType':
                                     cellContent = (
-                                      <span className={`px-2 py-1 rounded ${cell.networkType === 'LTE'
+                                      <span className={`px-1.5 py-0.5 rounded text-[10px] ${cell.networkType === 'LTE'
                                           ? 'bg-blue-500/10 text-blue-600'
                                           : 'bg-purple-500/10 text-purple-600'
                                         }`}>
@@ -865,7 +891,7 @@ export function TACPage() {
                                     break
                                   case 'tacConsistent':
                                     cellContent = cell.tac && cell.existingTac ? (
-                                      <span className={`px-2 py-1 rounded ${normalizeTac(String(cell.tac)) === normalizeTac(String(cell.existingTac))
+                                      <span className={`px-1.5 py-0.5 rounded text-[10px] ${normalizeTac(String(cell.tac)) === normalizeTac(String(cell.existingTac))
                                           ? 'bg-green-500/10 text-green-600'
                                           : 'bg-red-500/10 text-red-600'
                                         }`}>
@@ -896,7 +922,7 @@ export function TACPage() {
                                     break
                                   case 'suggestedTac':
                                     cellContent = cell.existingTac && cell.existingTac !== '-' && cell.suggestedTac ? (
-                                      <span className={`px-2 py-1 rounded font-mono ${cell.isSingularity
+                                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${cell.isSingularity
                                           ? 'bg-purple-500/10 text-purple-600'
                                           : 'bg-blue-500/10 text-blue-600'
                                         }`}>
@@ -959,8 +985,8 @@ export function TACPage() {
             </div>
 
             {/* 右列：地图窗口 */}
-            <div className="flex flex-col min-h-0">
-              <div className="bg-card rounded-lg border border-border p-3 flex-1 flex flex-col relative min-h-[500px]">
+            <div className="flex flex-col flex-1 min-w-0 min-h-0 w-1/2">
+              <div className="bg-card rounded-lg border border-border p-3 flex-1 flex flex-col relative min-h-0">
                 <OnlineMap
                   ref={mapRef}
                   mode="tac-check"

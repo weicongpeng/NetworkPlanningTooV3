@@ -1,0 +1,13 @@
+!table
+!version 300
+!Charset "Windows"
+Definition Table
+  Type NATIVE Charset "Windows"
+  Fields 7
+    ID Integer ;
+    TestType Char(50) ;
+    StartLon Float ;
+    StartLat Float ;
+    EndLon Float ;
+    EndLat Float ;
+    Problem Char(100) ;

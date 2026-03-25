@@ -86,6 +86,10 @@ async def update_parameters(request: UpdateParametersRequest) -> Dict[str, Any]:
         result = await run_in_threadpool(
             data_service.update_parameters, request.fullParamId, request.currentParamId
         )
+        # 工参更新成功后清除地图数据缓存
+        import app.api.v1.endpoints.map as map_module
+        map_module._map_data_cache = None
+        map_module._map_data_cache_time = 0
         return {"success": True, "message": "工参更新成功", "data": result}
     except ValueError as e:
         # 确保错误信息是安全的，避免GBK编码错误
@@ -129,6 +133,11 @@ async def upload_excel(
         print(
             f"[API] upload_excel success: id={result.get('id')}, name={result.get('name')}"
         )
+        # 清除地图数据缓存
+        # 注意：需要通过模块对象访问变量，直接import变量只能修改本地副本
+        import app.api.v1.endpoints.map as map_module
+        map_module._map_data_cache = None
+        map_module._map_data_cache_time = 0
         return {"success": True, "data": result}
     except ValueError as e:
         try:
@@ -164,6 +173,10 @@ async def upload_map(
         pass
     try:
         result = await data_service.upload_map(file, file_path)
+        # 清除地图数据缓存
+        import app.api.v1.endpoints.map as map_module
+        map_module._map_data_cache = None
+        map_module._map_data_cache_time = 0
         return {"success": True, "data": result}
     except ValueError as e:
         print(f"[API] upload_map ValueError: {e}")
@@ -203,11 +216,24 @@ async def get_data(data_id: str) -> Dict[str, Any]:
 
 
 @router.delete("/{data_id}", response_model=Dict[str, Any])
-async def delete_data(data_id: str) -> Dict[str, Any]:
-    """删除数据"""
+async def delete_data(data_id: str, force: bool = False) -> Dict[str, Any]:
+    """删除数据
+
+    Args:
+        data_id: 数据ID
+        force: 是否强制删除（即使文件被占用也尝试从索引中移除）
+    """
     try:
-        result = data_service.delete_data(data_id)
-        return {"success": result, "message": "删除成功" if result else "删除失败"}
+        result = data_service.delete_data(data_id, force=force)
+        message = "删除成功" if result else "删除失败"
+        if force and result:
+            message = "已从索引中移除（部分文件可能需要手动清理）"
+        # 删除成功后清除地图数据缓存
+        if result:
+            import app.api.v1.endpoints.map as map_module
+            map_module._map_data_cache = None
+            map_module._map_data_cache_time = 0
+        return {"success": result, "message": message}
     except Exception as e:
         safe_detail = str(e).encode("gbk", "replace").decode("gbk")
         raise HTTPException(status_code=500, detail=safe_detail)
@@ -479,6 +505,23 @@ async def get_layer_columns(data_id: str, layer_id: str) -> Dict[str, Any]:
         }
     except HTTPException:
         raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        safe_detail = str(e).encode("gbk", "replace").decode("gbk")
+        raise HTTPException(status_code=500, detail=safe_detail)
+
+
+@router.post("/cleanup/index", response_model=Dict[str, Any])
+async def cleanup_index() -> Dict[str, Any]:
+    """清理无效索引项（文件不存在但索引中存在的项）"""
+    try:
+        result = data_service.cleanup_index()
+        return {
+            "success": True,
+            "message": f"清理完成，移除了 {result.get('removed', 0)} 个无效索引项",
+            "data": result
+        }
     except Exception as e:
         import traceback
         traceback.print_exc()

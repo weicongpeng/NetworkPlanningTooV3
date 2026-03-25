@@ -374,6 +374,7 @@ class DataService:
             )
             safe_print(f"[DataService] 提示: 请检查前端是否正确传递了 file_path 参数")
 
+        # 9. 注册新文件
         self.index[new_data_id] = {
             "id": new_data_id,
             "name": new_filename,
@@ -386,7 +387,27 @@ class DataService:
             "metadata": metadata,
         }
         self._save_index()
-        safe_print(f"[DataService] 索引已更新")
+        safe_print(f"[DataService] 新文件已注册到索引: {new_data_id}")
+
+        # 10. 删除原始的全量工参和其他旧的全量工参，保持唯一性
+        files_to_delete = []
+        for existing_id, existing_data in self.index.items():
+            # 删除所有其他 full_params 文件（包括原始的 full_param_id），只保留新注册的 new_data_id
+            if existing_id != new_data_id and existing_data.get("fileType") == "full_params":
+                files_to_delete.append(existing_id)
+
+        if files_to_delete:
+            safe_print(
+                f"[DataService] 工参更新：删除 {len(files_to_delete)} 个旧的全量工参..."
+            )
+            for old_id in files_to_delete:
+                try:
+                    self.delete_data(old_id)
+                    safe_print(f"[DataService] 已删除旧全量工参: {old_id}")
+                except Exception as e:
+                    safe_print(f"[DataService] 删除旧文件失败: {old_id}, 错误: {e}")
+
+        safe_print(f"[DataService] 索引已更新，当前全量工参数量: 1")
 
         return {
             "newFileId": new_data_id,
@@ -1474,14 +1495,25 @@ class DataService:
         """根据文件名和sheet名称分类文件类型"""
         filename_lower = filename.lower()
 
-        # 待规划小区文件特征 - 必须以"cell-tree-export"开头
+        # 待规划小区文件特征 - 以"cell-tree-export"开头
         if filename_lower.startswith("cell-tree-export"):
             return "target_cells"
 
-        # 全量工参文件特征 - 包含LTE Project Parameters和NR Project Parameters
-        if "lte project parameters" in [
-            s.lower() for s in sheet_names
-        ] and "nr project parameters" in [s.lower() for s in sheet_names]:
+        # 全量工参文件特征 - 多种识别方式
+        # 方式1: 检查sheet名称
+        has_lte_params = any("lte project parameters" in s.lower() for s in sheet_names)
+        has_nr_params = any("nr project parameters" in s.lower() for s in sheet_names)
+
+        # 方式2: 检查文件名特征
+        has_projectparam = "projectparameter" in filename_lower or "mongoose" in filename_lower
+        has_timestamp = bool(re.search(r'\d{10,}', filename_lower))  # 包含10位以上数字（时间戳）
+
+        # 判断逻辑：如果有 Project Parameters sheet，或者文件名包含相关关键词
+        if (has_lte_params or has_nr_params) and (has_projectparam or has_timestamp):
+            return "full_params"
+
+        # 兼容：如果有 Project Parameters sheet，就认为是 full_params
+        if has_lte_params or has_nr_params:
             return "full_params"
 
         # 默认类型
@@ -3096,21 +3128,78 @@ class DataService:
                 del self._data_cache[key]
             safe_print(f"[DataService] 数据 {data_id} 的缓存已清除")
 
-    def delete_data(self, data_id: str) -> bool:
-        """删除数据"""
+    def delete_data(self, data_id: str, force: bool = False) -> bool:
+        """删除数据
+
+        Args:
+            data_id: 数据ID
+            force: 是否强制删除（即使文件被占用也尝试删除）
+
+        Returns:
+            bool: 是否删除成功
+        """
         if data_id not in self.index:
             return False
 
-        # 删除文件
-        data_dir = settings.DATA_DIR / data_id
-        if data_dir.exists():
-            shutil.rmtree(data_dir)
+        safe_print(f"[DataService] 删除数据: {data_id}, force={force}")
 
-        # 删除上传的原始文件 - 尝试新旧两种格式
+        # 1. 先清理缓存（防止文件句柄被占用）
+        self.clear_cache(data_id)
+
+        # 2. 尝试删除文件（带重试机制）
+        data_dir = settings.DATA_DIR / data_id
+        deletion_errors = []
+
+        if data_dir.exists():
+            if force:
+                # 强制删除：使用 onerror 回调处理只读文件和被占用的文件
+                def handle_remove_error(func, path, exc_info):
+                    """处理删除时的错误"""
+                    import stat
+                    import time
+
+                    try:
+                        # 尝试更改文件权限（Windows 只读文件）
+                        if not os.access(path, os.W_OK):
+                            os.chmod(path, stat.S_IWRITE)
+                            func(path)
+                        else:
+                            # 文件可能被占用，尝试重试
+                            for i in range(3):
+                                time.sleep(0.5)
+                                try:
+                                    func(path)
+                                    safe_print(f"[DataService] 重试 {i+1} 次后删除成功: {path}")
+                                    return
+                                except Exception as e:
+                                    if i == 2:
+                                        # 最后一次重试失败，记录错误
+                                        deletion_errors.append(f"{path}: {str(e)}")
+                    except Exception as e:
+                        deletion_errors.append(f"{path}: {str(e)}")
+
+                try:
+                    shutil.rmtree(data_dir, onerror=handle_remove_error)
+                    safe_print(f"[DataService] 数据目录已删除: {data_dir}")
+                except Exception as e:
+                    deletion_errors.append(f"{data_dir}: {str(e)}")
+            else:
+                # 普通删除
+                try:
+                    shutil.rmtree(data_dir)
+                    safe_print(f"[DataService] 数据目录已删除: {data_dir}")
+                except Exception as e:
+                    deletion_errors.append(f"{data_dir}: {str(e)}")
+
+        # 3. 删除上传的原始文件 - 尝试新旧两种格式
         # 新格式：{data_id}.xlsx
         upload_file = settings.UPLOAD_DIR / f"{data_id}.xlsx"
         if upload_file.exists():
-            upload_file.unlink()
+            try:
+                upload_file.unlink()
+                safe_print(f"[DataService] 上传文件已删除: {upload_file}")
+            except Exception as e:
+                deletion_errors.append(f"{upload_file}: {str(e)}")
         else:
             # 旧格式：{data_id}_{filename}.xlsx (兼容旧数据)
             old_filename = self.index[data_id].get("name", "")
@@ -3119,13 +3208,26 @@ class DataService:
                 if old_upload_file.exists():
                     try:
                         old_upload_file.unlink()
+                        safe_print(f"[DataService] 旧格式上传文件已删除: {old_upload_file}")
                     except:
-                        pass  # 忽略删除失败
+                        # 旧文件删除失败不记录（可能不存在）
+                        pass
 
-        # 更新索引
+        # 4. 无论文件删除是否成功，都从索引中移除（保持索引一致性）
+        # 但如果有严重错误，需要记录警告
+        if deletion_errors and not force:
+            # 非强制模式下，如果删除文件失败，仍然从索引中移除
+            # 但记录警告，让用户知道可能需要手动清理
+            safe_print(f"[DataService] 警告: 部分文件删除失败，但已从索引中移除:")
+            for error in deletion_errors:
+                safe_print(f"  - {error}")
+
+        # 5. 更新索引
         del self.index[data_id]
         self._save_index()
+        safe_print(f"[DataService] 数据 {data_id} 已从索引中移除")
 
+        # 6. 如果是强制删除且有错误，仍然返回成功（因为索引已更新）
         return True
 
     def preview_data(self, data_id: str, rows: int = 100) -> Optional[Dict]:
@@ -3149,6 +3251,68 @@ class DataService:
             }
 
         return None
+
+    def cleanup_index(self) -> Dict[str, Any]:
+        """清理无效索引项（文件不存在但索引中存在的项）
+
+        Returns:
+            dict: 包含 removed（移除的数量）和 items（被移除的项列表）
+        """
+        safe_print("[DataService] 开始清理无效索引...")
+
+        removed_items = []
+        ids_to_remove = []
+
+        for data_id, data_info in list(self.index.items()):
+            data_dir = settings.DATA_DIR / data_id
+
+            # 检查数据目录是否存在
+            if not data_dir.exists():
+                safe_print(f"[DataService] 发现无效索引: {data_id} - {data_info.get('name', '未知')} (目录不存在)")
+                ids_to_remove.append(data_id)
+                removed_items.append({
+                    "id": data_id,
+                    "name": data_info.get("name", "未知"),
+                    "reason": "目录不存在"
+                })
+                continue
+
+            # 对于 Excel 类型，检查必要文件是否存在
+            if data_info.get("type") == "excel":
+                has_valid_file = False
+                for filename in ["data.json", "default.json", "original.xlsx"]:
+                    if (data_dir / filename).exists():
+                        has_valid_file = True
+                        break
+
+                if not has_valid_file:
+                    safe_print(f"[DataService] 发现无效索引: {data_id} - {data_info.get('name', '未知')} (数据文件不存在)")
+                    ids_to_remove.append(data_id)
+                    removed_items.append({
+                        "id": data_id,
+                        "name": data_info.get("name", "未知"),
+                        "reason": "数据文件不存在"
+                    })
+
+        # 移除无效索引
+        for data_id in ids_to_remove:
+            del self.index[data_id]
+
+        # 如果有移除，保存索引
+        if ids_to_remove:
+            self._save_index()
+            safe_print(f"[DataService] 清理完成，移除了 {len(ids_to_remove)} 个无效索引项")
+
+            # 同时清理缓存
+            for data_id in ids_to_remove:
+                self.clear_cache(data_id)
+        else:
+            safe_print("[DataService] 索引有效，无需清理")
+
+        return {
+            "removed": len(ids_to_remove),
+            "items": removed_items
+        }
 
 
 # 创建全局实例
