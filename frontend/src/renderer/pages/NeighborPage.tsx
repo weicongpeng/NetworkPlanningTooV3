@@ -1400,7 +1400,7 @@ function NeighborTable({
       <table className="w-full text-xs text-left border-collapse table-fixed">
         <thead className="sticky top-0 z-20 bg-background border-b border-border shadow-sm">
           <tr>
-            {NEIGHBOR_COLUMNS.map((column) => (
+            {tableColumns.map((column) => (
               <th
                 key={column.key}
                 className="text-left p-2 font-medium bg-background z-20 relative group"
@@ -1412,7 +1412,7 @@ function NeighborTable({
                     type="text"
                     value={searchFilters?.[column.key] || ''}
                     onChange={(e) => onSearchChange(column.key, e.target.value)}
-                    placeholder={i18n.searchColPlaceholder}
+                    placeholder={tableI18n.searchColPlaceholder}
                     className="mt-1 w-full p-1 border border-border rounded text-[10px] bg-white dark:bg-slate-800"
                   />
                 )}
@@ -1434,18 +1434,18 @@ function NeighborTable({
         <tbody className="divide-y divide-border">
           {groupedData.length === 0 ? (
             <tr>
-              <td colSpan={NEIGHBOR_COLUMNS.length} className="px-3 py-8 text-center text-muted-foreground">
-                {i18n.noMatchResult}
+              <td colSpan={tableColumns.length} className="px-3 py-8 text-center text-muted-foreground">
+                {tableI18n.noMatchResult}
               </td>
             </tr>
           ) : (
             <>
               {/* 顶部占位行 */}
               <tr style={{ height: `${virtualData.offsetY}px` }}>
-                <td colSpan={NEIGHBOR_COLUMNS.length}></td>
+                <td colSpan={tableColumns.length}></td>
               </tr>
               {virtualData.visibleData.map((row: any, index: number) => {
-                const { group, targetIdx, isFirstInGroup } = row
+                const { group, targetIdx } = row
                 const isSelected = selectedSectorKey === group.sourceKey
                 const actualIndex = virtualData.startIndex + index
 
@@ -1461,7 +1461,7 @@ function NeighborTable({
                       onSourceSectorClick?.(group, group.targets)
                     }}
                   >
-                    {NEIGHBOR_COLUMNS.map((column) => {
+                    {tableColumns.map((column) => {
                       const width = columnWidths[column.key]
                       let cellContent: any
 
