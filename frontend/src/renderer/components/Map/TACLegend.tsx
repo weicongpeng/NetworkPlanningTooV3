@@ -7,6 +7,7 @@
  * 3. 网络类型标识
  */
 
+import { useTranslation } from 'react-i18next'
 import { tacColorMapper } from '../../utils/tacColors'
 import type { NetworkType } from '../../config/sector-config'
 
@@ -26,6 +27,7 @@ export function TACLegend({
   onToggleVisible,
   networkType = 'LTE'
 }: TACLegendProps) {
+  const { t } = useTranslation()
   // 获取TAC图例数据
   const tacLegend = tacColorMapper.getTACLegend(networkType)
   const tacCount = tacLegend.length
@@ -50,9 +52,9 @@ export function TACLegend({
             fontSize: '10px',
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
           }}
-          title="显示图例"
+          title={t('tac.legend') || '显示图例'}
         >
-          图例
+          {t('tac.legend') || '图例'}
         </button>
       </div>
     )
@@ -77,7 +79,7 @@ export function TACLegend({
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px', flexShrink: 0 }}>
         <div style={{ fontWeight: 600, color: '#333', fontSize: '12px' }}>
-          图例({networkType})
+          {t('tac.legend') || '图例'}({networkType})
         </div>
         {onToggleVisible && (
           <button
@@ -90,7 +92,7 @@ export function TACLegend({
               padding: '0 4px',
               color: '#666',
             }}
-            title="隐藏图例"
+            title={t('tac.hideLegend') || '隐藏图例'}
           >
             ×
           </button>
@@ -144,7 +146,7 @@ export function TACLegend({
         color: '#6B7280',
         flexShrink: 0
       }}>
-        共 {tacCount} 个不同TAC值
+        {t('tac.totalTacValues', { count: tacCount }) || `共 ${tacCount} 个不同TAC值`}
       </div>
     </div>
   )
