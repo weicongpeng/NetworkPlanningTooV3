@@ -523,7 +523,7 @@ export function PCIPage() {
 
   const handleRunPCI = async () => {
     // **新增**: 前端验证配置参数
-    const validationError = validateConfig(config)
+    const validationError = validateConfig(config, t)
     if (validationError) {
       setError(validationError)
       return
