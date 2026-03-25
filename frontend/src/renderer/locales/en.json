@@ -58,7 +58,21 @@
     "mapLayers": "Map Layers",
     "noRecentFiles": "No recent files",
     "unauthorized": "Unauthorized",
-    "authorized": "Authorized"
+    "authorized": "Authorized",
+    "dataDesc": "Import and manage parameter data",
+    "pciDesc": "LTE and NR PCI auto planning",
+    "neighborDesc": "Auto generate neighbor relations",
+    "tacDesc": "Compare layer TAC with network TAC",
+    "tacPlanningDesc": "Data-driven new cell TAC allocation",
+    "mapDesc": "View base station distribution",
+    "configDesc": "Manage system configuration",
+    "backendService": "Backend Service",
+    "database": "Database",
+    "license": "License",
+    "online": "Online",
+    "offline": "Offline",
+    "valid": "Activated",
+    "invalid": "Not Activated"
   },
   "data": {
     "title": "Data Management",
