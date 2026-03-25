@@ -58,7 +58,21 @@
     "mapLayers": "地图图层",
     "noRecentFiles": "暂无最近文件",
     "unauthorized": "未授权",
-    "authorized": "已授权"
+    "authorized": "已授权",
+    "dataDesc": "导入和管理工参数据",
+    "pciDesc": "LTE和NR的PCI自动规划",
+    "neighborDesc": "自动生成邻区关系",
+    "tacDesc": "对比图层TAC与现网TAC，统计一致性",
+    "tacPlanningDesc": "数据驱动的新站小区TAC分配",
+    "mapDesc": "查看基站分布和覆盖",
+    "configDesc": "管理系统配置",
+    "backendService": "后端服务",
+    "database": "数据库",
+    "license": "许可证",
+    "online": "运行中",
+    "offline": "离线",
+    "valid": "已激活",
+    "invalid": "未激活"
   },
   "data": {
     "title": "数据管理",
