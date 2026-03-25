@@ -221,6 +221,8 @@ export function LayerControl({
   onCustomLayerRemove,
   onLabelSettingsChange
 }: LayerControlProps) {
+  const { t } = useTranslation()
+
   // 从持久化 store 获取标签设置
   const { labelSettingsMap: persistedLabelSettings, setLabelSettings } = useMapStore()
 
