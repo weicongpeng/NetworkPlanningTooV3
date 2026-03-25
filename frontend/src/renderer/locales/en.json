@@ -1,0 +1,40 @@
+{
+  "license": {
+    "title": "Configuration",
+    "licenseManagement": "License Management",
+    "status": "Status",
+    "authorized": "Authorized",
+    "unauthorized": "Unauthorized",
+    "expiryDate": "Expiry Date",
+    "remainingDays": "Remaining Days",
+    "days": "days",
+    "expiredMessage": "License has expired, please contact administrator:",
+    "email": "Email:",
+    "wechat": "WeChat:",
+    "uploadPrompt": "Click to upload license (.lic/.dat)",
+    "uploading": "Uploading...",
+    "uploadSuccess": "Upload successful",
+    "uploadError": "Upload failed, please try again later",
+    "loading": "Loading..."
+  },
+  "theme": {
+    "title": "Theme & Colors",
+    "themeMode": "Theme Mode",
+    "dark": "Dark",
+    "light": "Light",
+    "colorScheme": "Color Scheme",
+    "blue": "Blue",
+    "green": "Green",
+    "purple": "Purple",
+    "orange": "Orange",
+    "pink": "Pink",
+    "apply": "Apply",
+    "cancel": "Cancel"
+  },
+  "language": {
+    "title": "Language Settings",
+    "select": "Select Language",
+    "zh": "中文",
+    "en": "English"
+  }
+}
