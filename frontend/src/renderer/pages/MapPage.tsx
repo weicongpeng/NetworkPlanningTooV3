@@ -1441,7 +1441,7 @@ export function MapPage() {
                   type="text"
                   value={locationInput.lat}
                   onChange={(e) => setLocationInput(prev => ({ ...prev, lat: e.target.value }))}
-                  placeholder="例如: 39.90923"
+                  placeholder={t('map.latitudeExample') || '例如: 39.90923'}
                   className="w-full px-3 py-2 text-xs border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
