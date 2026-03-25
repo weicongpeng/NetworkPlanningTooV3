@@ -266,7 +266,7 @@ export function LicensePage() {
           {isLoading && (
             <div className="text-center py-8">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-2"></div>
-              <p className="text-xs text-muted-foreground">加载中...</p>
+              <p className="text-xs text-muted-foreground">{t('license.loading')}</p>
             </div>
           )}
         </div>
