@@ -1159,7 +1159,7 @@ export function NeighborPage() {
                       handleSearch()
                     }
                   }}
-                  placeholder="输入小区名称或 基站ID-小区ID"
+                  placeholder={i18n.searchPlaceholder}
                   className="w-full pl-10 pr-10 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-xs"
                 />
                 {searchValue && (
@@ -1176,25 +1176,25 @@ export function NeighborPage() {
                 className="flex items-center gap-2 px-3 py-2 bg-card border border-border rounded-lg hover:bg-muted/80 transition-colors text-xs"
               >
                 <Search size={14} />
-                搜索
+                {i18n.search}
               </button>
               <button
                 onClick={handleToggleMeasure}
                 className={`flex items-center gap-2 px-3 py-2 bg-card border border-border rounded-lg hover:bg-muted/80 transition-colors text-xs ${
                   measureMode ? 'bg-primary' : ''
                 }`}
-                title={measureMode ? '退出测距模式' : '进入测距模式'}
+                title={measureMode ? i18n.exitMeasureMode : i18n.enterMeasureMode}
               >
                 <Ruler size={14} />
-                测距
+                {i18n.measure}
               </button>
               <button
                 onClick={handleClearAllMarkers}
                 className="flex items-center gap-2 px-3 py-2 bg-card border border-border rounded-lg hover:bg-muted/80 transition-colors text-xs"
-                title="清除所有标记（定位 + 测距）"
+                title={i18n.clearMarkersTip}
               >
                 <X size={14} />
-                清除
+                {i18n.clear}
               </button>
               <div className="ml-auto">
                 <MapTypeSwitch mapRef={mapRef} />
@@ -1206,13 +1206,13 @@ export function NeighborPage() {
               <div className="mb-2 p-2 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg text-xs text-blue-700 dark:text-blue-300 flex items-center justify-between">
                 <span className="flex items-center gap-2">
                   <Search size={14} />
-                  已添加 {searchMarkers.length} 个搜索标记
+                  {i18n.searchMarkerCount.replace('{{count}}', String(searchMarkers.length))}
                 </span>
                 <button
                   onClick={handleClearMarkers}
                   className="text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-100 font-medium"
                 >
-                  清除全部
+                  {i18n.clearAll}
                 </button>
               </div>
             )}

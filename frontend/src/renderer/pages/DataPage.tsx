@@ -734,7 +734,7 @@ export function DataPage() {
         <h2 className="text-xl font-semibold mb-4">{t('data.preview') || '数据预览'}</h2>
         {!selectedId ? (
           <p className="text-muted-foreground text-center py-8">
-            请选择数据查看预览
+            {t('data.selectToPreview') || '请选择数据查看预览'}
           </p>
         ) : (
           <DataPreview dataId={selectedId} />
