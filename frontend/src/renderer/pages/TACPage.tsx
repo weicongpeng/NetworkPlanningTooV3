@@ -529,7 +529,7 @@ export function TACPage() {
   return (
     <div className="h-full flex flex-col p-4 min-h-0">
       {/* 页面标题 */}
-      <h1 className="text-3xl font-bold mb-6 shrink-0">TAC核查</h1>
+      <h1 className="text-3xl font-bold mb-6 shrink-0">{t('tac.title') || 'TAC核查'}</h1>
 
       {/* 配置区域 */}
       <div className="bg-card p-4 rounded-lg border border-border mb-6 shrink-0">
