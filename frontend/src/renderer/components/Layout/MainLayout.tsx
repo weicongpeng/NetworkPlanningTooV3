@@ -98,10 +98,12 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
 
           {/* 底部版本信息 - 配色与侧边栏一致，无分隔线 */}
           <div
-            className="text-xs text-muted-foreground"
+            className="text-xs"
             style={{
               opacity: sidebarOpen ? 1 : 0,
               transition: 'opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+              color: '#9ca3af',
+              flexShrink: 0,
             }}
           >
             <div className="px-4 py-3">
