@@ -1064,7 +1064,7 @@ export function LayerControl({
           maxHeight: '100%',
           overflowY: 'auto',
           overflowX: 'hidden',
-          paddingTop: '40px',
+          paddingTop: '8px',
           paddingLeft: '8px',
           paddingRight: '8px',
           paddingBottom: '24px',
