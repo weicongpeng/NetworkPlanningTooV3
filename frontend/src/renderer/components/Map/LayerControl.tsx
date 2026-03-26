@@ -939,7 +939,7 @@ export function LayerControl({
           pointerEvents: 'none',
         }}
       >
-        {/* 书钉控件 - 位于面板左上角 */}
+        {/* 书钉控件 - 位于容器左侧边缘，始终可见（面板隐藏时） */}
         <button
           onClick={handleTogglePin}
           style={{
@@ -1003,7 +1003,7 @@ export function LayerControl({
           </svg>
         </button>
 
-        {/* 图层控制面板 */}
+        {/* 图层控制面板 - 从左侧滑入/滑出 */}
         <div
           ref={panelRef}
           className="layer-control"
@@ -1016,7 +1016,7 @@ export function LayerControl({
             backgroundColor: 'rgba(255, 255, 255, 0.98)',
             backdropFilter: 'blur(12px)',
             borderRadius: '0',
-            boxShadow: '-4px 0 20px rgba(0, 0, 0, 0.15)',
+            boxShadow: '4px 0 20px rgba(0, 0, 0, 0.15)',
             width: `${panelWidth}px`,
             minWidth: '240px',
             height: '100%',
@@ -1024,13 +1024,13 @@ export function LayerControl({
             overflow: 'hidden',
             fontSize: '14px',
             border: '1px solid rgba(0, 0, 0, 0.1)',
-            borderRight: 'none',
+            borderRight: '1px solid rgba(0, 0, 0, 0.1)',
             borderTop: 'none',
             borderBottom: 'none',
             borderLeft: 'none',
             boxSizing: 'border-box',
             transition: 'transform 0.35s cubic-bezier(0.25, 0.1, 0.25, 1), opacity 0.35s ease',
-            transform: isVisible ? 'translateX(0)' : `translateX(-${panelWidth}px)`,
+            transform: isVisible ? 'translateX(0)' : `translateX(-${panelWidth + 10}px)`,
             opacity: isVisible ? 1 : 0,
           }}
           onMouseEnter={() => {
