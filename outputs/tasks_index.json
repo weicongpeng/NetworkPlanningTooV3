@@ -295,5 +295,28 @@
     "created_at": "2026-03-26T21:33:13.554098",
     "started_at": "2026-03-26T21:33:13.557000",
     "completed_at": null
+  },
+  "783b3b2d-a052-438e-9600-d54fd4f60afa": {
+    "task_id": "783b3b2d-a052-438e-9600-d54fd4f60afa",
+    "task_type": "pci",
+    "config": {
+      "networkType": "LTE",
+      "distanceThreshold": 5.0,
+      "pciModulus": 3,
+      "inheritModulus": false,
+      "pciRange": {
+        "min": 0,
+        "max": 503
+      },
+      "enableTACPlanning": true,
+      "customRules": null
+    },
+    "status": "completed",
+    "progress": 100.0,
+    "result": null,
+    "error": null,
+    "created_at": "2026-03-26T21:51:33.755534",
+    "started_at": "2026-03-26T21:51:33.770485",
+    "completed_at": null
   }
 }

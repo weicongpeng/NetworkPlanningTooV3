@@ -906,7 +906,7 @@ export function LayerControl({
           '--panel-width': `${panelWidth}px`,
         } as React.CSSProperties}
       >
-        {/* 显示/隐藏控件 - 扁平矩形样式 */}
+        {/* 显示/隐藏控件 - 与面板风格一致的扁平矩形样式 */}
         <div
           onClick={() => setIsVisible(!isVisible)}
           onMouseEnter={() => setIsControlHovered(true)}
@@ -920,23 +920,38 @@ export function LayerControl({
             transform: 'translateY(-50%)',
             zIndex: 1002,
             pointerEvents: 'auto',
-            backgroundColor: isControlHovered ? '#D0D0D0' : '#E0E0E0',
+            // 配色与侧边栏面板保持一致：白色毛玻璃效果
+            backgroundColor: isControlHovered
+              ? 'rgba(255, 255, 255, 0.95)'
+              : 'rgba(255, 255, 255, 0.85)',
+            backdropFilter: 'blur(12px)',
             borderRadius: '4px',
-            boxShadow: 'none',
+            boxShadow: '-2px 0 8px rgba(0, 0, 0, 0.1)',
             width: '16px',
             height: '64px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
-            border: 'none',
-            transition: isResizing.current ? 'none' : 'background-color 0.2s ease',
+            border: '1px solid rgba(0, 0, 0, 0.08)',
+            // 与面板同步的过渡动画，确保跟随速度一致
+            transition: isResizing.current
+              ? 'none'
+              : 'right 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s ease, box-shadow 0.2s ease',
           }}
         >
           {isVisible ? (
-            <ChevronLeft size={14} color="#666666" strokeWidth={2.5} />
+            <ChevronLeft
+              size={14}
+              color={isControlHovered ? '#3b82f6' : '#6b7280'}
+              strokeWidth={2.5}
+            />
           ) : (
-            <ChevronRight size={14} color="#666666" strokeWidth={2.5} />
+            <ChevronRight
+              size={14}
+              color={isControlHovered ? '#3b82f6' : '#6b7280'}
+              strokeWidth={2.5}
+            />
           )}
         </div>
 
