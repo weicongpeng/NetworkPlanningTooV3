@@ -459,6 +459,17 @@ export function TACPlanningPage() {
                         </div>
                     </div>
 
+                    {/* 任务错误信息 - 显示任务执行失败的原因 */}
+                    {taskResult.status === 'failed' && taskResult.error && (
+                        <div className="mb-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-start gap-2 shrink-0">
+                            <AlertCircle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
+                            <div className="flex-1">
+                                <p className="text-red-500 font-medium text-xs mb-0.5">{t('tacPlanning.failed') || '规划失败'}</p>
+                                <p className="text-red-600 text-xs">{taskResult.error}</p>
+                            </div>
+                        </div>
+                    )}
+
                     {taskResult.status === 'completed' && taskResult.results && (
                         <div className="flex flex-col flex-1 min-h-0">
                             <div className="flex justify-end mb-2 shrink-0">

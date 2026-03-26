@@ -103,32 +103,37 @@ class TaskManager:
         self._load_tasks_index()
 
     # ============================================================
+    # ============================================================
     # 任务持久化方法 - 支持后端重启后恢复历史任务
     # ============================================================
 
     def _get_task_serializable_data(self, task: Task) -> Dict[str, Any]:
         """获取任务的可序列化数据（排除 asyncio.Task 等不可序列化字段）"""
-        # config 可能是 Pydantic 模型，需要 dump 为 dict
+        # config 可能是 Pydantic 模型，需要用 mode='json' 转为 JSON 兼容格式
         config_data = {}
         if task.config is not None:
-            if hasattr(task.config, "model_dump"):
-                config_data = task.config.model_dump()
-            elif hasattr(task.config, "dict"):
-                config_data = task.config.dict()
-            else:
-                config_data = {"raw": str(task.config)}
+            try:
+                if hasattr(task.config, 'model_dump'):
+                    config_data = task.config.model_dump(mode='json')
+                elif hasattr(task.config, 'dict'):
+                    config_data = task.config.dict()
+                else:
+                    config_data = {'raw': str(task.config)}
+            except Exception as e:
+                logger.warning(f'[TaskManager] config 序列化失败: {e}')
+                config_data = {'raw': str(task.config)}
 
         return {
-            "task_id": task.task_id,
-            "task_type": task.task_type.value if hasattr(task.task_type, "value") else str(task.task_type),
-            "config": config_data,
-            "status": task.status.value if hasattr(task.status, "value") else str(task.status),
-            "progress": task.progress,
-            "result": task.result,
-            "error": task.error,
-            "created_at": task.created_at.isoformat() if task.created_at else None,
-            "started_at": task.started_at.isoformat() if task.started_at else None,
-            "completed_at": task.completed_at.isoformat() if task.completed_at else None,
+            'task_id': task.task_id,
+            'task_type': task.task_type.value if hasattr(task.task_type, 'value') else str(task.task_type),
+            'config': config_data,
+            'status': task.status.value if hasattr(task.status, 'value') else str(task.status),
+            'progress': task.progress,
+            'result': task.result,
+            'error': task.error,
+            'created_at': task.created_at.isoformat() if task.created_at else None,
+            'started_at': task.started_at.isoformat() if task.started_at else None,
+            'completed_at': task.completed_at.isoformat() if task.completed_at else None,
         }
 
     def _persist_task(self, task_id: str) -> None:
@@ -137,8 +142,17 @@ class TaskManager:
             task = self.tasks.get(task_id)
             if task is None:
                 return
+
+            serializable_data = self._get_task_serializable_data(task)
+            saved_result = serializable_data.get("result")
+
+            if task.result is not None and saved_result is None:
+                logger.warning(
+                    f"[TaskManager] 任务 {task_id[:8]}... 的 result 序列化失败！"
+                    f"原始 result 有 {len(task.result)} 个 key，序列化后为 None。"
+                )
+
             self._tasks_index_file.parent.mkdir(parents=True, exist_ok=True)
-            # 读取现有索引
             index_data = {}
             if self._tasks_index_file.exists():
                 try:
@@ -146,61 +160,75 @@ class TaskManager:
                         index_data = json.load(f)
                 except Exception:
                     index_data = {}
-            # 更新该任务
-            index_data[task_id] = self._get_task_serializable_data(task)
-            # 写回磁盘
+
+            index_data[task_id] = serializable_data
+
             with open(self._tasks_index_file, "w", encoding="utf-8") as f:
                 json.dump(index_data, f, ensure_ascii=False, indent=2)
+
+            logger.info(f"[TaskManager] 任务已持久化: {task_id[:8]}... type={task.task_type.value} status={task.status.value}")
+
         except Exception as e:
-            logger.warning(f"[TaskManager] 保存任务索引失败: {e}")
+            import traceback
+            logger.error(f"[TaskManager] 保存任务 {task_id[:8] if task_id else '?'}... 索引失败: {e}")
+            logger.error(f"[TaskManager] Traceback: {traceback.format_exc()[:500]}")
 
     def _load_tasks_index(self) -> None:
         """从磁盘恢复已完成的任务元数据（支持后端重启后导出）"""
         if not self._tasks_index_file.exists():
+            logger.info(f"[TaskManager] 任务索引文件不存在，将从头开始")
             return
         try:
             with open(self._tasks_index_file, "r", encoding="utf-8") as f:
                 index_data = json.load(f)
+        except json.JSONDecodeError as e:
+            logger.warning(f"[TaskManager] 任务索引文件损坏，将重新创建: {e}")
+            return
 
-            for task_id, task_data in index_data.items():
-                # 只恢复已完成的任务（重启后可以导出）
-                status_str = task_data.get("status", "")
-                if hasattr(TaskStatus, "_member_names_") and status_str in TaskStatus._value2member_map_:
-                    status = TaskStatus._value2member_map_[status_str]
-                else:
-                    continue
+        recovered = 0
+        skipped = 0
+        for task_id, task_data in index_data.items():
+            status_str = task_data.get("status", "")
+            if status_str not in TaskStatus._value2member_map_:
+                skipped += 1
+                continue
 
-                if status != TaskStatus.COMPLETED:
-                    continue
+            status = TaskStatus._value2member_map_[status_str]
+            if status != TaskStatus.COMPLETED:
+                skipped += 1
+                continue
 
-                # 重建 Task 对象（不包含 asyncio.Task 和 progress_callback）
-                task_type_str = task_data.get("task_type", "")
-                if task_type_str in TaskType._value2member_map_:
-                    task_type = TaskType._value2member_map_[task_type_str]
-                else:
-                    continue
+            task_type_str = task_data.get("task_type", "")
+            if task_type_str not in TaskType._value2member_map_:
+                skipped += 1
+                continue
 
-                task = Task(task_type, task_data.get("config", {}))
-                task.task_id = task_id
-                task.status = status
-                task.progress = task_data.get("progress", 100.0)
-                task.result = task_data.get("result")
-                task.error = task_data.get("error")
-                task.created_at = datetime.fromisoformat(task_data["created_at"]) if task_data.get("created_at") else datetime.now()
-                task.started_at = datetime.fromisoformat(task_data["started_at"]) if task_data.get("started_at") else None
-                task.completed_at = datetime.fromisoformat(task_data["completed_at"]) if task_data.get("completed_at") else None
-                # asyncio.Task 和 progress_callback 不恢复，设为 None
-                task.task = None
+            task_type = TaskType._value2member_map_[task_type_str]
+            task_result = task_data.get("result")
 
-                self.tasks[task_id] = task
-                logger.info(f"[TaskManager] 从磁盘恢复已完成任务: {task_id} ({task_type_str})")
+            if task_result is None:
+                logger.warning(
+                    f"[TaskManager] 任务 {task_id[:8]}... 已完成但 result 为 None！"
+                    f"可能是持久化时序列化失败。请尝试重新运行该规划任务。"
+                )
 
-            if index_data:
-                logger.info(f"[TaskManager] 从磁盘恢复了 {len(self.tasks)} 个已完成任务")
-        except Exception as e:
-            logger.warning(f"[TaskManager] 加载任务索引失败: {e}")
+            task = Task(task_type, task_data.get("config", {}))
+            task.task_id = task_id
+            task.status = status
+            task.progress = task_data.get("progress", 100.0)
+            task.result = task_result
+            task.error = task_data.get("error")
+            task.created_at = datetime.fromisoformat(task_data["created_at"]) if task_data.get("created_at") else datetime.now()
+            task.started_at = datetime.fromisoformat(task_data["started_at"]) if task_data.get("started_at") else None
+            task.completed_at = datetime.fromisoformat(task_data["completed_at"]) if task_data.get("completed_at") else None
+            task.task = None
 
-    # ============================================================
+            self.tasks[task_id] = task
+            recovered += 1
+
+        logger.info(f"[TaskManager] 从磁盘恢复任务: 成功={recovered}, 跳过={skipped}, 总计={len(index_data)}")
+
+
     # 数据准备优化辅助方法 (P1-2)
     # ============================================================
 
@@ -734,6 +762,7 @@ class TaskManager:
 
             # 完成任务
             task.status = TaskStatus.COMPLETED
+            self._persist_task(task.task_id)
             task.completed_at = datetime.now()
             task.result = {
                 "taskId": result["taskId"],
@@ -949,6 +978,7 @@ class TaskManager:
 
             # 完成任务
             task.status = TaskStatus.COMPLETED
+            self._persist_task(task.task_id)
             task.completed_at = datetime.now()
             task.result = {
                 "taskId": result["taskId"],
@@ -1005,6 +1035,7 @@ class TaskManager:
 
             # 完成任务
             task.status = TaskStatus.COMPLETED
+            self._persist_task(task.task_id)
             task.completed_at = datetime.now()
  
             total_cells = len(results)
@@ -1162,6 +1193,7 @@ class TaskManager:
  
             # 5. 完成任务
             task.status = TaskStatus.COMPLETED
+            self._persist_task(task.task_id)
             task.completed_at = datetime.now()
             # 计算TAC错配 (如果存在 existingTac)
             mismatched_count = 0
