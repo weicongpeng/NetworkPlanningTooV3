@@ -34,13 +34,14 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen bg-background overflow-hidden">
       {/* 侧边栏容器 - 包含侧边栏和控件 */}
       <div className="relative">
-        {/* 侧边栏 */}
+        {/* 侧边栏 - 统一使用浅灰色背景 */}
         <aside
           style={{
             width: sidebarOpen ? '180px' : '42px',
             transition: 'width 0.35s cubic-bezier(0.25, 0.1, 0.25, 1)',
+            backgroundColor: '#f3f4f6', // 浅灰色，与导航项背景一致
           }}
-          className="bg-secondary border-r border-border flex flex-col relative z-20"
+          className="border-r border-gray-200 flex flex-col relative z-20"
         >
           {/* 导航菜单 - 固定高度和间距，避免上下移动，图标位置固定，内容边距统一 */}
           <nav className="flex-1 overflow-y-auto py-3">
