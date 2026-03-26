@@ -902,11 +902,9 @@ export function LayerControl({
           top: 0,
           right: 0,
           height: '100vh',
-          // 设置 CSS 变量供子元素使用
-          '--panel-width': `${panelWidth}px`,
         } as React.CSSProperties}
       >
-        {/* 显示/隐藏控件 - 与面板风格一致的扁平矩形样式 */}
+        {/* 显示/隐藏控件 - 使用 margin-left 固定在面板左侧边缘外侧 */}
         <div
           onClick={() => setIsVisible(!isVisible)}
           onMouseEnter={() => setIsControlHovered(true)}
@@ -914,13 +912,10 @@ export function LayerControl({
           style={{
             position: 'absolute',
             top: '50%',
-            // 关键修复：按钮始终紧贴在面板左侧边缘外侧
-            // 面板可见时：right = 面板宽度 + 按钮宽度（按钮紧贴在面板左边缘外侧）
-            // 面板隐藏时：right = 0（按钮在屏幕右边缘）
-            // 使用 CSS 变量确保与面板宽度同步
-            '--panel-width': `${panelWidth}px`,
-            '--button-width': '16px',
-            right: isVisible ? `calc(var(--panel-width) + var(--button-width))` : '0px',
+            // 关键修复：按钮使用 right 定位，从容器右边缘计算
+            // 面板可见时：按钮在面板左侧外侧 (right = 面板宽度 + 按钮宽度)
+            // 面板隐藏时：按钮紧贴容器右边缘 (right = 0)
+            right: isVisible ? `${panelWidth + 16}px` : '0px',
             transform: 'translateY(-50%)',
             zIndex: 1002,
             pointerEvents: 'auto',
@@ -938,7 +933,7 @@ export function LayerControl({
             justifyContent: 'center',
             cursor: 'pointer',
             border: '1px solid rgba(0, 0, 0, 0.08)',
-            // 与面板同步的过渡动画，确保跟随速度一致
+            // 拖拽时不使用过渡动画，确保实时跟随
             transition: isResizing.current
               ? 'none'
               : 'right 0.35s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s ease, box-shadow 0.2s ease',
@@ -966,8 +961,8 @@ export function LayerControl({
           style={{
             position: 'absolute',
             top: '0px',
-            // 使用 right 属性实现平滑过渡动画，与切换按钮同步
-            right: isVisible ? '0px' : `-${panelWidth}px`,
+            // 面板始终紧贴容器右边缘
+            right: '0px',
             zIndex: 1000,
             pointerEvents: 'auto',
             backgroundColor: 'rgba(255, 255, 255, 0.98)',
