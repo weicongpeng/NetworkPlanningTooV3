@@ -951,6 +951,69 @@ export function LayerControl({
           title="拖动调整宽度"
         />
 
+        {/* 展开/隐藏控件 - 位于面板内部左上角 */}
+        <button
+          onClick={() => setIsVisible(!isVisible)}
+          onMouseEnter={() => setIsControlHovered(true)}
+          onMouseLeave={() => setIsControlHovered(false)}
+          style={{
+            position: 'absolute',
+            top: '8px',
+            left: '8px',
+            zIndex: 1003,
+            pointerEvents: 'auto',
+            backgroundColor: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            padding: '4px',
+            borderRadius: '4px',
+            transition: 'background-color 0.2s ease',
+          }}
+          title={isVisible ? '收起面板' : '展开面板'}
+        >
+          {/* 三条横线样式 */}
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '3px',
+              transition: 'transform 0.35s ease',
+              transform: isVisible ? 'rotate(0deg)' : 'rotate(90deg)',
+            }}
+          >
+            <span
+              style={{
+                display: 'block',
+                width: '16px',
+                height: '2px',
+                backgroundColor: isControlHovered ? '#3b82f6' : '#6b7280',
+                borderRadius: '1px',
+                transition: 'width 0.2s ease, background-color 0.2s ease',
+              }}
+            />
+            <span
+              style={{
+                display: 'block',
+                width: '12px',
+                height: '2px',
+                backgroundColor: isControlHovered ? '#3b82f6' : '#6b7280',
+                borderRadius: '1px',
+                transition: 'width 0.2s ease, background-color 0.2s ease',
+              }}
+            />
+            <span
+              style={{
+                display: 'block',
+                width: '16px',
+                height: '2px',
+                backgroundColor: isControlHovered ? '#3b82f6' : '#6b7280',
+                borderRadius: '1px',
+                transition: 'width 0.2s ease, background-color 0.2s ease',
+              }}
+            />
+          </div>
+        </button>
+
         {/* 内容容器 - 处理滚动 */}
         <div style={{
           height: 'calc(100vh - 0px)',
