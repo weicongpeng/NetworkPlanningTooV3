@@ -604,44 +604,23 @@ export function LayerControl({
   // 添加显示/隐藏状态管理
   const [isVisible, setIsVisible] = useState(true) // 默认展开
   const [isPinned, setIsPinned] = useState(false) // 是否固定侧边栏
-  const [isHovering, setIsHovering] = useState(false) // 鼠标是否悬停在面板上
 
   // 面板引用
   const panelRef = useRef<HTMLDivElement>(null)
 
-  // 延迟隐藏定时器
-  const hideTimerRef = useRef<NodeJS.Timeout | null>(null)
-
-  // 清除延迟隐藏定时器
-  const clearHideTimer = useCallback(() => {
-    if (hideTimerRef.current) {
-      clearTimeout(hideTimerRef.current)
-      hideTimerRef.current = null
-    }
-  }, [])
-
-  // 延迟隐藏面板
-  const delayHide = useCallback(() => {
-    clearHideTimer()
-    hideTimerRef.current = setTimeout(() => {
-      if (!isPinned && !isHovering) {
-        setIsVisible(false)
-      }
-    }, 150) // 150ms 延迟
-  }, [isPinned, isHovering, clearHideTimer])
-
-  // 点击书钉控件 - 切换固定状态
+  // 点击控件 - 切换固定/隐藏状态
   const handleTogglePin = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
-    const newPinned = !isPinned
-    setIsPinned(newPinned)
-    clearHideTimer()
-    if (newPinned) {
-      setIsVisible(true) // 固定时保持显示
+    if (isPinned) {
+      // 取消固定，隐藏面板
+      setIsPinned(false)
+      setIsVisible(false)
     } else {
-      setIsVisible(false) // 取消固定时隐藏
+      // 固定面板
+      setIsPinned(true)
+      setIsVisible(true)
     }
-  }, [isPinned, clearHideTimer])
+  }, [isPinned])
 
   // 面板宽度状态
   const [panelWidth, setPanelWidth] = useState(240)
