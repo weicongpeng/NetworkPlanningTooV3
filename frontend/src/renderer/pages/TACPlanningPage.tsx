@@ -127,6 +127,60 @@ export function TACPlanningPage() {
         errorCountRef.current = 0
 
         try {
+            // 先检查数据文件是否存在
+            try {
+                const listResponse = await dataApi.list(1, 100, true)
+                if (listResponse.success && listResponse.data) {
+                    const dataItems = listResponse.data
+                    const networkType = config.networkType
+
+                    // 检查待规划小区文件 (cell-tree-export)
+                    const targetCellsFile = dataItems.find(item =>
+                        item.type === 'excel' &&
+                        item.name.toLowerCase().startsWith('cell-tree-export')
+                    )
+
+                    // 检查全量工参文件 (projectparameter_mongoose)
+                    const fullParamsFile = dataItems.find(item =>
+                        item.type === 'excel' &&
+                        item.name.toLowerCase().startsWith('projectparameter_mongoose')
+                    )
+
+                    // 检查TAC图层文件
+                    const tacFileName = networkType === 'LTE' ? '4G_TAC.TAB' : '5G_TAC.TAB'
+                    const tacLayerFile = dataItems.find(item =>
+                        item.type === 'map' && (
+                            item.name.toLowerCase().includes('4g_tac') ||
+                            item.name.toLowerCase().includes('5g_tac') ||
+                            item.name.toLowerCase().includes('tac')
+                        )
+                    )
+
+                    // 构建错误消息
+                    const missingFiles: string[] = []
+                    if (!targetCellsFile) {
+                        missingFiles.push(t('tacPlanning.targetCellsFile') || '待规划小区(cell-tree-export)')
+                    }
+                    if (!fullParamsFile) {
+                        missingFiles.push(t('tacPlanning.fullParamsFile') || '全量工参(ProjectParameter_mongoose)')
+                    }
+                    if (!tacLayerFile) {
+                        missingFiles.push(t('tacPlanning.tacLayerFile') || `TAC图层(${tacFileName})`)
+                    }
+
+                    if (missingFiles.length > 0) {
+                        setError(
+                            (t('tacPlanning.missingDataFiles') || '请先导入以下数据文件：') +
+                            '\n' + missingFiles.join('、')
+                        )
+                        setLoading(false)
+                        return
+                    }
+                }
+            } catch (listErr) {
+                console.warn('检查数据文件列表失败，将继续尝试规划:', listErr)
+            }
+
             const response = await tacPlanningApi.plan(config!)
             if (response.success && response.data) {
                 const newTaskId = response.data.taskId
