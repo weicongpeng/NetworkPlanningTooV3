@@ -961,8 +961,9 @@ export function LayerControl({
           style={{
             position: 'absolute',
             top: '0px',
-            // 面板始终紧贴容器右边缘
-            right: '0px',
+            // 面板使用 right 实现显示/隐藏，宽度独立调整
+            // 面板可见时：right = 0，面板隐藏时：right = -面板宽度
+            right: isVisible ? '0px' : `-${panelWidth}px`,
             zIndex: 1000,
             pointerEvents: 'auto',
             backgroundColor: 'rgba(255, 255, 255, 0.98)',
@@ -979,9 +980,11 @@ export function LayerControl({
             borderRight: 'none',
             borderTop: 'none',
             boxSizing: 'border-box',
-            // 使用 right 来隐藏/显示面板，确保完全移出屏幕
-            // 过渡动画与切换按钮保持一致
-            transition: isResizing.current ? 'none' : 'right 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+            // 过渡动画：显示/隐藏用 right，宽度调整时同时动画 width
+            // 拖拽时不使用过渡动画，确保实时跟随
+            transition: isResizing.current
+              ? 'none'
+              : 'right 0.35s cubic-bezier(0.4, 0, 0.2, 1), width 0.15s ease-out',
           }}
         >
         {/* 拖动调整手柄 */}
