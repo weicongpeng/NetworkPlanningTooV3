@@ -602,13 +602,42 @@ export function LayerControl({
   }
 
   // 添加显示/隐藏状态管理
-  const [isVisible, setIsVisible] = useState(true)
+  const [isVisible, setIsVisible] = useState(false) // 默认隐藏
+  const [isPinned, setIsPinned] = useState(false) // 是否固定侧边栏
+  const [isHoveringRight, setIsHoveringRight] = useState(false) // 是否悬停在右侧区域
 
   // 控件悬停状态
   const [isControlHovered, setIsControlHovered] = useState(false)
 
   // 面板引用
   const panelRef = useRef<HTMLDivElement>(null)
+
+  // 鼠标悬停检测 - 显示/隐藏侧边栏
+  const handleMouseEnterRightEdge = useCallback(() => {
+    if (!isPinned) {
+      setIsHoveringRight(true)
+      setIsVisible(true)
+    }
+  }, [isPinned])
+
+  const handleMouseLeaveRightEdge = useCallback(() => {
+    if (!isPinned) {
+      setIsHoveringRight(false)
+      setIsVisible(false)
+    }
+  }, [isPinned])
+
+  // 点击书钉控件 - 切换固定状态
+  const handleTogglePin = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    const newPinned = !isPinned
+    setIsPinned(newPinned)
+    if (newPinned) {
+      setIsVisible(true) // 固定时保持显示
+    } else {
+      setIsVisible(false) // 取消固定时隐藏
+    }
+  }, [isPinned])
 
   // 面板宽度状态
   const [panelWidth, setPanelWidth] = useState(240)
