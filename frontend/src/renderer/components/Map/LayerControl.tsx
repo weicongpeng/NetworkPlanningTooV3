@@ -924,7 +924,22 @@ export function LayerControl({
         }
       `}</style>
 
-      {/* 图层控制面板容器 - 包含面板和切换按钮 */}
+      {/* 右侧悬停检测区域 - 整个右侧边缘 */}
+      <div
+        onMouseEnter={handleMouseEnterRightEdge}
+        onMouseLeave={handleMouseLeaveRightEdge}
+        style={{
+          position: 'absolute',
+          top: 0,
+          right: 0,
+          width: '12px',
+          height: '100vh',
+          zIndex: 998,
+          pointerEvents: isPinned ? 'none' : 'auto',
+        }}
+      />
+
+      {/* 图层控制面板容器 - 包含面板和书钉控件 */}
       <div
         style={{
           position: 'absolute',
@@ -940,7 +955,7 @@ export function LayerControl({
           style={{
             position: 'absolute',
             top: '0px',
-            // 使用 right 实现平滑过渡动画，与切换按钮同步
+            // 使用 right 实现平滑过渡动画
             right: isVisible ? '0px' : `-${panelWidth}px`,
             zIndex: 1000,
             pointerEvents: 'auto',
@@ -958,10 +973,22 @@ export function LayerControl({
             borderRight: 'none',
             borderTop: 'none',
             boxSizing: 'border-box',
-            // 过渡动画与切换按钮保持一致
+            // 过渡动画
             transition: isResizing.current
               ? 'none'
-              : 'right 0.4s cubic-bezier(0.25, 0.1, 0.25, 1)',
+              : 'right 0.35s cubic-bezier(0.25, 0.1, 0.25, 1)',
+          }}
+          onMouseEnter={() => {
+            // 当鼠标进入面板时，如果已固定则保持显示
+            if (isPinned) {
+              setIsVisible(true)
+            }
+          }}
+          onMouseLeave={() => {
+            // 当鼠标离开面板时，如果未固定则隐藏
+            if (!isPinned) {
+              setIsVisible(false)
+            }
           }}
         >
         {/* 拖动调整手柄 */}
@@ -980,67 +1007,65 @@ export function LayerControl({
           title="拖动调整宽度"
         />
 
-        {/* 展开/隐藏控件 - 位于面板内部左上角 */}
+        {/* 书钉控件 - 位于面板内部右上角 */}
         <button
-          onClick={() => setIsVisible(!isVisible)}
+          onClick={handleTogglePin}
           onMouseEnter={() => setIsControlHovered(true)}
           onMouseLeave={() => setIsControlHovered(false)}
           style={{
             position: 'absolute',
-            top: '8px',
-            left: '8px',
+            top: '10px',
+            right: '10px',
             zIndex: 1003,
             pointerEvents: 'auto',
-            backgroundColor: 'transparent',
+            backgroundColor: isPinned ? '#3b82f6' : (isControlHovered ? 'rgba(59, 130, 246, 0.1)' : 'transparent'),
             border: 'none',
             cursor: 'pointer',
-            padding: '4px',
-            borderRadius: '4px',
-            transition: 'background-color 0.2s ease',
+            padding: '6px',
+            borderRadius: '6px',
+            transition: 'background-color 0.2s ease, transform 0.2s ease',
+            transform: isControlHovered ? 'scale(1.1)' : 'scale(1)',
           }}
-          title={isVisible ? '收起面板' : '展开面板'}
+          title={isPinned ? '取消固定' : '固定面板'}
         >
-          {/* 三条横线样式 */}
-          <div
+          {/* 书钉 SVG 图标 */}
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 20 20"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
             style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '3px',
-              transition: 'transform 0.35s ease',
-              transform: isVisible ? 'rotate(0deg)' : 'rotate(90deg)',
+              transition: 'transform 0.3s ease',
+              transform: isPinned ? 'rotate(0deg)' : 'rotate(-20deg)',
             }}
           >
-            <span
-              style={{
-                display: 'block',
-                width: '16px',
-                height: '2px',
-                backgroundColor: isControlHovered ? '#3b82f6' : '#6b7280',
-                borderRadius: '1px',
-                transition: 'width 0.2s ease, background-color 0.2s ease',
-              }}
+            {/* 书钉主体 - 顶部圆形头 */}
+            <circle
+              cx="10"
+              cy="5"
+              r="3.5"
+              fill={isPinned ? '#ffffff' : (isControlHovered ? '#3b82f6' : '#6b7280')}
+              stroke={isPinned ? '#3b82f6' : (isControlHovered ? '#3b82f6' : '#9ca3af')}
+              strokeWidth="1.5"
             />
-            <span
-              style={{
-                display: 'block',
-                width: '12px',
-                height: '2px',
-                backgroundColor: isControlHovered ? '#3b82f6' : '#6b7280',
-                borderRadius: '1px',
-                transition: 'width 0.2s ease, background-color 0.2s ease',
-              }}
+            {/* 书钉针脚 */}
+            <path
+              d="M10 8.5 L10 16"
+              stroke={isPinned ? '#ffffff' : (isControlHovered ? '#3b82f6' : '#6b7280')}
+              strokeWidth="2"
+              strokeLinecap="round"
             />
-            <span
-              style={{
-                display: 'block',
-                width: '16px',
-                height: '2px',
-                backgroundColor: isControlHovered ? '#3b82f6' : '#6b7280',
-                borderRadius: '1px',
-                transition: 'width 0.2s ease, background-color 0.2s ease',
-              }}
+            {/* 书钉底部弧形 */}
+            <path
+              d="M7 16 L10 14 L13 16"
+              stroke={isPinned ? '#ffffff' : (isControlHovered ? '#3b82f6' : '#6b7280')}
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill="none"
             />
-          </div>
+          </svg>
         </button>
 
         {/* 内容容器 - 处理滚动 */}
@@ -1049,7 +1074,7 @@ export function LayerControl({
           maxHeight: '100vh',
           overflowY: 'auto',
           overflowX: 'hidden',
-          paddingTop: '8px',
+          paddingTop: '40px',
           paddingLeft: '8px',
           paddingRight: '8px',
           paddingBottom: '24px',
