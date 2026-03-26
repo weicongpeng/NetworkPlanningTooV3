@@ -36,32 +36,36 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
       <aside
         style={{
           width: sidebarOpen ? '180px' : '42px',
-          transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          transition: 'width 0.35s cubic-bezier(0.25, 0.1, 0.25, 1)',
         }}
         className="bg-secondary border-r border-border flex flex-col relative z-20"
       >
-        {/* 侧边栏边缘把手 - 右边缘中部 */}
+        {/* 侧边栏边缘把手 - 右边缘中部，与面板风格一致 */}
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#D0D0D0' }}
-          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#E0E0E0' }}
+          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.95)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.88)' }}
           style={{
-            transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s ease',
             width: '16px',
             height: '64px',
-            backgroundColor: '#E0E0E0',
+            // 配色与侧边栏面板保持一致：白色毛玻璃效果
+            backgroundColor: 'rgba(255, 255, 255, 0.88)',
+            backdropFilter: 'blur(12px)',
             borderRadius: '4px',
-            border: 'none',
+            border: '1px solid rgba(0, 0, 0, 0.06)',
+            boxShadow: '2px 0 8px rgba(0, 0, 0, 0.08)',
             cursor: 'pointer',
+            // 与侧边栏同步的过渡动画
+            transition: 'background-color 0.2s ease, box-shadow 0.2s ease',
           }}
           className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center justify-center z-30"
           title={sidebarOpen ? t('common.collapseSidebar') : t('common.expandSidebar')}
         >
           {/* 箭头图标 */}
           {sidebarOpen ? (
-            <ChevronLeft size={14} color="#666666" />
+            <ChevronLeft size={14} color="#6b7280" strokeWidth={2.5} />
           ) : (
-            <ChevronRight size={14} color="#666666" />
+            <ChevronRight size={14} color="#6b7280" strokeWidth={2.5} />
           )}
         </button>
 
