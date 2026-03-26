@@ -7,9 +7,7 @@ import {
   Network,
   Layers,
   MapPin,
-  Shield,
-  ChevronLeft,
-  ChevronRight
+  Shield
 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
