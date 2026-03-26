@@ -112,11 +112,11 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
           </div>
         </aside>
 
-        {/* 展开/隐藏控件 - 位于侧边栏右侧外边 */}
+        {/* 展开/隐藏控件 - 位于侧边栏右侧外侧，配色与侧边栏一致 */}
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.95)' }}
-          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.88)' }}
+          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#e5e7eb' }}
+          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f3f4f6' }}
           style={{
             position: 'absolute',
             top: '50%',
@@ -125,15 +125,12 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
             transform: 'translateY(-50%)',
             width: '16px',
             height: '64px',
-            // 配色与侧边栏面板保持一致：白色毛玻璃效果
-            backgroundColor: 'rgba(255, 255, 255, 0.88)',
-            backdropFilter: 'blur(12px)',
+            // 配色与侧边栏面板保持一致：浅灰色
+            backgroundColor: '#f3f4f6',
             borderRadius: '4px',
-            border: '1px solid rgba(0, 0, 0, 0.06)',
-            boxShadow: '2px 0 8px rgba(0, 0, 0, 0.08)',
             cursor: 'pointer',
             // 与侧边栏同步的过渡动画
-            transition: 'left 0.35s cubic-bezier(0.25, 0.1, 0.25, 1), background-color 0.2s ease, box-shadow 0.2s ease',
+            transition: 'left 0.35s cubic-bezier(0.25, 0.1, 0.25, 1), background-color 0.2s ease',
             zIndex: 30,
           }}
           title={sidebarOpen ? t('common.collapseSidebar') : t('common.expandSidebar')}
