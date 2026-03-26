@@ -604,6 +604,7 @@ export function LayerControl({
   // 添加显示/隐藏状态管理
   const [isVisible, setIsVisible] = useState(true) // 默认展开
   const [isPinned, setIsPinned] = useState(false) // 是否固定侧边栏
+  const [isPinHovered, setIsPinHovered] = useState(false) // 控件是否被悬停
 
   // 面板引用
   const panelRef = useRef<HTMLDivElement>(null)
