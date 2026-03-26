@@ -905,95 +905,91 @@ export function LayerControl({
         }
       `}</style>
 
-      {/* 书钉控件 - 位于页面左上角，独立于面板 */}
-      <button
-        onClick={handleTogglePin}
-        style={{
-          position: 'fixed',
-          top: '10px',
-          left: '10px',
-          zIndex: 1001,
-          pointerEvents: 'auto',
-          backgroundColor: 'rgba(255, 255, 255, 0.98)',
-          backdropFilter: 'blur(12px)',
-          border: '1px solid rgba(0, 0, 0, 0.1)',
-          cursor: 'pointer',
-          padding: '8px',
-          borderRadius: '8px',
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-          transition: 'opacity 0.2s ease, transform 0.2s ease',
-          opacity: isVisible ? 0 : 1,
-          transform: isVisible ? 'scale(0.9)' : 'scale(1)',
-          // 始终禁用 pointerEvents 为 none，让按钮可点击
-        }}
-        title={isPinned ? '取消固定' : '展开面板'}
-      >
-        {/* 书钉 SVG 图标 */}
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 20 20"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          style={{
-            transition: 'transform 0.3s ease',
-            transform: isPinned ? 'rotate(0deg)' : 'rotate(-15deg)',
-          }}
-        >
-          {/* 书钉主体 - 顶部圆形头 */}
-          <circle
-            cx="10"
-            cy="5"
-            r="3.5"
-            fill={isPinned ? '#3b82f6' : '#6b7280'}
-            stroke={isPinned ? '#2563eb' : '#9ca3af'}
-            strokeWidth="1.5"
-          />
-          {/* 书钉针脚 */}
-          <path
-            d="M10 8.5 L10 16"
-            stroke={isPinned ? '#3b82f6' : '#6b7280'}
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-          {/* 书钉底部弧形 */}
-          <path
-            d="M7 16 L10 14 L13 16"
-            stroke={isPinned ? '#3b82f6' : '#6b7280'}
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            fill="none"
-          />
-        </svg>
-      </button>
-
-      {/* 图层控制面板容器 */}
+      {/* 图层控制面板容器 - 使用固定定位作为外层容器 */}
       <div
         style={{
-          position: 'absolute',
+          position: 'fixed',
           top: 0,
+          left: 0,
           right: 0,
-          height: '100vh',
-          width: `${panelWidth}px`,
-          zIndex: 1000,
-          pointerEvents: isVisible ? 'auto' : 'none',
-          transition: 'transform 0.35s cubic-bezier(0.25, 0.1, 0.25, 1), opacity 0.35s ease',
-          transform: isVisible ? 'translateX(0)' : `translateX(${panelWidth}px)`,
-          opacity: isVisible ? 1 : 0,
-        } as React.CSSProperties}
+          bottom: 0,
+          zIndex: 998,
+          pointerEvents: 'none',
+        }}
       >
-        {/* 图层控制面板 - 直角设计 */}
+        {/* 书钉控件 - 位于页面左上角 */}
+        <button
+          onClick={handleTogglePin}
+          style={{
+            position: 'absolute',
+            top: '10px',
+            left: '10px',
+            zIndex: 1003,
+            pointerEvents: 'auto',
+            backgroundColor: 'rgba(255, 255, 255, 0.98)',
+            backdropFilter: 'blur(12px)',
+            border: '1px solid rgba(0, 0, 0, 0.1)',
+            cursor: 'pointer',
+            padding: '8px',
+            borderRadius: '8px',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+            transition: 'opacity 0.25s ease, transform 0.25s ease',
+            opacity: isVisible || isPinned ? 0 : 1,
+            transform: isVisible || isPinned ? 'scale(0.9)' : 'scale(1)',
+            visibility: (isVisible || isPinned) ? 'hidden' : 'visible',
+          }}
+          title={isPinned ? '取消固定' : '展开面板'}
+        >
+          {/* 书钉 SVG 图标 */}
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 20 20"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            style={{
+              transition: 'transform 0.3s ease',
+              transform: isPinned ? 'rotate(0deg)' : 'rotate(-15deg)',
+            }}
+          >
+            {/* 书钉主体 - 顶部圆形头 */}
+            <circle
+              cx="10"
+              cy="5"
+              r="3.5"
+              fill={isPinned ? '#3b82f6' : '#6b7280'}
+              stroke={isPinned ? '#2563eb' : '#9ca3af'}
+              strokeWidth="1.5"
+            />
+            {/* 书钉针脚 */}
+            <path
+              d="M10 8.5 L10 16"
+              stroke={isPinned ? '#3b82f6' : '#6b7280'}
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+            {/* 书钉底部弧形 */}
+            <path
+              d="M7 16 L10 14 L13 16"
+              stroke={isPinned ? '#3b82f6' : '#6b7280'}
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill="none"
+            />
+          </svg>
+        </button>
+
+        {/* 图层控制面板 */}
         <div
           ref={panelRef}
           className="layer-control"
           style={{
             position: 'absolute',
             top: '0px',
-            left: '0px',
             right: '0px',
             zIndex: 1000,
-            pointerEvents: 'auto',
+            pointerEvents: isVisible ? 'auto' : 'none',
             backgroundColor: 'rgba(255, 255, 255, 0.98)',
             backdropFilter: 'blur(12px)',
             borderRadius: '0',
@@ -1008,6 +1004,12 @@ export function LayerControl({
             borderRight: 'none',
             borderTop: 'none',
             boxSizing: 'border-box',
+            transition: 'transform 0.35s cubic-bezier(0.25, 0.1, 0.25, 1), opacity 0.35s ease',
+            transform: isVisible ? 'translateX(0)' : `translateX(${panelWidth}px)`,
+            opacity: isVisible ? 1 : 0,
+          }}
+          onMouseEnter={() => {
+            // 鼠标进入面板时，取消延迟隐藏
           }}
           onMouseLeave={() => {
             // 鼠标离开面板时，只有未固定才隐藏
