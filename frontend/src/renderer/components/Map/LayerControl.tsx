@@ -956,10 +956,10 @@ export function LayerControl({
             borderRadius: '8px',
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
             transition: 'opacity 0.25s ease, transform 0.25s ease',
-            opacity: isVisible || isPinned ? 0 : 1,
-            transform: isVisible || isPinned ? 'scale(0.9)' : 'scale(1)',
-            visibility: (isVisible || isPinned) ? 'hidden' : 'visible',
-            pointerEvents: (isVisible || isPinned) ? 'none' : 'auto',
+            opacity: !isVisible && !isPinned ? 1 : 0,
+            transform: !isVisible && !isPinned ? 'scale(1)' : 'scale(0.9)',
+            visibility: !isVisible && !isPinned ? 'visible' : 'hidden',
+            pointerEvents: !isVisible && !isPinned ? 'auto' : 'none',
           }}
           title={isPinned ? '取消固定' : '展开面板'}
         >
