@@ -83,16 +83,16 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
             })}
           </nav>
 
-          {/* 底部信息 - 使用固定高度容器避免菜单上下移动 */}
-          <div className="border-t border-border text-xs text-muted-foreground">
-            <div
-              style={{
-                opacity: sidebarOpen ? 1 : 0,
-                transition: 'opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-              }}
-              className="px-4 py-4 h-[52px]"
-            >
-              <p>版本: 2.0.0</p>
+          {/* 底部版本信息 - 配色与侧边栏一致，无分隔线 */}
+          <div
+            className="text-xs text-muted-foreground"
+            style={{
+              opacity: sidebarOpen ? 1 : 0,
+              transition: 'opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+            }}
+          >
+            <div className="px-4 py-3">
+              <p>v2.0.0</p>
             </div>
           </div>
         </aside>
