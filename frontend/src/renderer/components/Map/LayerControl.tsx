@@ -621,8 +621,9 @@ export function LayerControl({
   }, [isPinned])
 
   const handleMouseLeaveRightEdge = useCallback(() => {
+    setIsHoveringRight(false)
+    // 只有在未固定时才隐藏面板
     if (!isPinned) {
-      setIsHoveringRight(false)
       setIsVisible(false)
     }
   }, [isPinned])
