@@ -602,7 +602,7 @@ export function LayerControl({
   }
 
   // 添加显示/隐藏状态管理
-  const [isVisible, setIsVisible] = useState(false) // 默认隐藏
+  const [isVisible, setIsVisible] = useState(true) // 默认展开
   const [isPinned, setIsPinned] = useState(false) // 是否固定侧边栏
   const [isHoveringRight, setIsHoveringRight] = useState(false) // 是否悬停在右侧区域
 
