@@ -608,22 +608,6 @@ export function LayerControl({
   // 面板引用
   const panelRef = useRef<HTMLDivElement>(null)
 
-  // 鼠标悬停检测 - 显示/隐藏侧边栏
-  const handleMouseEnterRightEdge = useCallback(() => {
-    if (!isPinned) {
-      setIsHoveringRight(true)
-      setIsVisible(true)
-    }
-  }, [isPinned])
-
-  const handleMouseLeaveRightEdge = useCallback(() => {
-    setIsHoveringRight(false)
-    // 只有在未固定时才隐藏面板
-    if (!isPinned) {
-      setIsVisible(false)
-    }
-  }, [isPinned])
-
   // 点击书钉控件 - 切换固定状态
   const handleTogglePin = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
