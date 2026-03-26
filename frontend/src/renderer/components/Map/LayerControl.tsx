@@ -914,74 +914,11 @@ export function LayerControl({
           top: 0,
           left: 0,
           height: '100%',
+          width: `${panelWidth}px`,
           zIndex: 998,
           pointerEvents: 'none',
         }}
       >
-        {/* 书钉控件 - 位于容器左侧边缘，始终可见（面板隐藏时） */}
-        <button
-          onClick={handleTogglePin}
-          style={{
-            position: 'absolute',
-            top: '10px',
-            left: '10px',
-            zIndex: 1003,
-            pointerEvents: 'auto',
-            backgroundColor: 'rgba(255, 255, 255, 0.98)',
-            backdropFilter: 'blur(12px)',
-            border: '1px solid rgba(0, 0, 0, 0.1)',
-            cursor: 'pointer',
-            padding: '8px',
-            borderRadius: '8px',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-            transition: 'opacity 0.25s ease, transform 0.25s ease',
-            opacity: !isVisible && !isPinned ? 1 : 0,
-            transform: !isVisible && !isPinned ? 'scale(1)' : 'scale(0.9)',
-            visibility: !isVisible && !isPinned ? 'visible' : 'hidden',
-            pointerEvents: !isVisible && !isPinned ? 'auto' : 'none',
-          }}
-          title={isPinned ? '取消固定' : '展开面板'}
-        >
-          {/* 书钉 SVG 图标 */}
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 20 20"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            style={{
-              transition: 'transform 0.3s ease',
-              transform: isPinned ? 'rotate(0deg)' : 'rotate(-15deg)',
-            }}
-          >
-            {/* 书钉主体 - 顶部圆形头 */}
-            <circle
-              cx="10"
-              cy="5"
-              r="3.5"
-              fill={isPinned ? '#3b82f6' : '#6b7280'}
-              stroke={isPinned ? '#2563eb' : '#9ca3af'}
-              strokeWidth="1.5"
-            />
-            {/* 书钉针脚 */}
-            <path
-              d="M10 8.5 L10 16"
-              stroke={isPinned ? '#3b82f6' : '#6b7280'}
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-            {/* 书钉底部弧形 */}
-            <path
-              d="M7 16 L10 14 L13 16"
-              stroke={isPinned ? '#3b82f6' : '#6b7280'}
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              fill="none"
-            />
-          </svg>
-        </button>
-
         {/* 图层控制面板 - 从左侧滑入/滑出 */}
         <div
           ref={panelRef}
@@ -1013,15 +950,15 @@ export function LayerControl({
             opacity: isVisible ? 1 : 0,
           }}
           onMouseEnter={() => {
-            // 鼠标进入面板时，清除延迟隐藏定时器
-            clearHideTimer()
-            setIsHovering(true)
+            // 鼠标进入面板时，如果未固定则保持显示
+            if (!isPinned) {
+              setIsVisible(true)
+            }
           }}
           onMouseLeave={() => {
-            // 鼠标离开面板时，延迟隐藏
-            setIsHovering(false)
+            // 鼠标离开面板时，如果未固定则隐藏
             if (!isPinned) {
-              delayHide()
+              setIsVisible(false)
             }
           }}
         >
@@ -1041,13 +978,70 @@ export function LayerControl({
           title="拖动调整宽度"
         />
 
+        {/* 固定/解开控件 - 位于面板内部右上角 */}
+        <button
+          onClick={handleTogglePin}
+          style={{
+            position: 'absolute',
+            top: '10px',
+            right: '10px',
+            zIndex: 1003,
+            pointerEvents: 'auto',
+            backgroundColor: isPinned ? '#3b82f6' : 'transparent',
+            cursor: 'pointer',
+            padding: '6px',
+            borderRadius: '6px',
+            border: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'background-color 0.2s ease',
+          }}
+          title={isPinned ? '解开固定' : '固定侧边栏'}
+        >
+          {/* 固定图标 SVG - 图钉样式 */}
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 18 18"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            {/* 图钉头部 */}
+            <circle
+              cx="9"
+              cy="4.5"
+              r="3"
+              fill={isPinned ? '#ffffff' : '#6b7280'}
+              stroke={isPinned ? '#2563eb' : '#9ca3af'}
+              strokeWidth="1.2"
+            />
+            {/* 图钉针脚 */}
+            <path
+              d="M9 7.5 L9 14"
+              stroke={isPinned ? '#ffffff' : '#6b7280'}
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+            {/* 图钉底部 */}
+            <path
+              d="M6 14 L9 12.5 L12 14"
+              stroke={isPinned ? '#ffffff' : '#6b7280'}
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill="none"
+            />
+          </svg>
+        </button>
+
         {/* 内容容器 - 处理滚动 */}
         <div style={{
           height: '100%',
           maxHeight: '100%',
           overflowY: 'auto',
           overflowX: 'hidden',
-          paddingTop: '8px',
+          paddingTop: '40px',
           paddingLeft: '8px',
           paddingRight: '8px',
           paddingBottom: '24px',
