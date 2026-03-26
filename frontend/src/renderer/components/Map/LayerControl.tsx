@@ -645,8 +645,8 @@ export function LayerControl({
   // 执行调整大小
   const doResize = (e: MouseEvent) => {
     if (!isResizing.current) return
-    // 面板在右侧，向左拖动（X减小）增加宽度
-    const delta = startX.current - e.clientX
+    // 面板在左侧，向右拖动（X增大）增加宽度
+    const delta = e.clientX - startX.current
     const newWidth = Math.max(200, Math.min(500, startWidth.current + delta))
     setPanelWidth(newWidth)
   }
