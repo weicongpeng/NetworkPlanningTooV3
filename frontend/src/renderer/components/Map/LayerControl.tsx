@@ -924,7 +924,7 @@ export function LayerControl({
           position: 'absolute',
           top: 0,
           left: 0,
-          width: '20px',
+          width: '24px',
           height: '100%',
           zIndex: 997,
           pointerEvents: isPinned || isVisible ? 'none' : 'auto',
