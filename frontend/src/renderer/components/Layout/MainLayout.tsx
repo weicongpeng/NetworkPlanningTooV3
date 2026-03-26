@@ -112,8 +112,8 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
           {/* 展开/隐藏控件 - 位于侧边栏内部右下角 */}
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#d1d5db' }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#e5e7eb' }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#e5e7eb' }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f3f4f6' }}
             style={{
               position: 'absolute',
               bottom: '8px',
@@ -122,7 +122,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
               minWidth: '34px',
               height: '28px',
               padding: '0 8px',
-              backgroundColor: '#e5e7eb',
+              backgroundColor: '#f3f4f6',
               borderRadius: '6px',
               border: 'none',
               cursor: 'pointer',
