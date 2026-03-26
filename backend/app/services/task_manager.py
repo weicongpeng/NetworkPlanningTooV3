@@ -533,6 +533,7 @@ class TaskManager:
         # 创建任务
         task = Task(TaskType.PCI, config)
         self.tasks[task.task_id] = task
+        self._persist_task(task.task_id)
         logger.info(f"[TaskManager] 任务创建成功, task_id: {task.task_id}")
 
         # 启动任务
