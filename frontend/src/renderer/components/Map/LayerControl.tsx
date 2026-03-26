@@ -1033,12 +1033,15 @@ export function LayerControl({
             opacity: isVisible ? 1 : 0,
           }}
           onMouseEnter={() => {
-            // 鼠标进入面板时，取消延迟隐藏
+            // 鼠标进入面板时，清除延迟隐藏定时器
+            clearHideTimer()
+            setIsHovering(true)
           }}
           onMouseLeave={() => {
-            // 鼠标离开面板时，只有未固定才隐藏
+            // 鼠标离开面板时，延迟隐藏
+            setIsHovering(false)
             if (!isPinned) {
-              setIsVisible(false)
+              delayHide()
             }
           }}
         >
