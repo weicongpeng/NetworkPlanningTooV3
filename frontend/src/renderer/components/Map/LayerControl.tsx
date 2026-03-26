@@ -928,19 +928,18 @@ export function LayerControl({
         }
       `}</style>
 
-      {/* 图层控制面板容器 - 使用固定定位作为外层容器 */}
+      {/* 图层控制面板容器 - 相对于父容器定位，高度匹配地图窗口 */}
       <div
         style={{
-          position: 'fixed',
+          position: 'absolute',
           top: 0,
           left: 0,
-          right: 0,
-          bottom: 0,
+          height: '100%',
           zIndex: 998,
           pointerEvents: 'none',
         }}
       >
-        {/* 书钉控件 - 位于页面左上角 */}
+        {/* 书钉控件 - 位于面板左上角 */}
         <button
           onClick={handleTogglePin}
           style={{
@@ -1011,7 +1010,7 @@ export function LayerControl({
           style={{
             position: 'absolute',
             top: '0px',
-            right: '0px',
+            left: '0px',
             zIndex: 1000,
             pointerEvents: isVisible ? 'auto' : 'none',
             backgroundColor: 'rgba(255, 255, 255, 0.98)',
@@ -1020,16 +1019,18 @@ export function LayerControl({
             boxShadow: '-4px 0 20px rgba(0, 0, 0, 0.15)',
             width: `${panelWidth}px`,
             minWidth: '240px',
-            height: '100vh',
-            maxHeight: '100vh',
+            height: '100%',
+            maxHeight: '100%',
             overflow: 'hidden',
             fontSize: '14px',
             border: '1px solid rgba(0, 0, 0, 0.1)',
             borderRight: 'none',
             borderTop: 'none',
+            borderBottom: 'none',
+            borderLeft: 'none',
             boxSizing: 'border-box',
             transition: 'transform 0.35s cubic-bezier(0.25, 0.1, 0.25, 1), opacity 0.35s ease',
-            transform: isVisible ? 'translateX(0)' : `translateX(${panelWidth}px)`,
+            transform: isVisible ? 'translateX(0)' : `translateX(-${panelWidth}px)`,
             opacity: isVisible ? 1 : 0,
           }}
           onMouseEnter={() => {
@@ -1050,7 +1051,7 @@ export function LayerControl({
           onMouseDown={startResize}
           style={{
             position: 'absolute',
-            left: 0,
+            right: 0,
             top: 0,
             bottom: 0,
             width: '8px',
@@ -1063,8 +1064,8 @@ export function LayerControl({
 
         {/* 内容容器 - 处理滚动 */}
         <div style={{
-          height: 'calc(100vh - 0px)',
-          maxHeight: '100vh',
+          height: '100%',
+          maxHeight: '100%',
           overflowY: 'auto',
           overflowX: 'hidden',
           paddingTop: '8px',
