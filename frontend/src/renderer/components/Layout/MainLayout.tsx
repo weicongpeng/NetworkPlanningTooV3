@@ -35,7 +35,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
       {/* 侧边栏 */}
       <aside
         style={{
-          width: sidebarOpen ? '116px' : '42px',
+          width: sidebarOpen ? '180px' : '42px',
           transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         }}
         className="bg-secondary border-r border-border flex flex-col relative z-20"
