@@ -994,8 +994,11 @@ export function LayerControl({
             width: '8px',
             cursor: 'ew-resize',
             zIndex: 10,
-            backgroundColor: 'transparent',
+            backgroundColor: 'rgba(0, 0, 0, 0.03)',
+            transition: 'background-color 0.2s ease',
           }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.03)'}
           title="拖动调整宽度"
         />
 
