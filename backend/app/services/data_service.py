@@ -236,6 +236,13 @@ class DataService:
             f"[DataService] 开始更新工参: Full={full_param_id}, Current={current_param_id}"
         )
 
+        # 【关键修复】在reload模式下，uvicorn重启后内存索引可能与磁盘不一致
+        # 先强制从磁盘重新加载索引，确保使用最新数据
+        self.reload_index()
+        safe_print(
+            f"[DataService] 索引重新加载后，当前索引共 {len(self.index)} 条"
+        )
+
         # 1. 获取文件路径 - 提供更详细的错误信息
         missing_ids = []
         if full_param_id not in self.index:
