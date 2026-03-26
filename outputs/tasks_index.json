@@ -195,5 +195,105 @@
     "created_at": "2026-03-26T21:10:21.636407",
     "started_at": "2026-03-26T21:10:21.637570",
     "completed_at": null
+  },
+  "0d26b3e2-3be0-4afd-9032-b117b7d1ab81": {
+    "task_id": "0d26b3e2-3be0-4afd-9032-b117b7d1ab81",
+    "task_type": "neighbor",
+    "config": {
+      "planningType": "LTE-LTE",
+      "maxDistance": 3.0,
+      "maxNeighbors": 64,
+      "coverageDistanceFactor": 1.0,
+      "coverageRadiusFactor": 1.0,
+      "customRules": null
+    },
+    "status": "completed",
+    "progress": 100.0,
+    "result": null,
+    "error": null,
+    "created_at": "2026-03-26T21:16:07.627391",
+    "started_at": "2026-03-26T21:16:07.632518",
+    "completed_at": null
+  },
+  "3c49fb29-0ab0-4741-839f-450cb451a1b7": {
+    "task_id": "3c49fb29-0ab0-4741-839f-450cb451a1b7",
+    "task_type": "neighbor",
+    "config": {
+      "planningType": "NR-NR",
+      "maxDistance": 3.0,
+      "maxNeighbors": 64,
+      "coverageDistanceFactor": 1.0,
+      "coverageRadiusFactor": 1.0,
+      "customRules": null
+    },
+    "status": "pending",
+    "progress": 0.0,
+    "result": null,
+    "error": null,
+    "created_at": "2026-03-26T21:21:07.435605",
+    "started_at": null,
+    "completed_at": null
+  },
+  "4d34c092-1e42-4358-ac63-781bf27522f8": {
+    "task_id": "4d34c092-1e42-4358-ac63-781bf27522f8",
+    "task_type": "pci",
+    "config": {
+      "networkType": "NR",
+      "distanceThreshold": 5.0,
+      "pciModulus": 30,
+      "inheritModulus": false,
+      "pciRange": {
+        "min": 0,
+        "max": 1007
+      },
+      "enableTACPlanning": true,
+      "customRules": null
+    },
+    "status": "pending",
+    "progress": 0.0,
+    "result": null,
+    "error": null,
+    "created_at": "2026-03-26T21:22:06.582983",
+    "started_at": null,
+    "completed_at": null
+  },
+  "67a3ce17-a0b9-4515-8e1a-fa4bce48cee9": {
+    "task_id": "67a3ce17-a0b9-4515-8e1a-fa4bce48cee9",
+    "task_type": "tac_planning",
+    "config": {
+      "networkType": "LTE",
+      "enableSingularityCheck": true,
+      "singularityConfig": {
+        "search_radius": 1500,
+        "azimuth_tolerance": 60,
+        "singularity_threshold": 0.5
+      }
+    },
+    "status": "completed",
+    "progress": 100,
+    "result": null,
+    "error": null,
+    "created_at": "2026-03-26T21:23:42.120957",
+    "started_at": "2026-03-26T21:23:42.121549",
+    "completed_at": null
+  },
+  "200ea661-87e0-4046-9a47-c0e031c1942b": {
+    "task_id": "200ea661-87e0-4046-9a47-c0e031c1942b",
+    "task_type": "neighbor",
+    "config": {
+      "planningType": "LTE-LTE",
+      "maxDistance": 3.0,
+      "maxNeighbors": 64,
+      "coverageDistanceFactor": 1.0,
+      "coverageRadiusFactor": 1.0,
+      "customRules": null
+    },
+    "status": "completed",
+    "progress": 100.0,
+    "result": null,
+    "error": null,
+    "created_at": "2026-03-26T21:33:13.554098",
+    "started_at": "2026-03-26T21:33:13.557000",
+    "completed_at": null
   }
 }
