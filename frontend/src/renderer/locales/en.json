@@ -446,6 +446,10 @@
     "tacLayer": "TAC Layer",
     "tacLayerTip": "Import 4G or 5G TAC layer in Data Management, layer format is zip package (contains .tab or .shp MapInfo format data).",
     "remark": "Note: This is data-driven planning, used for TAC allocation of new sites/cells.",
+    "missingDataFiles": "Please import the following data files first:",
+    "targetCellsFile": "Cells to Plan (cell-tree-export)",
+    "fullParamsFile": "Full Parameters (ProjectParameter_mongoose)",
+    "tacLayerFile": "TAC Layer",
     "column": {
       "siteId": "Site ID",
       "siteName": "Site Name",
