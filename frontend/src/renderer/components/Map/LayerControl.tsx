@@ -902,9 +902,11 @@ export function LayerControl({
           top: 0,
           right: 0,
           height: '100vh',
+          // 设置 CSS 变量供子元素使用
+          '--panel-width': `${panelWidth}px`,
         } as React.CSSProperties}
       >
-        {/* 显示/隐藏控件 - 使用 margin-left 固定在面板左侧边缘外侧 */}
+        {/* 显示/隐藏控件 - 扁平矩形样式 */}
         <div
           onClick={() => setIsVisible(!isVisible)}
           onMouseEnter={() => setIsControlHovered(true)}
@@ -912,45 +914,29 @@ export function LayerControl({
           style={{
             position: 'absolute',
             top: '50%',
-            // 关键修复：按钮使用 right 定位，从容器右边缘计算
-            // 面板可见时：按钮在面板左侧外侧 (right = 面板宽度 + 按钮宽度)
-            // 面板隐藏时：按钮紧贴容器右边缘 (right = 0)
-            right: isVisible ? `${panelWidth + 16}px` : '0px',
+            // 面板显示时：使用 CSS 变量计算位置（在面板左侧边缘）
+            // 面板隐藏时：在屏幕右边缘附近
+            right: isVisible ? 'calc(var(--panel-width) + 0px)' : '0px',
             transform: 'translateY(-50%)',
             zIndex: 1002,
             pointerEvents: 'auto',
-            // 配色与侧边栏面板保持一致：白色毛玻璃效果
-            backgroundColor: isControlHovered
-              ? 'rgba(255, 255, 255, 0.95)'
-              : 'rgba(255, 255, 255, 0.85)',
-            backdropFilter: 'blur(12px)',
+            backgroundColor: isControlHovered ? '#D0D0D0' : '#E0E0E0',
             borderRadius: '4px',
-            boxShadow: '-2px 0 8px rgba(0, 0, 0, 0.1)',
+            boxShadow: 'none',
             width: '16px',
             height: '64px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
-            border: '1px solid rgba(0, 0, 0, 0.08)',
-            // 拖拽时不使用过渡动画，确保实时跟随
-            transition: isResizing.current
-              ? 'none'
-              : 'right 0.35s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s ease, box-shadow 0.2s ease',
+            border: 'none',
+            transition: isResizing.current ? 'none' : 'background-color 0.2s ease',
           }}
         >
           {isVisible ? (
-            <ChevronLeft
-              size={14}
-              color={isControlHovered ? '#3b82f6' : '#6b7280'}
-              strokeWidth={2.5}
-            />
+            <ChevronLeft size={14} color="#666666" strokeWidth={2.5} />
           ) : (
-            <ChevronRight
-              size={14}
-              color={isControlHovered ? '#3b82f6' : '#6b7280'}
-              strokeWidth={2.5}
-            />
+            <ChevronRight size={14} color="#666666" strokeWidth={2.5} />
           )}
         </div>
 
@@ -961,9 +947,7 @@ export function LayerControl({
           style={{
             position: 'absolute',
             top: '0px',
-            // 面板使用 right 实现显示/隐藏，宽度独立调整
-            // 面板可见时：right = 0，面板隐藏时：right = -面板宽度
-            right: isVisible ? '0px' : `-${panelWidth}px`,
+            right: '0px',
             zIndex: 1000,
             pointerEvents: 'auto',
             backgroundColor: 'rgba(255, 255, 255, 0.98)',
@@ -980,11 +964,9 @@ export function LayerControl({
             borderRight: 'none',
             borderTop: 'none',
             boxSizing: 'border-box',
-            // 过渡动画：显示/隐藏用 right，宽度调整时同时动画 width
-            // 拖拽时不使用过渡动画，确保实时跟随
-            transition: isResizing.current
-              ? 'none'
-              : 'right 0.35s cubic-bezier(0.4, 0, 0.2, 1), width 0.15s ease-out',
+            // 使用 transform 来隐藏/显示面板，确保完全移出屏幕
+            transform: isVisible ? 'translateX(0)' : 'translateX(100%)',
+            transition: isResizing.current ? 'none' : 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           }}
         >
         {/* 拖动调整手柄 */}
