@@ -309,6 +309,9 @@ export function DataPage() {
          }
      } catch (err: any) {
          console.error('Update failed:', err);
+         const errorMsg = err?.message || err?.data?.message || String(err);
+         setUpdateSuccess(null);
+         alert(`${t('data.updateFailed') || '工参更新失败'}: ${errorMsg}\n\n${t('data.updateFailedHint') || '提示：'} ${t('data.tryRefreshHint') || '请尝试刷新数据列表后重试。如果问题持续，请重启后端服务。'}`);
      }
    }
 
