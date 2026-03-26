@@ -34,10 +34,11 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen bg-background overflow-hidden">
       {/* 侧边栏容器 - 包含侧边栏和控件 */}
       <div className="relative">
-        {/* 侧边栏 - 统一使用浅灰色背景 */}
+        {/* 侧边栏 - 统一使用浅灰色背景，匹配窗口高度 */}
         <aside
           style={{
             width: sidebarOpen ? '180px' : '42px',
+            height: '100vh',
             transition: 'width 0.35s cubic-bezier(0.25, 0.1, 0.25, 1)',
             backgroundColor: '#f3f4f6', // 浅灰色，与导航项背景一致
           }}
