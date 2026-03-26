@@ -151,5 +151,19 @@
         }
       ]
     }
+  },
+  "238c0bbe-1732-4228-a5b5-28a21c5acd5b": {
+    "id": "238c0bbe-1732-4228-a5b5-28a21c5acd5b",
+    "name": "位置.xlsx",
+    "type": "excel",
+    "fileType": "geo_data",
+    "geometryType": "point",
+    "sourceType": "excel",
+    "size": 129058,
+    "uploadDate": "2026-03-27T00:55:08.687195",
+    "status": "ready",
+    "metadata": {
+      "pointCount": 287
+    }
   }
 }
