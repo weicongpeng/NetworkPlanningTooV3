@@ -907,6 +907,30 @@ export function LayerControl({
         }
       `}</style>
 
+      {/* 悬停检测区域 - 面板隐藏时显示在左侧边缘 */}
+      <div
+        onMouseEnter={() => {
+          if (!isPinned && !isVisible) {
+            setIsVisible(true)
+          }
+        }}
+        onMouseLeave={() => {
+          if (!isPinned && isVisible) {
+            setIsVisible(false)
+          }
+        }}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '20px',
+          height: '100%',
+          zIndex: 997,
+          pointerEvents: isPinned || isVisible ? 'none' : 'auto',
+          backgroundColor: 'transparent',
+        }}
+      />
+
       {/* 图层控制面板容器 - 相对于父容器定位，高度匹配地图窗口 */}
       <div
         style={{
