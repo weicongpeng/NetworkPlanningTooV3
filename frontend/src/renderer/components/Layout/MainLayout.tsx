@@ -110,38 +110,49 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
               <p>v2.0.0</p>
             </div>
           </div>
-        </aside>
 
-        {/* 展开/隐藏控件 - 位于侧边栏右侧外侧，配色与侧边栏一致 */}
-        <button
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#e5e7eb' }}
-          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f3f4f6' }}
-          style={{
-            position: 'absolute',
-            top: '50%',
-            // 控件始终贴在侧边栏右侧边缘外侧
-            left: sidebarOpen ? '180px' : '42px',
-            transform: 'translateY(-50%)',
-            width: '16px',
-            height: '64px',
-            // 配色与侧边栏面板保持一致：浅灰色
-            backgroundColor: '#f3f4f6',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            // 与侧边栏同步的过渡动画
-            transition: 'left 0.35s cubic-bezier(0.25, 0.1, 0.25, 1), background-color 0.2s ease',
-            zIndex: 30,
-          }}
-          title={sidebarOpen ? t('common.collapseSidebar') : t('common.expandSidebar')}
-        >
-          {/* 箭头图标 */}
-          {sidebarOpen ? (
-            <ChevronLeft size={14} color="#6b7280" strokeWidth={2.5} />
-          ) : (
-            <ChevronRight size={14} color="#6b7280" strokeWidth={2.5} />
-          )}
-        </button>
+          {/* 展开/隐藏控件 - 位于侧边栏内部右下角 */}
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#d1d5db' }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#e5e7eb' }}
+            style={{
+              position: 'absolute',
+              bottom: '8px',
+              right: '4px',
+              width: sidebarOpen ? 'auto' : '34px',
+              minWidth: '34px',
+              height: '28px',
+              padding: '0 8px',
+              backgroundColor: '#e5e7eb',
+              borderRadius: '6px',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'background-color 0.2s ease, width 0.35s cubic-bezier(0.25, 0.1, 0.25, 1)',
+              zIndex: 30,
+            }}
+            title={sidebarOpen ? t('common.collapseSidebar') : t('common.expandSidebar')}
+          >
+            {/* >>> 样式箭头 */}
+            <span
+              style={{
+                fontSize: '12px',
+                fontWeight: 'bold',
+                color: '#6b7280',
+                letterSpacing: '-1px',
+                transition: 'transform 0.35s cubic-bezier(0.25, 0.1, 0.25, 1)',
+                transform: sidebarOpen ? 'rotate(0deg)' : 'rotate(180deg)',
+                display: 'flex',
+                gap: '2px',
+              }}
+            >
+              {'>>>'}
+            </span>
+          </button>
+        </aside>
       </div>
 
       {/* 主内容区域 */}
