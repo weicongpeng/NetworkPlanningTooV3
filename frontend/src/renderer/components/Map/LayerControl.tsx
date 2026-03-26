@@ -982,13 +982,11 @@ export function LayerControl({
               : 'right 0.35s cubic-bezier(0.25, 0.1, 0.25, 1)',
           }}
           onMouseEnter={() => {
-            // 当鼠标进入面板时，如果已固定则保持显示
-            if (isPinned) {
-              setIsVisible(true)
-            }
+            // 鼠标进入面板时，确保显示
+            setIsVisible(true)
           }}
           onMouseLeave={() => {
-            // 当鼠标离开面板时，如果未固定则隐藏
+            // 鼠标离开面板时，只有未固定才隐藏
             if (!isPinned) {
               setIsVisible(false)
             }
