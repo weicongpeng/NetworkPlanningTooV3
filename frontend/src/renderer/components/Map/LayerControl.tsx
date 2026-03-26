@@ -1006,13 +1006,15 @@ export function LayerControl({
         {/* 固定/解开控件 - 位于面板内部右上角 */}
         <button
           onClick={handleTogglePin}
+          onMouseEnter={() => setIsPinHovered(true)}
+          onMouseLeave={() => setIsPinHovered(false)}
           style={{
             position: 'absolute',
             top: '10px',
             right: '10px',
             zIndex: 1003,
             pointerEvents: 'auto',
-            backgroundColor: isPinned ? '#3b82f6' : 'transparent',
+            backgroundColor: isPinned ? '#3b82f6' : (isPinHovered ? 'rgba(59, 130, 246, 0.15)' : 'transparent'),
             cursor: 'pointer',
             padding: '6px',
             borderRadius: '6px',
