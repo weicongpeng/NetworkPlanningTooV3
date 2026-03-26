@@ -1073,30 +1073,6 @@ export function LayerControl({
         </div>
       </div>
 
-      {/* 右侧悬停检测区域 - 用于显示隐藏的面板 */}
-      <div
-        onMouseEnter={() => {
-          if (!isPinned && !isVisible) {
-            setIsVisible(true)
-          }
-        }}
-        onMouseLeave={() => {
-          if (!isPinned && isVisible) {
-            setIsVisible(false)
-          }
-        }}
-        style={{
-          position: 'fixed',
-          top: 0,
-          right: 0,
-          width: '20px',
-          height: '100vh',
-          zIndex: 999,
-          pointerEvents: isVisible || isPinned ? 'none' : 'auto',
-          backgroundColor: 'transparent',
-        }}
-      />
-
       {/* 右键菜单 - 放在面板外部以避免被裁剪或出现滚动条 */}
       {contextMenu && (
         <div
