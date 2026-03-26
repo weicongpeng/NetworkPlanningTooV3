@@ -937,6 +937,7 @@ export function LayerControl({
             opacity: isVisible || isPinned ? 0 : 1,
             transform: isVisible || isPinned ? 'scale(0.9)' : 'scale(1)',
             visibility: (isVisible || isPinned) ? 'hidden' : 'visible',
+            pointerEvents: (isVisible || isPinned) ? 'none' : 'auto',
           }}
           title={isPinned ? '取消固定' : '展开面板'}
         >
