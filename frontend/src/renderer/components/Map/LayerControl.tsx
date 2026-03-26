@@ -962,7 +962,8 @@ export function LayerControl({
           style={{
             position: 'absolute',
             top: '0px',
-            right: '0px',
+            // 使用 right 属性实现平滑过渡动画，与切换按钮同步
+            right: isVisible ? '0px' : `-${panelWidth}px`,
             zIndex: 1000,
             pointerEvents: 'auto',
             backgroundColor: 'rgba(255, 255, 255, 0.98)',
@@ -979,9 +980,9 @@ export function LayerControl({
             borderRight: 'none',
             borderTop: 'none',
             boxSizing: 'border-box',
-            // 使用 transform 来隐藏/显示面板，确保完全移出屏幕
-            transform: isVisible ? 'translateX(0)' : 'translateX(100%)',
-            transition: isResizing.current ? 'none' : 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            // 使用 right 来隐藏/显示面板，确保完全移出屏幕
+            // 过渡动画与切换按钮保持一致
+            transition: isResizing.current ? 'none' : 'right 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
           }}
         >
         {/* 拖动调整手柄 */}
