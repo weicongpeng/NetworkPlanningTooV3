@@ -915,11 +915,12 @@ export function LayerControl({
             position: 'absolute',
             top: '50%',
             // 关键修复：按钮始终紧贴在面板左侧边缘外侧
-            // 面板可见时：right = 面板宽度（按钮16px宽，紧贴面板左边缘）
+            // 面板可见时：right = 面板宽度 + 按钮宽度（按钮紧贴在面板左边缘外侧）
             // 面板隐藏时：right = 0（按钮在屏幕右边缘）
             // 使用 CSS 变量确保与面板宽度同步
             '--panel-width': `${panelWidth}px`,
-            right: isVisible ? `calc(var(--panel-width) + 0px)` : '0px',
+            '--button-width': '16px',
+            right: isVisible ? `calc(var(--panel-width) + var(--button-width))` : '0px',
             transform: 'translateY(-50%)',
             zIndex: 1002,
             pointerEvents: 'auto',
