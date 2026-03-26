@@ -937,7 +937,7 @@ export function LayerControl({
             // 与面板同步的过渡动画，确保跟随速度一致
             transition: isResizing.current
               ? 'none'
-              : 'right 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s ease, box-shadow 0.2s ease',
+              : 'right 0.35s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s ease, box-shadow 0.2s ease',
           }}
         >
           {isVisible ? (
