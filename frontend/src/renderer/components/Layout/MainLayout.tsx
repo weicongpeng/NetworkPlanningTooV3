@@ -91,10 +91,11 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                 <span
                   style={{
                     opacity: sidebarOpen ? 1 : 0,
-                    maxWidth: sidebarOpen ? '200px' : '0px',
+                    maxWidth: sidebarOpen ? '140px' : '0px',
                     transition: 'opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
+                    textOverflow: 'ellipsis',
                     display: 'block',
                   }}
                 >
