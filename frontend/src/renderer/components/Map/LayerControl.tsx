@@ -925,18 +925,20 @@ export function LayerControl({
         }
       `}</style>
 
-      {/* 右侧悬停检测区域 - 整个右侧边缘 */}
+      {/* 右侧悬停检测区域 - 使用 fixed 定位避免被父容器裁剪 */}
       <div
         onMouseEnter={handleMouseEnterRightEdge}
         onMouseLeave={handleMouseLeaveRightEdge}
         style={{
-          position: 'absolute',
+          position: 'fixed',
           top: 0,
           right: 0,
-          width: '12px',
+          width: '16px',
           height: '100vh',
-          zIndex: 998,
+          zIndex: 997,
           pointerEvents: isPinned ? 'none' : 'auto',
+          // 视觉上透明
+          backgroundColor: 'transparent',
         }}
       />
 
