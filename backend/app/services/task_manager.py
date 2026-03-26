@@ -579,6 +579,7 @@ class TaskManager:
         # 创建任务
         task = Task(TaskType.TAC, config)
         self.tasks[task.task_id] = task
+        self._persist_task(task.task_id)
 
         # 启动任务
         task.task = asyncio.create_task(self._run_tac_task(task))
