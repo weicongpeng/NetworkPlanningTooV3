@@ -1014,7 +1014,7 @@ export function LayerControl({
             right: '10px',
             zIndex: 1003,
             pointerEvents: 'auto',
-            backgroundColor: isPinned ? '#3b82f6' : (isPinHovered ? 'rgba(59, 130, 246, 0.15)' : 'transparent'),
+            backgroundColor: isPinned ? '#3b82f6' : (isPinHovered ? '#f3f4f6' : 'transparent'),
             cursor: 'pointer',
             padding: '6px',
             borderRadius: '6px',
