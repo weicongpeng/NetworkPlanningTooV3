@@ -236,9 +236,24 @@ class DataService:
             f"[DataService] 开始更新工参: Full={full_param_id}, Current={current_param_id}"
         )
 
-        # 1. 获取文件路径
-        if full_param_id not in self.index or current_param_id not in self.index:
-            raise ValueError("找不到指定的文件ID")
+        # 1. 获取文件路径 - 提供更详细的错误信息
+        missing_ids = []
+        if full_param_id not in self.index:
+            missing_ids.append(f"全量工参({full_param_id[:8]}...)")
+        if current_param_id not in self.index:
+            missing_ids.append(f"现网工参({current_param_id[:8]}...)")
+
+        if missing_ids:
+            safe_print(
+                f"[DataService] ❌ ID不在索引中! 当前索引共 {len(self.index)} 条"
+            )
+            safe_print(
+                f"[DataService] 请求: full={full_param_id}, current={current_param_id}"
+            )
+            safe_print(
+                f"[DataService] 索引中的全部ID: {list(self.index.keys())}"
+            )
+            raise ValueError(f"找不到指定的文件ID: {', '.join(missing_ids)}")
 
         full_info = self.index[full_param_id]
         current_info = self.index[current_param_id]
