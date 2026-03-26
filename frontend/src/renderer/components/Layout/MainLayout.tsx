@@ -53,14 +53,25 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                 <Link
                   key={item.name}
                   to={item.href}
-                  className={`${isActive
-                      ? 'bg-blue-400 text-white hover:bg-blue-500'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                    } flex items-center h-[42px] rounded-lg transition-colors`}
+                  className="flex items-center h-[42px] rounded-lg transition-colors"
                   style={{
                     paddingLeft: '6px',
                     paddingRight: '6px',
                     gap: '8px',
+                    backgroundColor: isActive ? '#60a5fa' : 'transparent',
+                    color: isActive ? '#ffffff' : '#6b7280',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.backgroundColor = '#e5e7eb'
+                      e.currentTarget.style.color = '#374151'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.backgroundColor = 'transparent'
+                      e.currentTarget.style.color = '#6b7280'
+                    }
                   }}
                 >
                   <div className="flex-shrink-0 w-6 flex justify-center">
