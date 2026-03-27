@@ -287,63 +287,73 @@ class GeoDataService:
         wkt_upper = wkt_str.upper()
 
         # 检查是否为 POLYGON 格式
-        if wkt_upper.startswith('POLYGON'):
-            try:
-                # 提取括号内的坐标部分
-                # POLYGON ((lng lat, lng lat, ...))
-                # 或 POLYGON ((lng lat, lng lat, ...), (lng lat, ...))
-                match = re.search(r'POLYGON\s*\(((.*))\)', wkt_str, re.IGNORECASE | re.DOTALL)
-                if not match:
-                    return False, "WKT格式无法解析", []
+        if not wkt_upper.startswith('POLYGON'):
+            return False, f"不支持的WKT类型: {wkt_str[:50]}...", []
 
-                coords_str = match.group(1).strip()
-                if not coords_str:
-                    return False, "WKT坐标为空", []
+        try:
+            # 找到第一个左括号和对应的右括号
+            # POLYGON ((lng lat, lng lat, ...))
+            start = wkt_str.find('(')
+            if start == -1:
+                return False, "WKT格式无法解析：未找到左括号", []
 
-                # 解析坐标对
-                # 支持多种格式：
-                # 1. (lng lat, lng lat, ...)
-                # 2. ((lng lat, ...), (lng lat, ...))
-                points: List[Tuple[float, float]] = []
+            # 找到对应的右括号（从内向外匹配）
+            paren_count = 0
+            end = start
+            for i in range(start, len(wkt_str)):
+                if wkt_str[i] == '(':
+                    paren_count += 1
+                elif wkt_str[i] == ')':
+                    paren_count -= 1
+                    if paren_count == 0:
+                        end = i
+                        break
 
-                # 检查是否有外环/内环 (MULTI-RING)
-                if coords_str.startswith('('):
-                    # 多环格式，需要找到第一层括号内的内容（外环）
-                    ring_match = re.match(r'\(\s*(.*?)\s*\)\s*$', coords_str, re.DOTALL)
-                    if ring_match:
-                        coords_str = ring_match.group(1)
+            coords_str = wkt_str[start + 1:end].strip()
+            if not coords_str:
+                return False, "WKT坐标为空", []
 
-                # 分割坐标对
-                # 坐标对之间用逗号分隔
-                coord_pairs = re.split(r',\s*(?![^()]*\))', coords_str)
+            # 检查是否有外环/内环 (MULTI-RING)
+            # 格式: ((lng lat, ...), (lng lat, ...))
+            outer_coords = coords_str
+            if coords_str.startswith('(') and coords_str.endswith(')'):
+                # 提取外环（第一个括号内的内容）
+                inner_start = coords_str.find('(')
+                inner_end = coords_str.rfind(')')
+                if inner_start != -1 and inner_end != -1:
+                    outer_coords = coords_str[inner_start + 1:inner_end].strip()
 
-                for pair_str in coord_pairs:
-                    pair_str = pair_str.strip()
-                    if not pair_str:
+            # 分割坐标对
+            # 坐标对之间用逗号分隔
+            points: List[Tuple[float, float]] = []
+
+            # 先尝试按逗号分割
+            coord_pairs = outer_coords.split(',')
+
+            for pair_str in coord_pairs:
+                pair_str = pair_str.strip()
+                if not pair_str:
+                    continue
+
+                # 解析坐标对 (lng lat)
+                # 支持多种分隔符：空格
+                coords = pair_str.split()
+
+                if len(coords) >= 2:
+                    try:
+                        lng = float(coords[0])
+                        lat = float(coords[1])
+                        points.append((lng, lat))
+                    except ValueError:
                         continue
 
-                    # 解析坐标对 (lng lat)
-                    # 支持多种分隔符：空格、逗号
-                    coords = re.split(r'[\s,]+', pair_str.strip())
-                    coords = [c for c in coords if c]  # 过滤空字符串
+            if len(points) < 3:
+                return False, f"WKT点数不足（需要至少3个点）: {len(points)}", []
 
-                    if len(coords) >= 2:
-                        try:
-                            lng = float(coords[0])
-                            lat = float(coords[1])
-                            points.append((lng, lat))
-                        except ValueError:
-                            continue
+            return True, "", points
 
-                if len(points) < 3:
-                    return False, f"WKT点数不足（需要至少3个点）: {len(points)}", []
-
-                return True, "", points
-
-            except Exception as e:
-                return False, f"WKT解析失败: {str(e)}", []
-        else:
-            return False, f"不支持的WKT类型: {wkt_str[:50]}...", []
+        except Exception as e:
+            return False, f"WKT解析失败: {str(e)}", []
 
     def _extract_polygon_data(
         self, df: pd.DataFrame, fields: Dict[str, Any]
