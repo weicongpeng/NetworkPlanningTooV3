@@ -84,7 +84,7 @@ export interface LayerFileOption {
   visible: boolean
   dataId: string
   sourceType?: 'mapinfo' | 'excel'
-  geometryType?: 'point' | 'sector'
+  geometryType?: 'point' | 'sector' | 'polygon'
 }
 
 /**
