@@ -77,8 +77,27 @@ class GeoDataService:
         else:
             print(f"[GeoDataService] 未检测到方位角列，文件将被识别为点状图层")
 
-        # 5. 提取并转换数据
-        geo_data = self._extract_data(df, fields)
+        # 5. 根据 geometry_type 选择提取方式
+        geometry_type = fields["geometry_type"]
+
+        # 如果是 WKT 多边形数据，先检查 WKT 字段
+        if geometry_type == "polygon":
+            wkt_col = fields.get("wkt")
+            if wkt_col:
+                # 验证WKT数据
+                wkt_count = df[wkt_col].notna().sum()
+                print(
+                    f"[GeoDataService] 检测到WKT列「{wkt_col}」，共 {wkt_count} 条多边形数据"
+                )
+            else:
+                print(f"[GeoDataService] 未检测到WKT列，降级为点状图层")
+                geometry_type = "point"
+
+        # 根据几何类型提取数据
+        if geometry_type == "polygon":
+            geo_data = self._extract_polygon_data(df, fields)
+        else:
+            geo_data = self._extract_data(df, fields)
 
         # 验证提取结果
         if len(geo_data) == 0:
@@ -91,7 +110,7 @@ class GeoDataService:
             )
 
         return {
-            "geometryType": fields["geometry_type"],
+            "geometryType": geometry_type,
             "fields": fields,
             "data": geo_data,
             "pointCount": len(geo_data),
