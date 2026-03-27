@@ -45,7 +45,7 @@ export interface GeoDataLayerOptions {
 
 // 默认样式：黑框白底
 const DEFAULT_POINT_STYLE = {
-  radius: 6,
+  radius: 10,  // 10米半径
   fillColor: '#ffffff',
   color: '#000000',
   weight: 2,
