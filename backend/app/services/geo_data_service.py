@@ -235,13 +235,11 @@ class GeoDataService:
                     point["name"] = f"点_{idx + 1}"
 
                 # 提取方位角（如果存在，作为快捷访问放在根部）
-                # 注意：输入数据中的方位角是弧度单位，需要转换为度数用于前端渲染
+                # 注意：输入数据中的方位角是角度单位（0-360度）
                 if azi_col and pd.notna(row[azi_col]):
                     try:
-                        azimuth_radians = float(row[azi_col])
-                        # 弧度转度数: degrees = radians * (180 / π)
-                        azimuth_degrees = azimuth_radians * (180 / math.pi)
-                        point["azimuth"] = azimuth_degrees % 360
+                        azimuth = float(row[azi_col])
+                        point["azimuth"] = azimuth % 360
                     except (ValueError, TypeError):
                         pass
 
