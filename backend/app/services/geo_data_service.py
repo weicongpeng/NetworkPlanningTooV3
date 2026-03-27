@@ -3,9 +3,10 @@
 支持 Excel、CSV、TXT 格式的地理化数据导入
 """
 
+import re
 import pandas as pd
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple, Optional
 import json
 
 from app.services.geo_field_detector import GeoFieldDetector
