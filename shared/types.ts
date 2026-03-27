@@ -34,7 +34,7 @@ export interface DataItem {
   metadata?: Record<string, any>
   originalPath?: string
   fileType?: 'full_params' | 'current_params' | 'target_cells' | 'tac_layer' | 'mapinfo_layer' | 'geo_data' | 'default'
-  geometryType?: 'point' | 'sector'
+  geometryType?: 'point' | 'sector' | 'polygon'
   sourceType?: 'excel' | 'mapinfo'
   subType?: string
 }
