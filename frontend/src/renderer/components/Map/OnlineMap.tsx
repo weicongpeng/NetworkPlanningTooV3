@@ -1619,9 +1619,11 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
           // 对于扇区和多边形类型的地理化数据，使用 GeoDataLayer
           if (geometryType === 'sector' || geometryType === 'polygon') {
             console.log('[OnlineMap] 使用 GeoDataLayer 渲染', geometryType, '数据')
+            console.log('[OnlineMap] layerFile:', JSON.stringify(layerFile, null, 2))
+            console.log('[OnlineMap] rawData 前3条:', JSON.stringify(rawData?.slice(0, 3), null, 2))
 
             // 准备 GeoDataLayer 数据
-            const geoDataItems: GeoDataItem[] = rawData.map((item: any) => {
+            const geoDataItems: GeoDataItem[] = rawData.map((item: any, idx: number) => {
               const geoItem: GeoDataItem = {
                 name: item.name,
                 properties: item,
@@ -1642,10 +1644,12 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
               if (geometryType === 'polygon') {
                 geoItem.wkt = item.wkt
                 geoItem.coordinates = item.coordinates
+                console.log(`[OnlineMap] 第${idx}条多边形数据: name=${item.name}, hasWKT=${!!item.wkt}, hasCoordinates=${!!item.coordinates}, coordsLength=${item.coordinates?.length}`)
               }
 
               return geoItem
             })
+            console.log('[OnlineMap] geoDataItems 数量:', geoDataItems.length)
 
             // 创建 GeoDataLayer
             if (!geoDataLayerManagerRef.current) {
