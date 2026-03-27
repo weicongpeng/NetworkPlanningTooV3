@@ -2049,6 +2049,11 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
         mapInfoLayerManagerRef.current.clear() // 清理所有图层
         mapInfoLayerManagerRef.current = null
       }
+      // 清理地理化数据图层
+      if (geoDataLayerManagerRef.current) {
+        geoDataLayerManagerRef.current.clear()
+        geoDataLayerManagerRef.current = null
+      }
       loadedMapInfoLayersRef.current.clear() // 清理已加载图层记录
       mapInfoLayerRefsRef.current.clear() // 清理图层引用映射
       lteSectorLayerRef.current = null
