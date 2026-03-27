@@ -617,6 +617,20 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
 
     setMapInfoLayerVisibility: (layerId: string, visible: boolean) => {
       console.log('[OnlineMap] setMapInfoLayerVisibility called:', { layerId, visible })
+
+      // 先检查是否是 GeoDataLayer（扇区或多边形类型）
+      if (geoDataLayerManagerRef.current) {
+        const geoLayer = geoDataLayerManagerRef.current.getLayer(layerId)
+        if (geoLayer) {
+          console.log('[OnlineMap] GeoDataLayer 可见性切换:', layerId, visible)
+          if (mapInstanceRef.current) {
+            geoLayer.setVisible(mapInstanceRef.current, visible)
+          }
+          return
+        }
+      }
+
+      // 处理 MapInfoLayer
       const layerRef = mapInfoLayerRefsRef.current.get(layerId)
       if (layerRef && mapInstanceRef.current) {
         if (visible) {
