@@ -244,15 +244,25 @@ export function MapPage() {
         (item.fileType === 'default' || item.fileType === 'geo_data' || !item.fileType)
       )
 
-      const excelPointFiles: LayerFileOption[] = excelItems.map(item => ({
-        id: item.id,
-        name: item.name,
-        type: item.geometryType === 'sector' ? 'sector' : 'point',
-        visible: false,
-        dataId: item.id,
-        sourceType: 'excel',
-        geometryType: item.geometryType
-      }))
+      const excelPointFiles: LayerFileOption[] = excelItems.map(item => {
+        // 根据 geometryType 确定图层类型
+        let type: 'point' | 'line' | 'polygon' | 'sector' = 'point'
+        if (item.geometryType === 'sector') {
+          type = 'sector'
+        } else if (item.geometryType === 'polygon') {
+          type = 'polygon'
+        }
+
+        return {
+          id: item.id,
+          name: item.name,
+          type: type,
+          visible: false,
+          dataId: item.id,
+          sourceType: 'excel',
+          geometryType: item.geometryType
+        }
+      })
       setPointFiles(excelPointFiles)
 
     } catch (error) {
