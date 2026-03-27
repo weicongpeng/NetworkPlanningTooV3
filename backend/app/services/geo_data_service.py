@@ -78,17 +78,19 @@ class GeoDataService:
             if not is_valid:
                 raise ValueError(f"❌ 文件「{filename}」坐标验证失败\n\n{error_msg}")
 
-        # 4. 如果有方位角，验证方位角
+        # 4. 如果有方位角且不是多边形数据，验证方位角
         azimuth_col = fields.get("azimuth")
-        if azimuth_col:
-            is_valid, error_msg = self.detector.validate_azimuth(df, azimuth_col)
-            if not is_valid:
-                raise ValueError(f"❌ 文件「{filename}」方位角验证失败\n\n{error_msg}")
-            print(
-                f"[GeoDataService] 检测到方位角列「{azimuth_col}」，文件将被识别为扇区图层"
-            )
-        else:
-            print(f"[GeoDataService] 未检测到方位角列，文件将被识别为点状图层")
+        geometry_type = fields["geometry_type"]
+        if geometry_type != "polygon":
+            if azimuth_col:
+                is_valid, error_msg = self.detector.validate_azimuth(df, azimuth_col)
+                if not is_valid:
+                    raise ValueError(f"❌ 文件「{filename}」方位角验证失败\n\n{error_msg}")
+                print(
+                    f"[GeoDataService] 检测到方位角列「{azimuth_col}」，文件将被识别为扇区图层"
+                )
+            else:
+                print(f"[GeoDataService] 未检测到方位角列，文件将被识别为点状图层")
 
         # 5. 根据 geometry_type 选择提取方式
         geometry_type = fields["geometry_type"]
