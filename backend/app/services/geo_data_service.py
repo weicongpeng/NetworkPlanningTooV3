@@ -45,8 +45,20 @@ class GeoDataService:
         # 2. 字段检测
         fields = self.detector.detect_fields(df)
 
-        # 检查必需字段
-        if not fields.get("longitude") or not fields.get("latitude"):
+        # 检查是否为多边形数据（WKT列包含所有坐标信息，不需要单独的经纬度列）
+        if fields.get("geometry_type") == "polygon" and fields.get("wkt"):
+            # 多边形数据：只需要WKT列，跳过经纬度检查
+            print(f"[GeoDataService] 检测到WKT列「{fields['wkt']}」，使用WKT格式解析坐标")
+            # 验证WKT数据
+            wkt_count = df[fields['wkt']].notna().sum()
+            if wkt_count == 0:
+                raise ValueError(
+                    f"❌ 文件「{filename}」WKT列为空\n\n"
+                    f"💡 请确保WKT列包含有效的POLYGON格式数据"
+                )
+            print(f"[GeoDataService] 检测到WKT列「{fields['wkt']}」，共 {wkt_count} 条多边形数据")
+        elif not fields.get("longitude") or not fields.get("latitude"):
+            # 点/扇区数据：必须要有经纬度列
             supported_fields = self.detector.get_supported_field_names()
             lon_fields = ", ".join(supported_fields["longitude"][:5])
             lat_fields = ", ".join(supported_fields["latitude"][:5])
@@ -58,13 +70,13 @@ class GeoDataService:
                 f"✅ 支持的纬度字段：{lat_fields} 等\n\n"
                 f"💡 提示：请确保表格包含经度和纬度列，字段名可以是中文或英文"
             )
-
-        # 3. 验证坐标
-        is_valid, error_msg = self.detector.validate_coordinates(
-            df, fields["longitude"], fields["latitude"]
-        )
-        if not is_valid:
-            raise ValueError(f"❌ 文件「{filename}」坐标验证失败\n\n{error_msg}")
+        else:
+            # 3. 验证坐标（仅对点/扇区数据）
+            is_valid, error_msg = self.detector.validate_coordinates(
+                df, fields["longitude"], fields["latitude"]
+            )
+            if not is_valid:
+                raise ValueError(f"❌ 文件「{filename}」坐标验证失败\n\n{error_msg}")
 
         # 4. 如果有方位角，验证方位角
         azimuth_col = fields.get("azimuth")

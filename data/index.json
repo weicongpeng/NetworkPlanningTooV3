@@ -151,5 +151,45 @@
     "metadata": {
       "pointCount": 13
     }
+  },
+  "02a041da-7ea0-466c-ba4a-007b6edf7071": {
+    "id": "02a041da-7ea0-466c-ba4a-007b6edf7071",
+    "name": "02a041da-7ea0-466c-ba4a-007b6edf7071.xlsx",
+    "type": "excel",
+    "fileType": "default",
+    "size": 12532,
+    "uploadDate": "2026-03-27T15:44:22.417735",
+    "status": "ready",
+    "metadata": {}
+  },
+  "0e8974e7-0e61-44f5-9414-5f25b5adce89": {
+    "id": "0e8974e7-0e61-44f5-9414-5f25b5adce89",
+    "name": "0e8974e7-0e61-44f5-9414-5f25b5adce89.xlsx",
+    "type": "excel",
+    "fileType": "default",
+    "size": 9610,
+    "uploadDate": "2026-03-27T15:44:22.439632",
+    "status": "ready",
+    "metadata": {}
+  },
+  "6e0956f5-c99d-4886-9d62-5c8c3529c91a": {
+    "id": "6e0956f5-c99d-4886-9d62-5c8c3529c91a",
+    "name": "6e0956f5-c99d-4886-9d62-5c8c3529c91a.xlsx",
+    "type": "excel",
+    "fileType": "default",
+    "size": 9610,
+    "uploadDate": "2026-03-27T15:44:22.467078",
+    "status": "ready",
+    "metadata": {}
+  },
+  "d46539fd-596d-46d9-917e-c6883a8fe162": {
+    "id": "d46539fd-596d-46d9-917e-c6883a8fe162",
+    "name": "d46539fd-596d-46d9-917e-c6883a8fe162.xlsx",
+    "type": "excel",
+    "fileType": "default",
+    "size": 12532,
+    "uploadDate": "2026-03-27T15:44:22.483722",
+    "status": "ready",
+    "metadata": {}
   }
 }
