@@ -246,3 +246,132 @@ class GeoDataService:
                 continue
 
         return result
+
+    def _parse_wkt(self, wkt_str: str) -> Tuple[bool, str, List[Tuple[float, float]]]:
+        """
+        解析WKT字符串为坐标点列表
+
+        Args:
+            wkt_str: WKT格式字符串，如 'POLYGON ((lng lat, lng lat, ...))'
+
+        Returns:
+            (是否成功, 错误信息, 坐标点列表 [(lng, lat), ...])
+        """
+        if not wkt_str or not isinstance(wkt_str, str):
+            return False, "WKT为空", []
+
+        wkt_str = wkt_str.strip()
+        wkt_upper = wkt_str.upper()
+
+        # 检查是否为 POLYGON 格式
+        if wkt_upper.startswith('POLYGON'):
+            try:
+                # 提取括号内的坐标部分
+                # POLYGON ((lng lat, lng lat, ...))
+                # 或 POLYGON ((lng lat, lng lat, ...), (lng lat, ...))
+                match = re.search(r'POLYGON\s*\(((.*))\)', wkt_str, re.IGNORECASE | re.DOTALL)
+                if not match:
+                    return False, "WKT格式无法解析", []
+
+                coords_str = match.group(1).strip()
+                if not coords_str:
+                    return False, "WKT坐标为空", []
+
+                # 解析坐标对
+                # 支持多种格式：
+                # 1. (lng lat, lng lat, ...)
+                # 2. ((lng lat, ...), (lng lat, ...))
+                points: List[Tuple[float, float]] = []
+
+                # 检查是否有外环/内环 (MULTI-RING)
+                if coords_str.startswith('('):
+                    # 多环格式，需要找到第一层括号内的内容（外环）
+                    ring_match = re.match(r'\(\s*(.*?)\s*\)\s*$', coords_str, re.DOTALL)
+                    if ring_match:
+                        coords_str = ring_match.group(1)
+
+                # 分割坐标对
+                # 坐标对之间用逗号分隔
+                coord_pairs = re.split(r',\s*(?![^()]*\))', coords_str)
+
+                for pair_str in coord_pairs:
+                    pair_str = pair_str.strip()
+                    if not pair_str:
+                        continue
+
+                    # 解析坐标对 (lng lat)
+                    # 支持多种分隔符：空格、逗号
+                    coords = re.split(r'[\s,]+', pair_str.strip())
+                    coords = [c for c in coords if c]  # 过滤空字符串
+
+                    if len(coords) >= 2:
+                        try:
+                            lng = float(coords[0])
+                            lat = float(coords[1])
+                            points.append((lng, lat))
+                        except ValueError:
+                            continue
+
+                if len(points) < 3:
+                    return False, f"WKT点数不足（需要至少3个点）: {len(points)}", []
+
+                return True, "", points
+
+            except Exception as e:
+                return False, f"WKT解析失败: {str(e)}", []
+        else:
+            return False, f"不支持的WKT类型: {wkt_str[:50]}...", []
+
+    def _extract_polygon_data(
+        self, df: pd.DataFrame, fields: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """
+        提取多边形数据
+
+        Returns:
+            [{
+                "name": "多边形名称",
+                "wkt": "POLYGON ((...))",
+                "coordinates": [[lng, lat], ...],
+                "properties": {...}
+            }]
+        """
+        result = []
+        wkt_col = fields.get("wkt")
+        name_col = fields.get("name")
+
+        for idx, row in df.iterrows():
+            try:
+                wkt_val = row[wkt_col] if wkt_col else None
+                if not wkt_val or pd.isna(wkt_val):
+                    continue
+
+                # 解析WKT
+                success, error_msg, coords = self._parse_wkt(str(wkt_val))
+                if not success:
+                    print(f"[GeoDataService] 第{idx+1}行WKT解析失败: {error_msg}")
+                    continue
+
+                # 提取名称
+                name = str(row[name_col]) if name_col and pd.notna(row[name_col]) else f"多边形_{idx+1}"
+
+                polygon = {
+                    "name": name,
+                    "wkt": str(wkt_val),
+                    "coordinates": coords,
+                    "properties": {}
+                }
+
+                # 提取所有原始字段到properties
+                for col in df.columns:
+                    val = row[col]
+                    if pd.notna(val):
+                        if col not in ["coordinates", "displayLng", "displayLat"]:
+                            polygon["properties"][col] = val
+
+                result.append(polygon)
+            except Exception as e:
+                print(f"[GeoDataService] 第{idx+1}行处理失败: {e}")
+                continue
+
+        return result
