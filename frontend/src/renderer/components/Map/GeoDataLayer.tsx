@@ -74,15 +74,29 @@ const LOD_THRESHOLD = 9
 
 /**
  * 创建扇区多边形坐标
+ * @param lat 纬度
+ * @param lng 经度
+ * @param azimuth 方位角（度数，以正北为0度，顺时针增加）
+ * @param beamwidth 扇形角度（度数）
+ * @param radiusMeters 扇形半径（米）
  */
 function createSectorPolygon(
   lat: number,
   lng: number,
   azimuth: number,
   beamwidth: number,
-  radius: number
+  radiusMeters: number
 ): L.LatLngExpression[] {
+  // 将米转换为经纬度距离
+  // 1度纬度 ≈ 111,320 米
+  // 1度经度 ≈ 111,320 * cos(纬度) 米
+  const latDeg = radiusMeters / 111320
+  const lngDeg = radiusMeters / (111320 * Math.cos(lat * Math.PI / 180))
+
+  // 扇形半角（度数转弧度）
   const beamRad = (beamwidth / 2) * (Math.PI / 180)
+  // 方位角是以正北为0度，顺时针增加
+  // 转换为数学角度（以东为0度，逆时针增加）
   const aziRad = (azimuth - 90) * (Math.PI / 180)
 
   // 计算扇形边界点
@@ -94,8 +108,8 @@ function createSectorPolygon(
 
   for (let i = 0; i <= numPoints; i++) {
     const angle = startAngle + (endAngle - startAngle) * (i / numPoints)
-    const x = lng + radius * Math.cos(angle)
-    const y = lat + radius * Math.sin(angle)
+    const x = lng + lngDeg * Math.cos(angle)
+    const y = lat + latDeg * Math.sin(angle)
     points.push([y, x])
   }
 
