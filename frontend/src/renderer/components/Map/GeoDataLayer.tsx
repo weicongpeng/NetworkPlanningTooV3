@@ -221,7 +221,6 @@ export class GeoDataLayer {
         : CoordinateTransformer.wgs84ToGcj02(item.latitude, item.longitude)
 
       const azimuth = item.azimuth || 0
-      const beamwidth = item.beamwidth || 65
       const coverType = item.cell_cover_type || 1
 
       // LOD: 室内小区 或 低缩放级别 → 圆点
