@@ -165,5 +165,35 @@
     "metadata": {
       "pointCount": 14
     }
+  },
+  "26551221-7d02-4403-8cd6-e6bf0e6bcce6": {
+    "id": "26551221-7d02-4403-8cd6-e6bf0e6bcce6",
+    "name": "26551221-7d02-4403-8cd6-e6bf0e6bcce6.xlsx",
+    "type": "excel",
+    "fileType": "default",
+    "size": 12532,
+    "uploadDate": "2026-03-27T15:27:06.456217",
+    "status": "ready",
+    "metadata": {}
+  },
+  "adf858f8-e002-4b5b-8ba7-cb9ec2156b3c": {
+    "id": "adf858f8-e002-4b5b-8ba7-cb9ec2156b3c",
+    "name": "adf858f8-e002-4b5b-8ba7-cb9ec2156b3c.xlsx",
+    "type": "excel",
+    "fileType": "default",
+    "size": 9579,
+    "uploadDate": "2026-03-27T15:27:06.471446",
+    "status": "ready",
+    "metadata": {}
+  },
+  "f2238bc1-47e6-438d-b8c1-7c18dd6420fe": {
+    "id": "f2238bc1-47e6-438d-b8c1-7c18dd6420fe",
+    "name": "f2238bc1-47e6-438d-b8c1-7c18dd6420fe.xlsx",
+    "type": "excel",
+    "fileType": "default",
+    "size": 12532,
+    "uploadDate": "2026-03-27T15:27:06.497159",
+    "status": "ready",
+    "metadata": {}
   }
 }
