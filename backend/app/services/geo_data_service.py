@@ -292,14 +292,18 @@ class GeoDataService:
         Returns:
             (是否成功, 错误信息, 坐标点列表 [(lng, lat), ...])
         """
+        print(f"[_parse_wkt] 开始解析 WKT: {wkt_str[:100]}...")
+
         if not wkt_str or not isinstance(wkt_str, str):
-            return False, "WKT为空", []
+            print(f"[_parse_wkt] WKT为空或非字符串")
+            return False, "WKT为空或非字符串", []
 
         wkt_str = wkt_str.strip()
         wkt_upper = wkt_str.upper()
 
         # 检查是否为 POLYGON 格式
         if not wkt_upper.startswith('POLYGON'):
+            print(f"[_parse_wkt] 不是 POLYGON 格式: {wkt_str[:50]}...")
             return False, f"不支持的WKT类型: {wkt_str[:50]}...", []
 
         try:
@@ -307,6 +311,7 @@ class GeoDataService:
             # POLYGON ((lng lat, lng lat, ...))
             start = wkt_str.find('(')
             if start == -1:
+                print(f"[_parse_wkt] 未找到左括号")
                 return False, "WKT格式无法解析：未找到左括号", []
 
             # 找到对应的右括号（从内向外匹配）
@@ -322,7 +327,10 @@ class GeoDataService:
                         break
 
             coords_str = wkt_str[start + 1:end].strip()
+            print(f"[_parse_wkt] 提取的坐标字符串: {coords_str}")
+
             if not coords_str:
+                print(f"[_parse_wkt] 坐标字符串为空")
                 return False, "WKT坐标为空", []
 
             # 检查是否有外环/内环 (MULTI-RING)
@@ -334,6 +342,7 @@ class GeoDataService:
                 inner_end = coords_str.rfind(')')
                 if inner_start != -1 and inner_end != -1:
                     outer_coords = coords_str[inner_start + 1:inner_end].strip()
+                    print(f"[_parse_wkt] 提取外环坐标: {outer_coords}")
 
             # 分割坐标对
             # 坐标对之间用逗号分隔
@@ -341,6 +350,7 @@ class GeoDataService:
 
             # 先尝试按逗号分割
             coord_pairs = outer_coords.split(',')
+            print(f"[_parse_wkt] 分割后的坐标对数量: {len(coord_pairs)}")
 
             for pair_str in coord_pairs:
                 pair_str = pair_str.strip()
@@ -350,21 +360,28 @@ class GeoDataService:
                 # 解析坐标对 (lng lat)
                 # 支持多种分隔符：空格
                 coords = pair_str.split()
+                print(f"[_parse_wkt] 解析坐标对: '{pair_str}' -> coords: {coords}")
 
                 if len(coords) >= 2:
                     try:
                         lng = float(coords[0])
                         lat = float(coords[1])
                         points.append((lng, lat))
-                    except ValueError:
+                        print(f"[_parse_wkt] 成功解析: ({lng}, {lat})")
+                    except ValueError as e:
+                        print(f"[_parse_wkt] 坐标解析失败: {e}")
                         continue
 
+            print(f"[_parse_wkt] 总共解析点数: {len(points)}")
             if len(points) < 3:
                 return False, f"WKT点数不足（需要至少3个点）: {len(points)}", []
 
+            print(f"[_parse_wkt] WKT解析成功，返回 {len(points)} 个点")
             return True, "", points
 
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             return False, f"WKT解析失败: {str(e)}", []
 
     def _extract_polygon_data(
