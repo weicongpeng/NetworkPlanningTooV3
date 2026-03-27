@@ -1971,6 +1971,13 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
           mapInfoLayerManagerRef.current = manager
         }
 
+        // 初始化地理化数据图层管理器
+        if (!geoDataLayerManagerRef.current) {
+          const geoManager = new GeoDataLayerManager()
+          geoManager.init(map)
+          geoDataLayerManagerRef.current = geoManager
+        }
+
         // 加载扇区数据
         await loadSectorData()
 
