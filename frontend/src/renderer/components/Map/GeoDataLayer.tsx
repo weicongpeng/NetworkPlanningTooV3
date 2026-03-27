@@ -259,37 +259,56 @@ export class GeoDataLayer {
    * 渲染多边形数据
    */
   private _renderPolygons(): void {
-    if (!this.leafletLayer) return
+    if (!this.leafletLayer) {
+      console.log('[GeoDataLayer] 渲染多边形: leafletLayer 未初始化')
+      return
+    }
 
+    console.log('[GeoDataLayer] 开始渲染多边形，数据量:', this.data.length)
+
+    let renderCount = 0
     for (let i = 0; i < this.data.length; i++) {
       const item = this.data[i]
-      if (!item.coordinates || item.coordinates.length < 3) continue
+      console.log(`[GeoDataLayer] 处理第${i}条数据: name=${item.name}, hasCoordinates=${!!item.coordinates}, coordsLength=${item.coordinates?.length}`)
 
-      // 转换坐标并构建多边形
-      const latLngs: L.LatLngExpression[] = item.coordinates.map(([lng, lat]) => {
-        const [gcjLat, gcjLng] = CoordinateTransformer.wgs84ToGcj02(lat, lng)
-        return [gcjLat, gcjLng] as L.LatLngExpression
-      })
-
-      // 确保多边形闭合
-      const first = latLngs[0]
-      const last = latLngs[latLngs.length - 1]
-      if (first[0] !== (last as number[])[0] || first[1] !== (last as number[])[1]) {
-        latLngs.push(first)
+      if (!item.coordinates || item.coordinates.length < 3) {
+        console.log(`[GeoDataLayer] 跳过第${i}条: coordinates为空或点数不足3`)
+        continue
       }
 
-      const polygon = L.polygon(latLngs, DEFAULT_POLYGON_STYLE)
-
-      if (this.onFeatureClick) {
-        polygon.on('click', (e) => {
-          L.DomEvent.stopPropagation(e as unknown as L.DomEvent.MouseEvent)
-          this.onFeatureClick!(item.properties, e as L.LeafletMouseEvent, item.name)
+      try {
+        // 转换坐标并构建多边形
+        const latLngs: L.LatLngExpression[] = item.coordinates.map(([lng, lat]) => {
+          const [gcjLat, gcjLng] = CoordinateTransformer.wgs84ToGcj02(lat, lng)
+          return [gcjLat, gcjLng] as L.LatLngExpression
         })
-      }
 
-      polygon.bindTooltip(item.name || `多边形${i+1}`, { permanent: false, direction: 'top' })
-      polygon.addTo(this.leafletLayer!)
+        console.log(`[GeoDataLayer] 第${i}条坐标转换后:`, latLngs.slice(0, 2))
+
+        // 确保多边形闭合
+        const first = latLngs[0]
+        const last = latLngs[latLngs.length - 1]
+        if (first[0] !== (last as number[])[0] || first[1] !== (last as number[])[1]) {
+          latLngs.push(first)
+        }
+
+        const polygon = L.polygon(latLngs, DEFAULT_POLYGON_STYLE)
+
+        if (this.onFeatureClick) {
+          polygon.on('click', (e) => {
+            L.DomEvent.stopPropagation(e as unknown as L.DomEvent.MouseEvent)
+            this.onFeatureClick!(item.properties, e as L.LeafletMouseEvent, item.name)
+          })
+        }
+
+        polygon.bindTooltip(item.name || `多边形${i+1}`, { permanent: false, direction: 'top' })
+        polygon.addTo(this.leafletLayer!)
+        renderCount++
+      } catch (error) {
+        console.error(`[GeoDataLayer] 第${i}条渲染失败:`, error)
+      }
     }
+    console.log(`[GeoDataLayer] 多边形渲染完成: ${renderCount}/${this.data.length} 条成功渲染`)
   }
 
   /**
