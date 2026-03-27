@@ -55,10 +55,11 @@ interface LayerVisibility {
 interface LayerFileOption {
   id: string
   name: string
-  type: 'point' | 'line' | 'polygon'
+  type: 'point' | 'line' | 'polygon' | 'sector'
   visible: boolean
   dataId: string
   sourceType?: 'mapinfo' | 'excel'
+  geometryType?: 'point' | 'sector' | 'polygon'
 }
 
 /**
