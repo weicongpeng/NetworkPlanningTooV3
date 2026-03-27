@@ -429,6 +429,9 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
   // MapInfo图层管理器引用
   const mapInfoLayerManagerRef = useRef<MapInfoLayerManager | null>(null)
 
+  // 地理化数据图层管理器引用
+  const geoDataLayerManagerRef = useRef<GeoDataLayerManager | null>(null)
+
   // 高亮配置Refs
   const pciHighlightConfigRef = useRef<PCIHighlightConfig | null>(null)
   const neighborHighlightConfigRef = useRef<NeighborHighlightConfig | null>(null)
