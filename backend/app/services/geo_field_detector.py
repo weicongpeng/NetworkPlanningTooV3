@@ -171,8 +171,13 @@ class GeoFieldDetector:
             if field_name not in detected:
                 detected[field_name] = None
 
-        # 根据是否有方位角确定几何类型
-        detected["geometry_type"] = "sector" if detected.get("azimuth") else "point"
+        # 确定几何类型优先级：polygon > sector > point
+        if detected.get("wkt"):
+            detected["geometry_type"] = "polygon"
+        elif detected.get("azimuth"):
+            detected["geometry_type"] = "sector"
+        else:
+            detected["geometry_type"] = "point"
 
         return detected
 
