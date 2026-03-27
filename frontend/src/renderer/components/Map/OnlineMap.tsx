@@ -2916,6 +2916,11 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
       mapInfoLayerRefsRef.current.forEach(({ mapInfoLayer }) => {
         mapInfoLayer.updateZoom(zoom)
       })
+
+      // 更新地理化数据图层（扇区/多边形）的缩放级别
+      if (geoDataLayerManagerRef.current) {
+        geoDataLayerManagerRef.current.updateZoom(zoom)
+      }
     }
 
     mapInstanceRef.current.on('zoomend', handleZoomEnd)
