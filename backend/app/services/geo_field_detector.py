@@ -123,19 +123,7 @@ class GeoFieldDetector:
             "siteid",
         ],
         "wkt": [
-            "wkt",
-            "WKT",
-            "geometry",
-            "geom",
-            "shape",
-            "shape_wkt",
-            "wkt_geometry",
-            "地理范围",
-            "多边形",
-            "polygon",
-            "POLYGON",
-            "边界",
-            "范围",
+            "WKT",  # 精确匹配
         ],
     }
 
