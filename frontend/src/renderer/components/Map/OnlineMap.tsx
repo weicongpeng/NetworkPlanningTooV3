@@ -1597,9 +1597,68 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
 
         if (rawData && rawData.length > 0) {
           // 存储原始数据用于标签渲染
+          pointFileDataRef.current.set(layerFile.id, rawData)
+
+          // 根据 geometryType 判断渲染方式
+          const geometryType = layerFile.geometryType || (layerFile.type === 'sector' ? 'sector' : 'point')
+
+          // 对于扇区和多边形类型的地理化数据，使用 GeoDataLayer
+          if (geometryType === 'sector' || geometryType === 'polygon') {
+            console.log('[OnlineMap] 使用 GeoDataLayer 渲染', geometryType, '数据')
+
+            // 准备 GeoDataLayer 数据
+            const geoDataItems: GeoDataItem[] = rawData.map((item: any) => {
+              const geoItem: GeoDataItem = {
+                name: item.name,
+                properties: item,
+                longitude: item.longitude,
+                latitude: item.latitude,
+                displayLng: item.displayLng,
+                displayLat: item.displayLat,
+              }
+
+              // 如果是扇区数据，添加扇区相关字段
+              if (geometryType === 'sector') {
+                geoItem.azimuth = item.azimuth
+                geoItem.beamwidth = item.beamwidth
+                geoItem.cell_cover_type = item.cell_cover_type
+              }
+
+              // 如果是多边形数据，添加多边形相关字段
+              if (geometryType === 'polygon') {
+                geoItem.wkt = item.wkt
+                geoItem.coordinates = item.coordinates
+              }
+
+              return geoItem
+            })
+
+            // 创建 GeoDataLayer
+            if (!geoDataLayerManagerRef.current) {
+              console.warn('[OnlineMap] GeoDataLayerManager 未初始化')
+              return
+            }
+
+            const geoLayer = geoDataLayerManagerRef.current.addLayer({
+              id: layerFile.id,
+              name: layerFile.name,
+              geometryType: geometryType,
+              data: geoDataItems,
+              visible: layerFile.visible,
+              zoom: mapInstanceRef.current?.getZoom() || 12,
+              onFeatureClick: (properties, event, name) => {
+                showFeatureInfo(properties, event, name || layerFile.name)
+              }
+            })
+
+            loadedMapInfoLayersRef.current.add(layerFile.id)
+            console.log('[OnlineMap] GeoDataLayer 创建完成:', layerFile.id, 'geometryType:', geometryType)
+            return
+          }
+
+          // 点状数据使用现有的 MapInfoLayer
           const pointData = rawData.filter((item: any) => item.longitude && item.latitude)
           console.log('[OnlineMap] 过滤后的点数据数量:', pointData.length)
-          pointFileDataRef.current.set(layerFile.id, pointData)
 
           // 转换Excel数据为GeoJSON
           // 注意：这里使用原始 WGS84 坐标，不进行前端转换
