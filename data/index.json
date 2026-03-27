@@ -98,34 +98,6 @@
       ]
     }
   },
-  "6a51a5a6-5c11-4d32-9a21-c315501d9dff": {
-    "id": "6a51a5a6-5c11-4d32-9a21-c315501d9dff",
-    "name": "扇区.xlsx",
-    "type": "excel",
-    "fileType": "geo_data",
-    "geometryType": "sector",
-    "sourceType": "excel",
-    "size": 3909,
-    "uploadDate": "2026-03-26T20:56:05.259215",
-    "status": "ready",
-    "metadata": {
-      "pointCount": 17
-    }
-  },
-  "1c75ee2a-ce62-47c7-9d65-28a71939d822": {
-    "id": "1c75ee2a-ce62-47c7-9d65-28a71939d822",
-    "name": "爱立信.xlsx",
-    "type": "excel",
-    "fileType": "geo_data",
-    "geometryType": "point",
-    "sourceType": "excel",
-    "size": 485019,
-    "uploadDate": "2026-03-26T20:56:09.669674",
-    "status": "ready",
-    "metadata": {
-      "pointCount": 2071
-    }
-  },
   "c904f1df-c9a3-4a23-b7dc-011cf569eb29": {
     "id": "c904f1df-c9a3-4a23-b7dc-011cf569eb29",
     "name": "gaotie_line.mif",
@@ -152,38 +124,46 @@
       ]
     }
   },
-  "238c0bbe-1732-4228-a5b5-28a21c5acd5b": {
-    "id": "238c0bbe-1732-4228-a5b5-28a21c5acd5b",
+  "9fcd9feb-f913-4f02-96e5-b7bad0e2dcda": {
+    "id": "9fcd9feb-f913-4f02-96e5-b7bad0e2dcda",
     "name": "位置.xlsx",
     "type": "excel",
     "fileType": "geo_data",
     "geometryType": "point",
     "sourceType": "excel",
     "size": 129058,
-    "uploadDate": "2026-03-27T00:55:08.687195",
+    "uploadDate": "2026-03-27T14:38:10.113698",
     "status": "ready",
     "metadata": {
       "pointCount": 287
     }
   },
-  "4f7fdef2-0e04-43ff-b068-4cbc4f1e3adf": {
-    "id": "4f7fdef2-0e04-43ff-b068-4cbc4f1e3adf",
-    "name": "4f7fdef2-0e04-43ff-b068-4cbc4f1e3adf.xlsx",
+  "c1b444e5-1148-49d6-a7a7-ea00dff0048e": {
+    "id": "c1b444e5-1148-49d6-a7a7-ea00dff0048e",
+    "name": "GeoDataTemplate-点.xlsx",
     "type": "excel",
-    "fileType": "default",
-    "size": 9681,
-    "uploadDate": "2026-03-27T14:25:28.686959",
+    "fileType": "geo_data",
+    "geometryType": "point",
+    "sourceType": "excel",
+    "size": 2655,
+    "uploadDate": "2026-03-27T14:55:40.316089",
     "status": "ready",
-    "metadata": {}
+    "metadata": {
+      "pointCount": 13
+    }
   },
-  "50f88eac-26e3-4ce0-9f77-8e3d771b3b55": {
-    "id": "50f88eac-26e3-4ce0-9f77-8e3d771b3b55",
-    "name": "50f88eac-26e3-4ce0-9f77-8e3d771b3b55.xlsx",
+  "2726c9aa-5d12-4f1d-bbd4-88dba79786e8": {
+    "id": "2726c9aa-5d12-4f1d-bbd4-88dba79786e8",
+    "name": "GeoDataTemplate - 扇形.xlsx",
     "type": "excel",
-    "fileType": "default",
-    "size": 10302,
-    "uploadDate": "2026-03-27T14:25:28.699235",
+    "fileType": "geo_data",
+    "geometryType": "sector",
+    "sourceType": "excel",
+    "size": 3321,
+    "uploadDate": "2026-03-27T14:55:50.819775",
     "status": "ready",
-    "metadata": {}
+    "metadata": {
+      "pointCount": 14
+    }
   }
 }
