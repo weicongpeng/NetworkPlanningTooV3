@@ -237,11 +237,11 @@ export class GeoDataLayer {
         marker.addTo(this.leafletLayer!)
       } else {
         // 室外小区且高缩放级别 → 扇形
-        // 半径根据缩放级别调整
-        const baseRadius = 50 // 米
-        const radius = baseRadius * Math.pow(2, Math.max(0, this.currentZoom - 12))
+        // 固定45度扇形，半径20米
+        const SECTOR_BEAMWIDTH = 45 // 固定45度扇形
+        const SECTOR_RADIUS = 20 // 米
 
-        const points = createSectorPolygon(displayLat, displayLng, azimuth, beamwidth, radius)
+        const points = createSectorPolygon(displayLat, displayLng, azimuth, SECTOR_BEAMWIDTH, SECTOR_RADIUS)
         const polygon = L.polygon(points, DEFAULT_SECTOR_STYLE)
 
         if (this.onFeatureClick) {
