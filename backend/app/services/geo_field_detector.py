@@ -121,6 +121,21 @@ class GeoFieldDetector:
             "cellid",
             "siteid",
         ],
+        "wkt": [
+            "wkt",
+            "WKT",
+            "geometry",
+            "geom",
+            "shape",
+            "shape_wkt",
+            "wkt_geometry",
+            "地理范围",
+            "多边形",
+            "polygon",
+            "POLYGON",
+            "边界",
+            "范围",
+        ],
     }
 
     def detect_fields(self, df: pd.DataFrame) -> Dict[str, Optional[str]]:
