@@ -398,21 +398,28 @@ class GeoDataService:
                 "properties": {...}
             }]
         """
+        print(f"[_extract_polygon_data] 开始提取，共 {len(df)} 行数据")
         result = []
         wkt_col = fields.get("wkt")
         name_col = fields.get("name")
+        print(f"[_extract_polygon_data] WKT列: {wkt_col}, 名称列: {name_col}")
 
         for idx, row in df.iterrows():
             try:
                 wkt_val = row[wkt_col] if wkt_col else None
                 if not wkt_val or pd.isna(wkt_val):
+                    print(f"[_extract_polygon_data] 第{idx+1}行: WKT值为空，跳过")
                     continue
+
+                print(f"[_extract_polygon_data] 第{idx+1}行 WKT: {str(wkt_val)[:80]}...")
 
                 # 解析WKT
                 success, error_msg, coords = self._parse_wkt(str(wkt_val))
                 if not success:
-                    print(f"[GeoDataService] 第{idx+1}行WKT解析失败: {error_msg}")
+                    print(f"[_extract_polygon_data] 第{idx+1}行WKT解析失败: {error_msg}")
                     continue
+
+                print(f"[_extract_polygon_data] 第{idx+1}行解析成功，坐标数: {len(coords)}")
 
                 # 提取名称
                 name = str(row[name_col]) if name_col and pd.notna(row[name_col]) else f"多边形_{idx+1}"
@@ -432,8 +439,10 @@ class GeoDataService:
                             polygon["properties"][col] = val
 
                 result.append(polygon)
+                print(f"[_extract_polygon_data] 已添加第{idx+1}个多边形，当前总数: {len(result)}")
             except Exception as e:
-                print(f"[GeoDataService] 第{idx+1}行处理失败: {e}")
+                print(f"[_extract_polygon_data] 第{idx+1}行处理失败: {e}")
                 continue
 
+        print(f"[_extract_polygon_data] 完成，共提取 {len(result)} 个多边形")
         return result
