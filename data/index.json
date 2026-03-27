@@ -138,62 +138,18 @@
       "pointCount": 287
     }
   },
-  "c1b444e5-1148-49d6-a7a7-ea00dff0048e": {
-    "id": "c1b444e5-1148-49d6-a7a7-ea00dff0048e",
+  "e8687e6c-7336-429d-b9bb-6851af80d7fe": {
+    "id": "e8687e6c-7336-429d-b9bb-6851af80d7fe",
     "name": "GeoDataTemplate-点.xlsx",
     "type": "excel",
     "fileType": "geo_data",
     "geometryType": "point",
     "sourceType": "excel",
     "size": 2655,
-    "uploadDate": "2026-03-27T14:55:40.316089",
+    "uploadDate": "2026-03-27T15:39:27.689076",
     "status": "ready",
     "metadata": {
       "pointCount": 13
     }
-  },
-  "2726c9aa-5d12-4f1d-bbd4-88dba79786e8": {
-    "id": "2726c9aa-5d12-4f1d-bbd4-88dba79786e8",
-    "name": "GeoDataTemplate - 扇形.xlsx",
-    "type": "excel",
-    "fileType": "geo_data",
-    "geometryType": "sector",
-    "sourceType": "excel",
-    "size": 3321,
-    "uploadDate": "2026-03-27T14:55:50.819775",
-    "status": "ready",
-    "metadata": {
-      "pointCount": 14
-    }
-  },
-  "26551221-7d02-4403-8cd6-e6bf0e6bcce6": {
-    "id": "26551221-7d02-4403-8cd6-e6bf0e6bcce6",
-    "name": "26551221-7d02-4403-8cd6-e6bf0e6bcce6.xlsx",
-    "type": "excel",
-    "fileType": "default",
-    "size": 12532,
-    "uploadDate": "2026-03-27T15:27:06.456217",
-    "status": "ready",
-    "metadata": {}
-  },
-  "adf858f8-e002-4b5b-8ba7-cb9ec2156b3c": {
-    "id": "adf858f8-e002-4b5b-8ba7-cb9ec2156b3c",
-    "name": "adf858f8-e002-4b5b-8ba7-cb9ec2156b3c.xlsx",
-    "type": "excel",
-    "fileType": "default",
-    "size": 9579,
-    "uploadDate": "2026-03-27T15:27:06.471446",
-    "status": "ready",
-    "metadata": {}
-  },
-  "f2238bc1-47e6-438d-b8c1-7c18dd6420fe": {
-    "id": "f2238bc1-47e6-438d-b8c1-7c18dd6420fe",
-    "name": "f2238bc1-47e6-438d-b8c1-7c18dd6420fe.xlsx",
-    "type": "excel",
-    "fileType": "default",
-    "size": 12532,
-    "uploadDate": "2026-03-27T15:27:06.497159",
-    "status": "ready",
-    "metadata": {}
   }
 }

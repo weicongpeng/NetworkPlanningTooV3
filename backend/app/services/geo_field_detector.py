@@ -231,7 +231,7 @@ class GeoFieldDetector:
 
     def validate_azimuth(self, df: pd.DataFrame, azi_col: str) -> Tuple[bool, str]:
         """
-        验证方位角数据的有效性
+        验证方位角数据的有效性（角度单位，0-360度）
 
         Args:
             df: 数据框
@@ -242,14 +242,14 @@ class GeoFieldDetector:
         """
         azi_values = pd.to_numeric(df[azi_col], errors="coerce")
 
-        # 方位角范围：0 到 2π（弧度）
-        valid_mask = azi_values.between(0, 2 * math.pi) & azi_values.notna()
+        # 方位角范围：0 到 360（角度）
+        valid_mask = azi_values.between(0, 360) & azi_values.notna()
         valid_count = valid_mask.sum()
 
         if valid_count == 0:
             return (
                 False,
-                f"没有有效的方位角数据。请检查列「{azi_col}」中的值是否在 0 到 2π（弧度）范围内",
+                f"没有有效的方位角数据。请检查列「{azi_col}」中的值是否在 0 到 360（角度）范围内",
             )
 
         if valid_count < len(df) * 0.5:
