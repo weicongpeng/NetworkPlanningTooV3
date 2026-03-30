@@ -201,6 +201,18 @@ export class GeoDataLayer {
     map.on('zoom', this._onZoomBound)
     map.on('zoomend', this._onZoomEndBound)
 
+    // 🔧 修复：添加到地图时，清理可能存在的旧定时器
+    // 防止之前的 _reRenderGeometries 定时器在新图层创建后触发并清空它
+    if (this._geometryRenderTimer !== null) {
+      clearTimeout(this._geometryRenderTimer)
+      this._geometryRenderTimer = null
+      console.log('[GeoDataLayer] addTo: 已清理旧的 _geometryRenderTimer')
+    }
+    if (this._zoomAnimFrameId !== null) {
+      cancelAnimationFrame(this._zoomAnimFrameId)
+      this._zoomAnimFrameId = null
+    }
+
     // 🔧 修复：安全地检查图层是否在地图上
     const leafletLayerOnMap = this.leafletLayer && map.hasLayer(this.leafletLayer)
     console.log('[GeoDataLayer] leafletLayerOnMap:', leafletLayerOnMap, 'leafletLayer 存在:', !!this.leafletLayer)
