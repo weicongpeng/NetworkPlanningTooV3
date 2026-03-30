@@ -1432,7 +1432,7 @@ export function PCIPage() {
                           {PCI_COLUMNS.map((column) => (
                             <th
                               key={column.key}
-                              className="p-2 bg-muted z-20 relative group"
+                              className="p-2 bg-muted z-20 relative group border-r border-border"
                               style={{ width: `${pciColumnWidths[column.key]}px`, minWidth: `${pciColumnWidths[column.key]}px` }}
                             >
                               <span className="block pr-3">{column.label}</span>
@@ -1525,7 +1525,7 @@ export function PCIPage() {
                                 return (
                                   <td
                                     key={column.key}
-                                    className={`p-2 ${isTruncated ? 'truncate' : ''} ${column.key === 'newPCI' ? 'font-semibold' : ''}`}
+                                    className={`p-2 border-r border-border ${isTruncated ? 'truncate' : ''} ${column.key === 'newPCI' ? 'font-semibold' : ''}`}
                                     style={{
                                       width: `${width}px`,
                                       minWidth: `${width}px`,

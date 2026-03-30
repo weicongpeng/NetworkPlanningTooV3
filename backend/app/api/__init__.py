@@ -31,6 +31,21 @@ async def lifespan(app: FastAPI):
     settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
     settings.TEMPLATE_DIR.mkdir(parents=True, exist_ok=True)
 
+    # 🔥 启动时自动清理无效数据索引
+    # 清理文件已删除但索引中仍存在的无效项
+    try:
+        from app.services.data_service import data_service
+        cleanup_result = data_service.cleanup_index()
+        removed_count = cleanup_result.get('removed', 0)
+        if removed_count > 0:
+            logger.info(f"✅ 已清理 {removed_count} 个无效数据索引项")
+            for item in cleanup_result.get('items', []):
+                logger.info(f"   - {item.get('name', '未知')} ({item.get('id', '')}): {item.get('reason', '')}")
+        else:
+            logger.info("✅ 数据索引检查完成，无无效项")
+    except Exception as e:
+        logger.error(f"❌ 清理无效数据索引失败: {e}")
+
     logger.info("应用启动完成")
     yield
 

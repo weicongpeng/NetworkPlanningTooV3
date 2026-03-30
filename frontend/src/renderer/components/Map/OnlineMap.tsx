@@ -22,8 +22,10 @@ import { CoordinateTransformer } from '../../utils/coordinate'
 import { SectorInfoPanel, useSectorInfoPanel } from './SectorInfoPanel'
 import { FeatureInfoPanel, useFeatureInfoPanel } from './FeatureInfoPanel'
 import { MapInfoLayerManager, MapInfoLayer, MapInfoLayerOptions, LayerGeometryType } from './MapInfoLayer'
-import { GeoDataLayerManager, GeoDataLayer, GeoDataItem } from './GeoDataLayer'
+import { GeoDataLayerManager, GeoDataItem } from './GeoDataLayer'
 import { layerApi, dataApi } from '../../services/api'
+
+console.log('🔥🔥🔥 OnlineMap.tsx 已加载 (2025-01-27-v3) 🔥🔥🔥')
 import { mapStateService } from '../../services/mapStateService'
 import { SectorSVGLayer, PCIHighlightConfig, TACHighlightConfig, NeighborHighlightConfig, SectorLabelConfig } from './SectorRendererSVG'
 import { pciDataSyncService } from '../../services/pciDataSyncService'
@@ -136,7 +138,7 @@ interface LocationMarker {
  */
 export interface OnlineMapRef {
   /** 飞到指定位置 */
-  flyTo: (latLng: [number, number], zoom?: number) => void
+  flyTo: (latLng: [number, number], zoom?: number, duration?: number) => void
   /** 调整地图视野以包含指定的所有坐标点 */
   fitBounds: (latLngs: Array<[number, number]>, padding?: [number, number]) => void
   /** 设置搜索标记 */
@@ -539,10 +541,14 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
    * 暴露方法给父组件
    */
   useImperativeHandle(ref, () => ({
-    flyTo: (latLng: [number, number], zoom = 14) => {
+    flyTo: (latLng: [number, number], zoom = 14, duration = 1.5) => {
       if (mapInstanceRef.current) {
         isUserInteractingRef.current = true
-        mapInstanceRef.current.flyTo(latLng, zoom, { duration: 1.5 })
+        if (duration === 0) {
+          mapInstanceRef.current.setView(latLng, zoom)
+        } else {
+          mapInstanceRef.current.flyTo(latLng, zoom, { duration })
+        }
       }
     },
 
@@ -609,10 +615,25 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
     setPointFileLabelVisibility: (fileId: string, visible: boolean) => {
       console.log('[OnlineMap] setPointFileLabelVisibility called:', fileId, visible)
       setPointFileLabelVisibilityState(prev => ({ ...prev, [fileId]: visible }))
+
+      // 1. 优先处理 MapInfoLayer（MapInfo 文件）
       const layerRef = mapInfoLayerRefsRef.current.get(fileId)
       if (layerRef) {
         layerRef.mapInfoLayer.setLabelVisibility(visible)
+        return
       }
+
+      // 2. 处理 GeoDataLayer（地理化数据：点状、扇区或多边形）
+      if (geoDataLayerManagerRef.current) {
+        const geoLayer = geoDataLayerManagerRef.current.getLayer(fileId)
+        if (geoLayer) {
+          console.log('[OnlineMap] GeoDataLayer 标签可见性切换:', fileId, visible)
+          geoLayer.setLabelVisibility(visible)
+          return
+        }
+      }
+
+      console.log('[OnlineMap] setPointFileLabelVisibility: 未找到图层:', fileId)
     },
 
     setMapInfoLayerVisibility: (layerId: string, visible: boolean) => {
@@ -655,13 +676,32 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
     setLayerFileLabelVisibility: (fileId: string, visible: boolean, settings: any) => {
       console.log('[OnlineMap] setLayerFileLabelVisibility:', fileId, visible, settings)
       setPointFileLabelVisibilityState(prev => ({ ...prev, [fileId]: visible }))
+
+      // 1. 优先处理 MapInfoLayer（MapInfo 文件）
       const layerRef = mapInfoLayerRefsRef.current.get(fileId)
       if (layerRef) {
         layerRef.mapInfoLayer.setLabelVisibility(visible)
         if (settings) {
           layerRef.mapInfoLayer.setLabelConfig(settings)
         }
+        return
       }
+
+      // 2. 处理 GeoDataLayer（地理化数据：点状、扇区或多边形）
+      if (geoDataLayerManagerRef.current) {
+        const geoLayer = geoDataLayerManagerRef.current.getLayer(fileId)
+        if (geoLayer) {
+          console.log('[OnlineMap] GeoDataLayer 标签可见性切换:', fileId, visible)
+          geoLayer.setLabelVisibility(visible)
+          if (settings) {
+            console.log('[OnlineMap] GeoDataLayer 应用标签配置:', settings)
+            geoLayer.setLabelConfig(settings)
+          }
+          return
+        }
+      }
+
+      console.log('[OnlineMap] ⚠️ 未找到图层:', fileId)
     },
 
     toggleMapType: () => {
@@ -1034,10 +1074,26 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
 
     setLayerFileLabelSettings: (fileId: string, settings: any) => {
       console.log('[OnlineMap] setLayerFileLabelSettings:', fileId, settings)
+
+      // 1. 优先处理 MapInfoLayer（MapInfo 文件）
       const layerRef = mapInfoLayerRefsRef.current.get(fileId)
       if (layerRef && layerRef.mapInfoLayer) {
+        console.log('[OnlineMap] 设置 MapInfoLayer 标签配置')
         layerRef.mapInfoLayer.setLabelConfig(settings)
+        return
       }
+
+      // 2. 处理 GeoDataLayer（地理化数据：点状、扇区或多边形）
+      if (geoDataLayerManagerRef.current) {
+        const geoLayer = geoDataLayerManagerRef.current.getLayer(fileId)
+        if (geoLayer) {
+          console.log('[OnlineMap] 设置 GeoDataLayer 标签配置')
+          geoLayer.setLabelConfig(settings)
+          return
+        }
+      }
+
+      console.log('[OnlineMap] setLayerFileLabelSettings: 未找到图层:', fileId)
     },
 
     setMeasureMode: (enabled: boolean) => {
@@ -1149,6 +1205,7 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
     if (selectionModeRef.current !== 'none') return
 
     hideSectorInfo()
+    hideFeatureInfo()
     setOverlappingSectors([])
     setOverlapPosition(null)
 
@@ -1224,7 +1281,7 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
         measurementLinesRef.current.push(polyline)
       }
     }
-  }, [measureMode, measurePoints, hideSectorInfo])
+  }, [measureMode, measurePoints, hideSectorInfo, hideFeatureInfo])
 
   /**
    * 处理地图右键事件，用于结束测量或释放测距模式
@@ -1569,9 +1626,19 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
 
     console.log('[OnlineMap] loadMapInfoLayer 开始加载:', layerFile.id, layerFile.name, 'sourceType:', layerFile.sourceType, 'visible:', layerFile.visible)
 
-    // 如果已经加载过，跳过
+    // 对于 GeoDataLayer（点、扇区或多边形），检查是否已存在，如果存在则直接更新可见性
+    if ((layerFile.geometryType === 'point' || layerFile.geometryType === 'sector' || layerFile.geometryType === 'polygon') && geoDataLayerManagerRef.current) {
+      const existingLayer = geoDataLayerManagerRef.current.getLayer(layerFile.id)
+      if (existingLayer) {
+        console.log('[OnlineMap] GeoDataLayer 已存在，直接更新可见性:', layerFile.visible)
+        existingLayer.setVisible(mapInstanceRef.current, layerFile.visible)
+        return
+      }
+    }
+
+    // 对于 MapInfoLayer，如果已经加载过，跳过
     if (loadedMapInfoLayersRef.current.has(layerFile.id)) {
-      console.log('[OnlineMap] 图层已加载，跳过:', layerFile.id)
+      console.log('[OnlineMap] MapInfoLayer 图层已加载，跳过:', layerFile.id)
       return
     }
 
@@ -1585,10 +1652,27 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
         console.log('[OnlineMap] response.data type:', Array.isArray(response.data) ? 'array' : typeof response.data)
         console.log('[OnlineMap] response.data keys:', response.data ? Object.keys(response.data) : 'no data')
 
+        // 详细调试 API 响应结构
+        console.log('[OnlineMap] ===== API 响应详情 =====')
+        console.log('[OnlineMap] response.success:', response.success)
+        console.log('[OnlineMap] response.data 存在:', !!response.data)
+        console.log('[OnlineMap] response.data 类型:', Array.isArray(response.data) ? 'array' : typeof response.data)
+        console.log('[OnlineMap] response.data.data 存在:', !!response.data?.data)
+        console.log('[OnlineMap] response.data.data 类型:', Array.isArray(response.data?.data) ? 'array' : typeof response.data?.data)
+
+        // 检查 rawData 中是否有 coordinates 字段
+        if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+          console.log('[OnlineMap] 第一条数据示例:', JSON.stringify(response.data[0], null, 2))
+          console.log('[OnlineMap] 第一条数据是否有 coordinates:', 'coordinates' in response.data[0])
+          console.log('[OnlineMap] 第一条数据.coordinates:', response.data[0].coordinates)
+        }
+        console.log('[OnlineMap] ==========================')
+
         // 后端返回的数据格式：
         // 1. default.json -> 直接返回数组
         // 2. data.json -> 直接返回数组
         // 3. LTE.json/NR.json -> 返回 {lte: [...]} 或 {nr: [...]}
+        // 4. API 包装格式 -> {success: true, data: [...]}
         // 前端需要正确处理这些格式
         let rawData = null
         if (Array.isArray(response.data)) {
@@ -1596,8 +1680,12 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
           rawData = response.data
           console.log('[OnlineMap] 数据是数组格式，长度:', rawData.length)
         } else if (response.data && typeof response.data === 'object') {
-          // 可能是 {lte: [...]} 或 {nr: [...]} 或 {default: [...]} 格式
-          if (response.data.default) {
+          // 可能是 {success: true, data: [...]} 或 {lte: [...]} 或 {nr: [...]} 或 {default: [...]} 格式
+          if (response.data.data && Array.isArray(response.data.data)) {
+            // API 包装格式：{success: true, data: [...]}
+            rawData = response.data.data
+            console.log('[OnlineMap] 从 data.data 获取数据（API包装格式），长度:', rawData.length)
+          } else if (response.data.default) {
             rawData = response.data.default
             console.log('[OnlineMap] 从 data.default 获取数据，长度:', rawData.length)
           } else if (response.data.lte) {
@@ -1614,10 +1702,37 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
           pointFileDataRef.current.set(layerFile.id, rawData)
 
           // 根据 geometryType 判断渲染方式
-          const geometryType = layerFile.geometryType || (layerFile.type === 'sector' ? 'sector' : 'point')
+          // 优先使用 layerFile.geometryType，如果未定义则根据 layerFile.type 判断
+          let geometryType: 'point' | 'sector' | 'polygon' = 'point'
 
-          // 对于扇区和多边形类型的地理化数据，使用 GeoDataLayer
-          if (geometryType === 'sector' || geometryType === 'polygon') {
+          // 调试：显示原始值
+          console.log('[OnlineMap] 📌 DEBUG: geometryType 计算开始')
+          console.log('[OnlineMap] 📌 layerFile.geometryType 原始值:', layerFile.geometryType, '类型:', typeof layerFile.geometryType)
+          console.log('[OnlineMap] 📌 layerFile.type 原始值:', layerFile.type, '类型:', typeof layerFile.type)
+
+          if (layerFile.geometryType) {
+            geometryType = layerFile.geometryType as any
+            console.log('[OnlineMap] ✅ 使用 layerFile.geometryType:', geometryType)
+          } else if (layerFile.type === 'sector') {
+            geometryType = 'sector'
+            console.log('[OnlineMap] ✅ 使用 layerFile.type === sector')
+          } else if (layerFile.type === 'polygon') {
+            geometryType = 'polygon'
+            console.log('[OnlineMap] ✅ 使用 layerFile.type === polygon')
+          } else {
+            console.log('[OnlineMap] ⚠️ 使用默认值 point')
+          }
+
+          // 调试 geometryType 判断
+          console.log('[OnlineMap] ===== geometryType 判断 =====')
+          console.log('[OnlineMap] layerFile.geometryType:', layerFile.geometryType)
+          console.log('[OnlineMap] layerFile.type:', layerFile.type)
+          console.log('[OnlineMap] 🎯 最终计算后的 geometryType:', geometryType)
+          console.log('[OnlineMap] 是否匹配 point、sector 或 polygon:', geometryType === 'point' || geometryType === 'sector' || geometryType === 'polygon')
+          console.log('[OnlineMap] ======================================')
+
+          // 对于点状、扇区和多边形类型的地理化数据，使用 GeoDataLayer
+          if (geometryType === 'point' || geometryType === 'sector' || geometryType === 'polygon') {
             console.log('[OnlineMap] 使用 GeoDataLayer 渲染', geometryType, '数据')
             console.log('[OnlineMap] layerFile:', JSON.stringify(layerFile, null, 2))
             console.log('[OnlineMap] rawData 前3条:', JSON.stringify(rawData?.slice(0, 3), null, 2))
@@ -1627,10 +1742,14 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
               const geoItem: GeoDataItem = {
                 name: item.name,
                 properties: item,
-                longitude: item.longitude,
-                latitude: item.latitude,
-                displayLng: item.displayLng,
-                displayLat: item.displayLat,
+              }
+
+              // 如果是点状或扇区数据，添加经纬度字段
+              if (geometryType === 'point' || geometryType === 'sector') {
+                geoItem.longitude = item.longitude
+                geoItem.latitude = item.latitude
+                geoItem.displayLng = item.displayLng
+                geoItem.displayLat = item.displayLat
               }
 
               // 如果是扇区数据，添加扇区相关字段
@@ -1642,14 +1761,22 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
 
               // 如果是多边形数据，添加多边形相关字段
               if (geometryType === 'polygon') {
-                geoItem.wkt = item.wkt
-                geoItem.coordinates = item.coordinates
-                console.log(`[OnlineMap] 第${idx}条多边形数据: name=${item.name}, hasWKT=${!!item.wkt}, hasCoordinates=${!!item.coordinates}, coordsLength=${item.coordinates?.length}`)
+                geoItem.path = item.path
+                console.log(`[OnlineMap] 📐 第${idx}条多边形数据:`, {
+                  name: item.name,
+                  hasPath: !!item.path,
+                  pathLength: item.path?.length,
+                  path: item.path
+                })
               }
 
               return geoItem
             })
+            console.log('[OnlineMap] ========== 多边形数据准备完成 ==========')
             console.log('[OnlineMap] geoDataItems 数量:', geoDataItems.length)
+            console.log('[OnlineMap] geoDataItems 前3条详情:', JSON.stringify(geoDataItems.slice(0, 3), null, 2))
+            console.log('[OnlineMap] layerFile.visible:', layerFile.visible)
+            console.log('[OnlineMap] ========================================')
 
             // 创建 GeoDataLayer
             if (!geoDataLayerManagerRef.current) {
@@ -1657,21 +1784,43 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
               return
             }
 
-            const geoLayer = geoDataLayerManagerRef.current.addLayer({
+            console.log('[OnlineMap] 🚀 准备调用 addLayer，参数:', {
               id: layerFile.id,
               name: layerFile.name,
               geometryType: geometryType,
-              data: geoDataItems,
-              visible: layerFile.visible,
-              zoom: mapInstanceRef.current?.getZoom() || 12,
-              onFeatureClick: (properties, event, name) => {
-                showFeatureInfo(properties, event, name || layerFile.name)
-              }
+              dataLength: geoDataItems.length,
+              visible: layerFile.visible
             })
 
-            loadedMapInfoLayersRef.current.add(layerFile.id)
-            console.log('[OnlineMap] GeoDataLayer 创建完成:', layerFile.id, 'geometryType:', geometryType)
-            return
+            try {
+              const geoLayer = geoDataLayerManagerRef.current.addLayer({
+                id: layerFile.id,
+                name: layerFile.name,
+                geometryType: geometryType,
+                data: geoDataItems,
+                visible: layerFile.visible,
+                zoom: mapInstanceRef.current?.getZoom() || 12,
+                onFeatureClick: (properties, event, name) => {
+                  showFeatureInfo(properties, event, name || layerFile.name)
+                }
+              })
+
+              console.log('[OnlineMap] ✅ addLayer 返回成功:', geoLayer)
+              loadedMapInfoLayersRef.current.add(layerFile.id)
+
+              // 同步标签可见性状态
+              const labelVisible = pointFileLabelVisibility[layerFile.id] || false
+              console.log('[OnlineMap] 同步 GeoDataLayer 标签可见性:', layerFile.id, labelVisible)
+              geoLayer.setLabelVisibility(labelVisible)
+
+              console.log('[OnlineMap] ✅ GeoDataLayer 创建完成:', layerFile.id, 'geometryType:', geometryType)
+              return
+            } catch (error) {
+              console.error('[OnlineMap] ❌ addLayer 调用失败:', error)
+              console.error('[OnlineMap] 错误堆栈:', error instanceof Error ? error.stack : 'No stack')
+              console.error('[OnlineMap] geoDataItems[0]:', geoDataItems[0])
+              return
+            }
           }
 
           // 点状数据使用现有的 MapInfoLayer
@@ -1980,7 +2129,8 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
         const tileLayer = L.tileLayer(getAMapTileUrl(savedState.mapLayerType), {
           attribution: '&copy; <a href="https://www.amap.com/">高德地图</a>',
           maxZoom: 18,
-          minZoom: 3
+          minZoom: 3,
+          preferCanvas: true  // 🔥 使用 Canvas 渲染器而非 DOM/SVG，提升瓦片渲染性能
         }).addTo(map)
 
         // 监听浏览器网络状态变化（仅依赖系统级事件）
@@ -2878,7 +3028,8 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
     const newTileLayer = L.tileLayer(getAMapTileUrl(mapLayerType), {
       attribution: '&copy; <a href="https://www.amap.com/">高德地图</a>',
       maxZoom: 18,
-      minZoom: 3
+      minZoom: 3,
+      preferCanvas: true  // 🔥 使用 Canvas 渲染器而非 DOM/SVG，提升瓦片渲染性能
     }).addTo(map)
 
     // 监听所有瓦片加载完成事件（用于检测网络恢复）
@@ -2937,6 +3088,30 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
   }, [])
 
   /**
+   * 监听地图移动，更新地理化数据图层标签
+   */
+  useEffect(() => {
+    if (!mapInstanceRef.current) return
+
+    const handleMapMove = () => {
+      console.log('[OnlineMap] 地图移动，更新地理化数据图层标签')
+
+      // 更新地理化数据图层的标签（显示新进入视口的元素）
+      if (geoDataLayerManagerRef.current) {
+        geoDataLayerManagerRef.current.onMapMove()
+      }
+    }
+
+    mapInstanceRef.current.on('moveend', handleMapMove)
+
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.off('moveend', handleMapMove)
+      }
+    }
+  }, [])
+
+  /**
    * 当layerFiles变化时加载MapInfo图层
    */
   useEffect(() => {
@@ -2961,8 +3136,63 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
       await loadMapInfoLayers();
 
       // 更新可见性
-      console.log('[OnlineMap] 更新图层可见性, 总数:', allFiles.length)
+      console.log('[OnlineMap] 🔴🔴🔴 更新图层可见性, 总数:', allFiles.length)
       for (const layerFile of allFiles) {
+        console.log('[OnlineMap] 🔴 处理图层:', layerFile.id, layerFile.name, 'visible:', layerFile.visible, 'geometryType:', layerFile.geometryType)
+        console.log('[OnlineMap] 🔴 geometryType判断:', {
+          isPoint: layerFile.geometryType === 'point',
+          isSector: layerFile.geometryType === 'sector',
+          isPolygon: layerFile.geometryType === 'polygon',
+          willEnterGeoDataLayerBranch: layerFile.geometryType === 'point' || layerFile.geometryType === 'sector' || layerFile.geometryType === 'polygon'
+        })
+
+        // 处理 GeoDataLayer（点状、扇区或多边形类型）
+        if (layerFile.geometryType === 'point' || layerFile.geometryType === 'sector' || layerFile.geometryType === 'polygon') {
+          console.log('[OnlineMap] ========== 处理GeoDataLayer可见性 ==========')
+          console.log('[OnlineMap] layerFile.id:', layerFile.id)
+          console.log('[OnlineMap] layerFile.name:', layerFile.name)
+          console.log('[OnlineMap] layerFile.visible:', layerFile.visible)
+          console.log('[OnlineMap] geoDataLayerManagerRef.current 存在:', !!geoDataLayerManagerRef.current)
+          console.log('[OnlineMap] mapInstanceRef.current 存在:', !!mapInstanceRef.current)
+
+          if (geoDataLayerManagerRef.current && mapInstanceRef.current) {
+            const geoLayer = geoDataLayerManagerRef.current.getLayer(layerFile.id)
+            console.log('[OnlineMap] geoLayer 获取结果:', !!geoLayer)
+            if (geoLayer) {
+              // 🔍 详细的类型检查
+              console.log('[OnlineMap] 🔍 geoLayer 详细检查:')
+              console.log('[OnlineMap]  - constructor.name:', geoLayer.constructor.name)
+              console.log('[OnlineMap]  - geoLayer.setVisible.toString():', geoLayer.setVisible.toString())
+              console.log('[OnlineMap]  - Object.keys(geoLayer):', Object.keys(geoLayer).slice(0, 20))
+
+              // 🔴 包装方法以确保日志输出
+              const originalSetVisible = geoLayer.setVisible.bind(geoLayer)
+              const layerId = layerFile.id // 捕获 layer ID
+              geoLayer.setVisible = function(map: any, visible: boolean) {
+                console.error('🔴🔴🔴 包装的 setVisible 被调用！id=' + layerId + ', visible=' + visible)
+                console.error('🔴🔴🔴 this =', this)
+                console.error('🔴🔴🔴 arguments:', arguments)
+                return originalSetVisible(map, visible)
+              }
+
+              console.log('[OnlineMap] 调用包装后的 geoLayer.setVisible(', layerFile.visible, ')')
+
+              try {
+                const result = geoLayer.setVisible(mapInstanceRef.current, layerFile.visible)
+                console.log('[OnlineMap] ✅ geoLayer.setVisible 成功完成，返回值:', result)
+              } catch (error) {
+                console.error('[OnlineMap] ❌ geoLayer.setVisible 出错:', error)
+                console.error('[OnlineMap] 错误堆栈:', error instanceof Error ? error.stack : 'No stack')
+              }
+            } else {
+              console.log('[OnlineMap] ⚠️ GeoDataLayer不存在，需要先创建')
+            }
+          }
+          console.log('[OnlineMap] ========================================')
+          continue
+        }
+
+        // 处理 MapInfoLayer
         const layerRef = mapInfoLayerRefsRef.current.get(layerFile.id);
         console.log('[OnlineMap] 处理图层:', layerFile.id, layerFile.name, 'visible:', layerFile.visible, 'layerRef存在:', !!layerRef)
 

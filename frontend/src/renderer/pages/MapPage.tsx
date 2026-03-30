@@ -238,11 +238,24 @@ export function MapPage() {
       console.log(`[MapPage] 总共加载 ${mapInfoFiles.length} 个 MapInfo 图层文件`)
       setLayerFiles(mapInfoFiles)
 
-      // 2. 处理 Excel 点文件 (fileType='default' 或 'geo_data' 或空)
-      const excelItems = items.filter(item =>
-        item.type === 'excel' &&
-        (item.fileType === 'default' || item.fileType === 'geo_data' || !item.fileType)
-      )
+      // 2. 处理 Excel 点文件 (fileType='default' 或 'geo_data' 或空，或者有 geometryType 字段)
+      const excelItems = items.filter(item => {
+        // 基本条件：必须是 excel 类型
+        if (item.type !== 'excel') return false
+
+        // 如果有 geometryType 字段（点/扇区/多边形），则包含它
+        if (item.geometryType && ['point', 'sector', 'polygon'].includes(item.geometryType)) {
+          console.log('[MapPage] ✅ 包含 Excel 数据项:', item.name, 'geometryType:', item.geometryType)
+          return true
+        }
+
+        // 否则检查 fileType
+        const isValidFileType = item.fileType === 'default' || item.fileType === 'geo_data' || !item.fileType
+        if (isValidFileType) {
+          console.log('[MapPage] ✅ 包含 Excel 数据项:', item.name, 'fileType:', item.fileType)
+        }
+        return isValidFileType
+      })
 
       const excelPointFiles: LayerFileOption[] = excelItems.map(item => {
         // 根据 geometryType 确定图层类型
@@ -1059,13 +1072,20 @@ export function MapPage() {
     else if (node.type === 'layer-file') {
       console.log('[MapPage] Applying label settings for layer file:', layerId, settings)
 
-      // 应用标签设置到 MapInfoLayer
+      // 🔥 修复：保存标签设置时，自动启用标签显示
+      // 用户既然在配置标签，肯定希望看到效果，所以强制显示标签
+      setPointFileLabelVisibility(prev => ({
+        ...prev,
+        [layerId]: true  // 强制启用标签显示
+      }))
+
+      // 应用标签设置到地图
       if (onlineMapRef.current) {
-        // 使用现有的 setLayerFileLabelVisibility 方法来应用设置
-        onlineMapRef.current.setLayerFileLabelVisibility(layerId, pointFileLabelVisibility[layerId] || false, settings)
+        // 传入 visible=true，确保标签显示并应用新配置
+        onlineMapRef.current.setLayerFileLabelVisibility(layerId, true, settings)
       }
     }
-  }, [layerFileLabelVisibility])
+  }, [pointFileLabelVisibility])
 
   return (
     <div className="flex flex-col h-full min-h-0">

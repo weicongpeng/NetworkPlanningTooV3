@@ -143,6 +143,84 @@ export class CoordinateTransformer {
   }
 
   /**
+   * 🔥 性能优化版：批量 WGS84 转 GCJ02
+   *
+   * 使用场景: GeoJSON 图层加载时批量转换坐标
+   *
+   * @param coords 坐标数组 [[lat, lng], ...]
+   * @returns 转换后的坐标数组 [[lat, lng], ...]
+   *
+   * 性能优势:
+   * - 减少 is 检查开销（直接在数组上操作）
+   * - 减少对象创建和销毁（直接操作基本类型数组）
+   * - 可以被进一步优化（如 WebAssembly 或 Worker 线程）
+   */
+  static batchWgs84ToGcj02Optimized(coords: Array<[number, number]>): Array<[number, number]> {
+    const results: Array<[number, number]> = new Array(coords.length)
+
+    for (let i = 0; i < coords.length; i++) {
+      const [wgsLat, wgsLng] = coords[i]
+
+      // 不在中国境内不需要转换（提前退出，减少计算）
+      if (!this.isInChina(wgsLat, wgsLng)) {
+        results[i] = [wgsLat, wgsLng]
+        continue
+      }
+
+      // WGS84 转 GCJ02 变换（内联以减少函数调用）
+      let dLat = this.transformLat(wgsLng - 105.0, wgsLat - 35.0)
+      let dLng = this.transformLon(wgsLng - 105.0, wgsLat - 35.0)
+      const radLat = (wgsLat / 180.0) * Math.PI
+      let magic = Math.sin(radLat)
+      magic = 1 - this.EE * magic * magic
+      const sqrtMagic = Math.sqrt(magic)
+      dLat = (dLat * 180.0) / (((this.A * (1 - this.EE)) / (magic * sqrtMagic)) * Math.PI)
+      dLng = (dLng * 180.0) / (this.A / sqrtMagic * Math.cos(radLat) * Math.PI)
+
+      results[i] = [wgsLat + dLat, wgsLng + dLng]
+    }
+
+    return results
+  }
+
+  /**
+   * 🔥 性能优化版：批量 GCJ02 转 WGS84
+   *
+   * @param coords 坐标数组 [[lat, lng], ...]
+   * @returns 转换后的坐标数组 [[lat, lng], ...]
+   */
+  static batchGcj02ToWgs84Optimized(coords: Array<[number, number]>): Array<[number, number]> {
+    const results: Array<[number, number]> = new Array(coords.length)
+
+    for (let i = 0; i < coords.length; i++) {
+      const [gcjLat, gcjLng] = coords[i]
+
+      // 不在中国境内不需要转换
+      if (!this.isInChina(gcjLat, gcjLng)) {
+        results[i] = [gcjLat, gcjLng]
+        continue
+      }
+
+      // GCJ02 转 WGS84 变换（内联以减少函数调用）
+      let dLat = this.transformLat(gcjLng - 105.0, gcjLat - 35.0)
+      let dLng = this.transformLon(gcjLng - 105.0, gcjLat - 35.0)
+      const radLat = (gcjLat / 180.0) * Math.PI
+      let magic = Math.sin(radLat)
+      magic = 1 - this.EE * magic * magic
+      const sqrtMagic = Math.sqrt(magic)
+      dLat = (dLat * 180.0) / (((this.A * (1 - this.EE)) / (magic * sqrtMagic)) * Math.PI)
+      dLng = (dLng * 180.0) / (this.A / sqrtMagic * Math.cos(radLat) * Math.PI)
+      const mgLat = gcjLat + dLat
+      const mgLng = gcjLng + dLng
+
+      // 逆向转换: WGS84 = GCJ02 - 偏移
+      results[i] = [gcjLat * 2 - mgLat, gcjLng * 2 - mgLng]
+    }
+
+    return results
+  }
+
+  /**
    * 批量转换 GCJ02 坐标数组到 WGS84
    *
    * @param coords GCJ02坐标数组

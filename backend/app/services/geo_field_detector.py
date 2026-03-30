@@ -122,8 +122,8 @@ class GeoFieldDetector:
             "cellid",
             "siteid",
         ],
-        "wkt": [
-            "WKT",  # 精确匹配
+        "polygon": [
+            "polygon",  # 不区分大小写匹配
         ],
     }
 
@@ -145,28 +145,70 @@ class GeoFieldDetector:
             }
         """
         detected = {}
+
+        # 🔴 早期调试：打印原始列名
+        print(f"[GeoFieldDetector] 🔴🔴🔴 原始列名 (df.columns): {list(df.columns)}")
+        print(f"[GeoFieldDetector] 🔴🔴🔴 列数量: {len(df.columns)}")
+
+        # 检查是否有 POLYGON 列（原始名称，不区分大小写）
+        has_polygon_col = any(str(col).strip().upper() == 'POLYGON' for col in df.columns)
+        print(f"[GeoFieldDetector] 🔴🔴🔴 是否有 POLYGON 列 (不区分大小写): {has_polygon_col}")
+
+        # 如果有 POLYGON 列，打印它的详细信息
+        for col in df.columns:
+            if str(col).strip().upper() == 'POLYGON':
+                print(f"[GeoFieldDetector] 🔴🔴🔴 找到 POLYGON 列！原始名称: '{col}', 类型: {type(col)}")
+
         columns = [str(col).strip() for col in df.columns]
 
-        # 对每个字段类型进行匹配
-        for field_name, patterns in self.FIELD_PATTERNS.items():
-            for col in columns:
-                col_lower = col.lower()
-                # 使用正则表达式进行模糊匹配
-                if any(re.search(p, col_lower, re.IGNORECASE) for p in patterns):
-                    detected[field_name] = col
-                    break
+        print(f"[GeoFieldDetector] 🔍 检测列名: {columns}")
+        print(f"[GeoFieldDetector] 🔍 looking for polygon in patterns: {self.FIELD_PATTERNS.get('polygon', [])}")
 
-            # 如果没有找到匹配，设置为 None
-            if field_name not in detected:
-                detected[field_name] = None
+        # 对每个字段类型进行匹配
+        print(f"[GeoFieldDetector] 🔍 字段类型列表: {list(self.FIELD_PATTERNS.keys())}")
+        print(f"[GeoFieldDetector] 🔍 准备开始循环检测...")
+
+        try:
+            for idx, (field_name, patterns) in enumerate(self.FIELD_PATTERNS.items()):
+                print(f"[GeoFieldDetector] 🔍 [{idx}] 开始检测字段类型: {field_name}")
+                found_match = False
+                for col in columns:
+                    col_lower = col.lower()
+                    # 使用正则表达式进行模糊匹配
+                    for p in patterns:
+                        match_result = re.search(p, col_lower, re.IGNORECASE)
+                        if match_result:
+                            detected[field_name] = col
+                            found_match = True
+                            print(f"[GeoFieldDetector] ✅ [{idx}] {field_name} = '{col}'")
+                            break
+                    if found_match:
+                        break
+
+                # 如果没有找到匹配，设置为 None
+                if not found_match:
+                    detected[field_name] = None
+                    if field_name in ["polygon", "name", "longitude", "latitude"]:
+                        print(f"[GeoFieldDetector] ⚠️ [{idx}] {field_name} 未找到匹配")
+        except Exception as e:
+            print(f"[GeoFieldDetector] ❌ 字段检测过程中出错: {e}")
+            import traceback
+            traceback.print_exc()
+
+        print(f"[GeoFieldDetector] 🔍 ========== 字段检测完成 ==========")
+        print(f"[GeoFieldDetector] 🔍 polygon 检测结果: {detected.get('polygon')}")
+        print(f"[GeoFieldDetector] 🔍 检测结果: {detected}")
 
         # 确定几何类型优先级：polygon > sector > point
-        if detected.get("wkt"):
+        if detected.get("polygon"):
             detected["geometry_type"] = "polygon"
+            print(f"[GeoFieldDetector] ✅ 几何类型: POLYGON")
         elif detected.get("azimuth"):
             detected["geometry_type"] = "sector"
+            print(f"[GeoFieldDetector] ✅ 几何类型: SECTOR")
         else:
             detected["geometry_type"] = "point"
+            print(f"[GeoFieldDetector] ⚠️ 几何类型: POINT (默认)")
 
         return detected
 

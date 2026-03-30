@@ -80,7 +80,8 @@ function createWindow() {
       preload: preloadPath,
       nodeIntegration: false,
       contextIsolation: true,
-      webSecurity: true
+      webSecurity: true,
+      backgroundThrottling: false  // 🔥 禁止后台休眠降频
     },
     backgroundColor: '#0f172a',
     show: false
@@ -172,8 +173,35 @@ function createWindow() {
   })
 }
 
+/**
+ * 🔥 后端健康检查：等待后端服务就绪
+ * @param maxWait 最大等待时间（毫秒）
+ */
+async function waitForBackendReady(maxWait: number = 10000): Promise<void> {
+  const startTime = Date.now()
+  const backendUrl = 'http://127.0.0.1:8000'
+
+  devLog('等待后端服务就绪...')
+
+  while (Date.now() - startTime < maxWait) {
+    try {
+      // 使用原生 fetch (Node 18+)
+      const response = await fetch(`${backendUrl}/docs`)
+      if (response.ok) {
+        devLog('✅ 后端服务已就绪')
+        return
+      }
+    } catch {
+      // 后端尚未就绪，继续等待
+    }
+    await new Promise(resolve => setTimeout(resolve, 500))
+  }
+
+  devLog(`⚠️ 后端在 ${maxWait / 1000} 秒内未就绪，将继续运行`)
+}
+
 // 启动后端服务
-function startBackend() {
+async function startBackend() {
   // 开发环境下，后端由 start_app.bat 启动，这里跳过以避免端口冲突
   if (isDev) {
     devLog('Dev mode: Skipping internal backend start')
@@ -225,6 +253,9 @@ function startBackend() {
       setTimeout(startBackend, 5000)
     }
   })
+
+  // 🔥 等待后端就绪
+  await waitForBackendReady()
 }
 
 // IPC 通信处理
@@ -265,15 +296,25 @@ ipcMain.handle('dialog:select-directory', async (_event, options) => {
   return result.filePaths[0]
 })
 
+// 🔥 性能优化：异步文件读取，避免阻塞主进程
+// 对于大文件读取，这可以显著改善应用响应性
 ipcMain.handle('read-file', async (_event, filePath: string) => {
   try {
-    const buffer = fs.readFileSync(filePath)
+    const buffer = await fs.promises.readFile(filePath)
     return buffer
   } catch (error) {
     console.error('Read file error:', error)
     return null
   }
 })
+
+// 🔥 性能优化：启用 GPU 加速和 V8 内存配置
+// 必须在 app.whenReady() 之前执行
+app.commandLine.appendSwitch('ignore-gpu-blocklist');       // 忽略显卡黑名单
+app.commandLine.appendSwitch('enable-gpu-rasterization');  // 开启 GPU 光栅化
+app.commandLine.appendSwitch('enable-zero-copy');           // 减少显存拷贝损耗
+app.commandLine.appendSwitch('num-raster-threads', '4');    // 适配多核 CPU
+app.commandLine.appendSwitch('--js-flags', '--max-old-space-size=4096')  // 增加 Node.js 堆内存限制
 
 // 应用生命周期
 app.whenReady().then(() => {

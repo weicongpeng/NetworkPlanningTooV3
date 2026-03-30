@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Upload, FileSpreadsheet, Trash2, Download, Loader2, AlertCircle, RefreshCw, CheckCircle2, Layers, FileDown, MapPin, Navigation } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Upload, FileSpreadsheet, Trash2, Download, Loader2, AlertCircle, RefreshCw, CheckCircle2, Layers, FileDown, MapPin, Navigation, CheckSquare, Square } from 'lucide-react'
 import { useDataStore } from '../store/dataStore'
 import { dataApi } from '../services/api'
 import type { DataItem } from '@shared/types'
@@ -10,6 +10,10 @@ import { useTranslation } from 'react-i18next'
 export function DataPage() {
   const { t } = useTranslation()
   const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  // 批量选择状态
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [batchDeleting, setBatchDeleting] = useState(false)
 
   // 工参更新相关状态
   const [selectedFullParamId, setSelectedFullParamId] = useState<string>('')
@@ -61,10 +65,19 @@ export function DataPage() {
 
   const isDesktop = !!(window as any).electronAPI
 
-  const handleDownloadTemplate = async (templateType: 'full_params' | 'target_cells') => {
+  const handleDownloadTemplate = async (templateType: 'full_params' | 'target_cells' | 'geo_data') => {
     try {
       // 确定下载文件名
-      const filename = templateType === 'full_params' ? 'ProjectParameter_mongoose.xlsx' : 'cell-tree-export.xlsx'
+      let filename: string
+      if (templateType === 'full_params') {
+        filename = 'ProjectParameter_mongoose.xlsx'
+      } else if (templateType === 'target_cells') {
+        filename = 'cell-tree-export.xlsx'
+      } else if (templateType === 'geo_data') {
+        filename = 'GeoDataTemplate.zip'
+      } else {
+        filename = 'template.xlsx'
+      }
       const url = `/api/v1/data/template/${templateType}`
 
       console.log('[Template Download] Requesting:', templateType, 'as', filename)
@@ -137,7 +150,10 @@ export function DataPage() {
 
         console.log('[Upload] Path Captured:', filePath || 'NULL (Browser Restriction)')
 
-        const success = await uploadFn(file, filePath || undefined)
+        // 修复：uploadExcel/uploadMap 的第二个参数是 context，不是 filePath
+        const success = context === 'geo_data'
+          ? await uploadFn(file, filePath || undefined)
+          : await uploadFn(file, context)
         if (!success) {
           allSuccess = false
         }
@@ -174,7 +190,10 @@ export function DataPage() {
 
       console.log('[Upload] Path Captured:', filePath || 'NULL (Browser Restriction)')
 
-      const success = await uploadFn(file, filePath || undefined)
+      // 修复：uploadExcel/uploadMap 的第二个参数是 context，不是 filePath
+      const success = context === 'geo_data'
+        ? await uploadFn(file, filePath || undefined)
+        : await uploadFn(file, context)
       if (success) {
         event.target.value = ''
         setUploadStatus(prev => ({ ...prev, [context]: 'success' }))
@@ -183,9 +202,27 @@ export function DataPage() {
         // 清除地图数据缓存，确保 pciDataSyncService 能获取到最新数据
         await mapDataService.clearCache()
 
-        // 地理化数据上传成功提示
-        if (context === 'geo_data') {
-          setUploadSuccess(`${t('data.geoDataSuccess') || '地理化数据上传成功'}！${t('data.geoDataImported', { name: file.name, count: items.filter(i => i.fileType === 'geo_data').length + 1 }) || `「${file.name}」已导入 ${items.filter(i => i.fileType === 'geo_data').length + 1} 个数据文件`}`)
+        // 上传成功提示横幅（紫色）
+        let successMessage = ''
+        switch (context) {
+          case 'geo_data':
+            successMessage = `${t('data.geoDataSuccess') || '地理化数据上传成功'}！${t('data.geoDataImported', { name: file.name, count: items.filter(i => i.fileType === 'geo_data').length + 1 }) || `「${file.name}」已导入 ${items.filter(i => i.fileType === 'geo_data').length + 1} 个数据文件`}`
+            break
+          case 'full_params':
+            successMessage = `${t('data.fullParamsSuccess') || '全量工参上传成功'}！${t('data.fullParamsImported', { name: file.name }) || `「${file.name}」已导入`}`
+            break
+          case 'target_cells':
+            successMessage = `${t('data.targetCellsSuccess') || '待规划小区上传成功'}！${t('data.targetCellsImported', { name: file.name }) || `「${file.name}」已导入`}`
+            break
+          case 'current_params':
+            successMessage = `${t('data.currentParamsSuccess') || '现网工参上传成功'}！${t('data.currentParamsImported', { name: file.name }) || `「${file.name}」已导入`}`
+            break
+          case 'map_layer':
+            successMessage = `${t('data.mapLayerSuccess') || '图层文件上传成功'}！${t('data.mapLayerImported', { name: file.name }) || `「${file.name}」已导入`}`
+            break
+        }
+        if (successMessage) {
+          setUploadSuccess(successMessage)
           setTimeout(() => setUploadSuccess(null), 3000)
         }
 
@@ -273,6 +310,63 @@ export function DataPage() {
     }
   }
 
+  const handleBatchDelete = async () => {
+    if (selectedIds.size === 0) return
+
+    const confirmed = confirm(
+      `${t('data.batchDeleteConfirm', { count: selectedIds.size }) || `确定要删除选中的 ${selectedIds.size} 个文件吗？`}\n\n${t('data.deleteWarning') || '删除后将无法恢复，且会影响使用该数据的规划结果。'}`
+    )
+    if (!confirmed) return
+
+    setBatchDeleting(true)
+    let successCount = 0
+    let failCount = 0
+
+    for (const id of selectedIds) {
+      try {
+        const result = await deleteItem(id)
+        if (result) {
+          successCount++
+        } else {
+          failCount++
+        }
+      } catch {
+        failCount++
+      }
+    }
+
+    setBatchDeleting(false)
+    setSelectedIds(new Set())
+    await fetchList(1, 50, true)
+
+    if (failCount > 0) {
+      alert(`${t('data.batchDeleteResult', { success: successCount, fail: failCount }) || `删除完成：成功 ${successCount} 个，失败 ${failCount} 个`}`)
+    }
+  }
+
+  const toggleSelectAll = useCallback(() => {
+    if (selectedIds.size === items.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(items.map(item => item.id)))
+    }
+  }, [selectedIds.size, items])
+
+  const toggleSelectItem = useCallback((id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }, [])
+
+  const allSelected = items.length > 0 && selectedIds.size === items.length
+
   const handleUpdateParameters = async () => {
      if (!selectedFullParamId || !selectedCurrentParamId) return
 
@@ -320,35 +414,6 @@ export function DataPage() {
          alert(`${t('data.updateFailed') || '工参更新失败'}: ${errorMsg}\n\n${t('data.updateFailedHint') || '提示：'} ${t('data.tryRefreshHint') || '请尝试刷新数据列表后重试。如果问题持续，请重启后端服务。'}`);
      }
    }
-
-  const handleCleanupIndex = async () => {
-    const confirmed = confirm(
-      `${t('data.cleanIndexConfirm') || '确定要清理无效索引吗？'}\n\n` +
-      `${t('data.cleanIndexTip2') || '这将会移除所有文件不存在但索引中仍然存在的记录。'}\n` +
-      `${t('data.cleanIndexSafe') || '此操作不会影响有效的数据文件。'}`
-    )
-
-    if (!confirmed) return
-
-    try {
-      const result = await dataApi.cleanupIndex()
-      if (result?.success) {
-        const removed = result.data?.removed || 0
-        const items = result.data?.items || []
-
-        if (removed > 0) {
-          alert(`${t('data.cleanComplete') || `清理完成！已移除 ${removed} 个无效索引项`}:\n\n${items.map((i: any) => `• ${i.name}`).join('\n')}`)
-        } else {
-          alert(t('data.noInvalidIndex') || '索引状态良好，没有发现无效项。')
-        }
-
-        await fetchList(1, 50, true)
-      }
-    } catch (err: any) {
-      console.error('[Cleanup] Failed:', err)
-      alert(`${t('data.cleanFailed') || '清理失败'}: ${err.message || (t('data.unknownError') || '未知错误')}`)
-    }
-  }
 
   // 筛选文件列表
   const fullParamFiles = items.filter(i => i.fileType === 'full_params')
@@ -410,27 +475,6 @@ export function DataPage() {
               {t('data.browserTip') || '提示：您当前正在使用浏览器访问。若要实现"更新后保存到原文件夹"，请运行 start_app.bat 使用桌面应用。'}
           </div>
       )}
-
-      {/* 工具栏 */}
-      <div className="mb-6 flex justify-between items-center">
-        <div className="flex gap-2">
-          <button
-            onClick={() => fetchList(1, 50, true)}
-            className="px-4 py-2 bg-card border border-border rounded-lg hover:bg-muted transition-colors flex items-center gap-2"
-          >
-            <RefreshCw size={16} />
-            {t('common.refresh') || '刷新列表'}
-          </button>
-          <button
-            onClick={handleCleanupIndex}
-            className="px-4 py-2 bg-card border border-border rounded-lg hover:bg-muted transition-colors flex items-center gap-2"
-            title={t('data.cleanIndexTip') || '清理无效的索引项（文件不存在但索引中仍然存在的记录）'}
-          >
-            <RefreshCw size={16} />
-            {t('data.cleanIndex') || '清理索引'}
-          </button>
-        </div>
-      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="space-y-8">
@@ -513,6 +557,7 @@ export function DataPage() {
                             multiple={true}
                             inline={true}
                             status={uploadStatus.map_layer}
+                            description={t('data.mapLayerDesc') || '支持ZIP/TAB/MIF，TAB需配套DAT文件'}
                         />
                     </div>
                     <div className="w-24">
@@ -530,10 +575,18 @@ export function DataPage() {
                             description={t('data.geoDataDesc') || '自动识别点状/扇区'}
                             inline={true}
                             status={uploadStatus.geo_data}
+                            multiple={true}
                         />
                     </div>
                     <div className="w-24">
-                        {/* 地理化数据不需要模板下载 */}
+                        <button
+                            onClick={() => handleDownloadTemplate('geo_data')}
+                            className="w-full px-2 py-1.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                            title={t('data.downloadTemplate') || '下载模板'}
+                        >
+                            <FileDown size={12} />
+                            <span>{t('data.template') || '模板'}</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -587,12 +640,41 @@ export function DataPage() {
         <div className="bg-card p-6 rounded-lg border border-border h-full">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold">{t('data.importedData') || '已导入数据'}</h2>
-            <button
-              onClick={() => fetchList(1, 50, true)}
-              className="text-sm text-primary hover:underline"
-            >
-              {t('data.refresh') || '刷新'}
-            </button>
+            <div className="flex items-center gap-2">
+              {items.length > 0 && (
+                <>
+                  <button
+                    onClick={toggleSelectAll}
+                    className={`text-xs px-2.5 py-1 rounded border transition-colors ${
+                      allSelected
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-background border-border hover:bg-muted'
+                    }`}
+                  >
+                    {allSelected ? (t('data.deselectAll') || '取消全选') : (t('data.selectAll') || '全选')}
+                  </button>
+                  <button
+                    onClick={handleBatchDelete}
+                    disabled={selectedIds.size === 0 || batchDeleting}
+                    className="text-xs px-2.5 py-1 rounded border bg-background border-border text-red-500 hover:bg-red-50 hover:border-red-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-background disabled:hover:border-border transition-colors flex items-center gap-1"
+                  >
+                    {batchDeleting ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : (
+                      <Trash2 size={12} />
+                    )}
+                    {t('data.batchDelete') || '删除'}
+                    {selectedIds.size > 0 && ` (${selectedIds.size})`}
+                  </button>
+                </>
+              )}
+              <button
+                onClick={() => { fetchList(1, 50, true); setSelectedIds(new Set()) }}
+                className="text-sm text-primary hover:underline"
+              >
+                {t('data.refresh') || '刷新'}
+              </button>
+            </div>
           </div>
 
           {items.length === 0 ? (
@@ -605,7 +687,9 @@ export function DataPage() {
                 <div
                   key={item.id}
                   className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
-                    selectedId === item.id
+                    selectedIds.has(item.id)
+                      ? 'bg-primary/5 border-primary/30 ring-1 ring-primary/20'
+                      : selectedId === item.id
                       ? 'bg-primary/10 border-primary'
                       : 'bg-muted border-border hover:bg-muted/80'
                   }`}
@@ -706,7 +790,18 @@ export function DataPage() {
                       </span>
                     </div>
                   </div>
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 items-center">
+                    <button
+                      onClick={(e) => toggleSelectItem(item.id, e)}
+                      className="p-1.5 hover:bg-background rounded text-muted-foreground hover:text-primary transition-colors"
+                      title={selectedIds.has(item.id) ? (t('data.deselectItem') || '取消选择') : (t('data.selectItem') || '选择')}
+                    >
+                      {selectedIds.has(item.id) ? (
+                        <CheckSquare size={16} className="text-primary" />
+                      ) : (
+                        <Square size={16} />
+                      )}
+                    </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation()

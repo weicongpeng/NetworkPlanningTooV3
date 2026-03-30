@@ -550,7 +550,7 @@ export function TACPlanningPage() {
                                             {COLUMNS.map((column) => (
                                                 <th
                                                     key={column.key}
-                                                    className="text-left p-2 font-medium bg-background z-20 relative group"
+                                                    className="text-left p-2 font-medium bg-background z-20 relative group border-r border-border"
                                                     style={{ width: `${columnWidths[column.key]}px`, minWidth: `${columnWidths[column.key]}px` }}
                                                 >
                                                     <span className="block pr-3">{t(`tacPlanning.column.${column.key}`) || column.label}</span>
@@ -593,10 +593,10 @@ export function TACPlanningPage() {
                                                     {COLUMNS.map((column) => {
                                                         const width = columnWidths[column.key]
                                                         const cellClassName = column.key === 'siteId' || column.key === 'sectorId' || column.key === 'longitude' || column.key === 'latitude' || column.key === 'tac'
-                                                            ? 'p-2 font-mono truncate'
+                                                            ? 'p-2 font-mono truncate border-r border-border'
                                                             : column.key === 'status'
-                                                            ? 'p-2'
-                                                            : 'p-2 truncate'
+                                                            ? 'p-2 border-r border-border'
+                                                            : 'p-2 truncate border-r border-border'
 
                                                         const getCellContent = () => {
                                                             switch (column.key) {

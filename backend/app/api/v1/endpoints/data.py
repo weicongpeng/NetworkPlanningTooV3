@@ -334,7 +334,7 @@ async def download_template(template_type: str):
     """下载模板文件
 
     Args:
-        template_type: 模板类型，'full_params' 或 'target_cells'
+        template_type: 模板类型，'full_params'、'target_cells' 或 'geo_data'
     """
     try:
         from app.core.config import settings
@@ -348,6 +348,9 @@ async def download_template(template_type: str):
         elif template_type == "target_cells":
             prefix = "cell-tree-export"
             description = "待规划小区模板"
+        elif template_type == "geo_data":
+            prefix = "GeoDataTemplate"
+            description = "地理化数据模板"
         else:
             raise HTTPException(
                 status_code=400, detail=f"不支持的模板类型: {template_type}"
@@ -360,17 +363,26 @@ async def download_template(template_type: str):
                 status_code=404, detail="模板目录不存在，请先上传模板文件"
             )
 
-        # 查找匹配前缀的文件
+        # 查找模板文件
         template_file = None
-        for file in template_dir.iterdir():
-            if file.is_file() and file.name.startswith(prefix):
-                template_file = file
-                break
+
+        # 对于 geo_data，直接查找完整的 zip 文件名
+        if template_type == "geo_data":
+            target_filename = "GeoDataTemplate.zip"
+            template_file = template_dir / target_filename
+            if not template_file.exists():
+                template_file = None
+        else:
+            # 对于其他类型，使用前缀搜索
+            for file in template_dir.iterdir():
+                if file.is_file() and file.name.startswith(prefix):
+                    template_file = file
+                    break
 
         if not template_file:
             raise HTTPException(
                 status_code=404,
-                detail=f"未找到{description}文件，请确保已上传前缀为'{prefix}'的文件到template目录",
+                detail=f"未找到{description}文件，请确保已上传{prefix}相关文件到template目录",
             )
 
         # 获取文件大小
@@ -382,15 +394,19 @@ async def download_template(template_type: str):
         # 自动检测MIME类型
         media_type, _ = mimetypes.guess_type(str(template_file))
         if not media_type:
-            media_type = (
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+            # 根据文件扩展名设置默认类型
+            if template_file.suffix == ".zip":
+                media_type = "application/zip"
+            else:
+                media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
         # 使用原始文件名（不带时间戳后缀）
         if template_type == "full_params":
             download_filename = "ProjectParameter_mongoose.xlsx"
         elif template_type == "target_cells":
             download_filename = "cell-tree-export.xlsx"
+        elif template_type == "geo_data":
+            download_filename = "GeoDataTemplate.zip"
         else:
             download_filename = template_file.name
 

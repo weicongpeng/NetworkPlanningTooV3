@@ -2854,12 +2854,77 @@ class DataService:
             if has_mapinfo:
                 # 解析 MapInfo 图层
                 from app.services.mapinfo_service import parse_mapinfo_files
-
-                layers = parse_mapinfo_files(data_dir)
-
-                # 保存图层元数据
                 import json
 
+                try:
+                    layers = parse_mapinfo_files(data_dir)
+                except ImportError as e:
+                    # 缺少 geopandas 库
+                    print(f"[DataService] ❌ 缺少必要的地理数据处理库")
+                    print(f"[DataService] 错误详情: {e}")
+
+                    # 保存空的 layers.json
+                    with open(data_dir / "layers.json", "w", encoding="utf-8") as f:
+                        json.dump([], f)
+
+                    # 标记为错误状态
+                    self.index[data_id] = {
+                        "id": data_id,
+                        "name": filename,
+                        "type": "map",
+                        "subType": "mapinfo",
+                        "size": file_path.stat().st_size,
+                        "originalPath": original_path,
+                        "uploadDate": datetime.now().isoformat(),
+                        "status": "error",
+                        "metadata": {
+                            "fileCount": len(extracted_files),
+                            "layerCount": 0,
+                            "layers": [],
+                            "error": "缺少必要的地理数据处理库 (geopandas)",
+                            "errorDetail": str(e),
+                        },
+                    }
+                    # 保存索引
+                    self._save_index()
+                    raise ValueError(
+                        f"MapInfo 文件解析失败：缺少必要的地理数据处理库。\n"
+                        f"请运行以下命令安装依赖：\n"
+                        f"  pip install geopandas shapely\n\n"
+                        f"Windows 用户可能需要先安装 GDAL，推荐使用 conda：\n"
+                        f"  conda install -c conda-forge geopandas"
+                    )
+                except Exception as e:
+                    print(f"[DataService] 解析 MapInfo 文件失败: {e}")
+                    import traceback
+                    traceback.print_exc()
+
+                    # 保存空的 layers.json
+                    with open(data_dir / "layers.json", "w", encoding="utf-8") as f:
+                        json.dump([], f)
+
+                    # 标记为错误状态
+                    self.index[data_id] = {
+                        "id": data_id,
+                        "name": filename,
+                        "type": "map",
+                        "subType": "mapinfo",
+                        "size": file_path.stat().st_size,
+                        "originalPath": original_path,
+                        "uploadDate": datetime.now().isoformat(),
+                        "status": "error",
+                        "metadata": {
+                            "fileCount": len(extracted_files),
+                            "layerCount": 0,
+                            "layers": [],
+                            "error": str(e),
+                        },
+                    }
+                    # 保存索引
+                    self._save_index()
+                    raise ValueError(f"MapInfo 文件解析失败: {e}")
+
+                # 保存图层元数据
                 with open(data_dir / "layers.json", "w", encoding="utf-8") as f:
                     json.dump(layers, f, ensure_ascii=False, indent=2)
 
@@ -2905,37 +2970,192 @@ class DataService:
             target_file = data_dir / filename
             shutil.copy(file_path, target_file)
 
-            # 关键修复: 如果提供了原始路径(Electron/Local模式)，尝试复制关联文件
-            # MapInfo .tab 文件通常依赖 .dat, .map, .id, .ind 等同名文件
-            if original_path:
+            # 🔥 关键修复: MapInfo 文件需要配套文件才能正确解析
+            # 获取文件基名（不含扩展名），支持大小写扩展名
+            stem = os.path.splitext(filename)[0]
+
+            # 辅助函数：查找文件（忽略大小写）
+            def find_file_ignore_case(directory: Path, basename: str, extensions: list) -> Optional[Path]:
+                """在目录中查找文件，忽略大小写"""
+                for ext in extensions:
+                    # 尝试小写
+                    test_path = directory / f"{basename.lower()}{ext.lower()}"
+                    if test_path.exists():
+                        return test_path
+                    # 尝试大写
+                    test_path = directory / f"{basename.upper()}{ext.upper()}"
+                    if test_path.exists():
+                        return test_path
+                    # 尝试原始大小写组合
+                    test_path = directory / f"{basename}{ext}"
+                    if test_path.exists():
+                        return test_path
+                return None
+
+            # 检查 .tab 和 .dat 文件是否存在（忽略大小写）
+            tab_extensions = [".tab", ".TAB", ".Tab"]
+            dat_extensions = [".dat", ".DAT", ".Dat"]
+
+            tab_file = find_file_ignore_case(data_dir, stem, tab_extensions)
+            dat_file = find_file_ignore_case(data_dir, stem, dat_extensions)
+
+            has_required_files = True
+            missing_files = []
+
+            # 检查 .tab 文件是否存在
+            if not tab_file:
+                has_required_files = False
+                missing_files.append(f"{stem}.tab")
+
+            # 检查 .dat 文件是否存在（关键文件！）
+            if not dat_file:
+                has_required_files = False
+                missing_files.append(f"{stem}.dat (关键文件)")
+
+            # 🔧 自动复制关联文件（优先级：original_path > uploads 目录）
+            if missing_files and original_path:
+                # 方式1: 从原始路径（Electron 桌面模式）
                 try:
                     original_dir = os.path.dirname(original_path)
-                    # 获取文件名(不带后缀)
-                    stem = os.path.splitext(filename)[0]
+                    print(f"[DataService] 🔍 检查关联文件: 目录={original_dir}, 基名={stem}")
 
-                    # 常见的MapInfo关联文件后缀
-                    extensions = [".dat", ".map", ".id", ".ind", ".mid"]
+                    # 所有可能的 MapInfo 关联文件后缀
+                    all_extensions = [
+                        ".dat", ".DAT",
+                        ".map", ".MAP",
+                        ".id", ".ID",
+                        ".ind", ".IND",
+                        ".mid", ".MID"
+                    ]
 
-                    print(
-                        f"[DataService] 检查关联文件: 目录={original_dir}, 基名={stem}"
-                    )
+                    copied_count = 0
+                    for ext in all_extensions:
+                        # 尝试多种大小写组合
+                        for ext_variant in [ext.lower(), ext.upper(), ext]:
+                            sibling_path = os.path.join(original_dir, f"{stem}{ext_variant}")
+                            if os.path.exists(sibling_path):
+                                target_sibling = data_dir / os.path.basename(sibling_path)
+                                if not target_sibling.exists():
+                                    shutil.copy2(sibling_path, target_sibling)
+                                    print(f"[DataService] ✅ 已复制关联文件: {os.path.basename(sibling_path)}")
+                                    copied_count += 1
 
-                    for ext in extensions:
-                        # 尝试查找同名不同后缀的文件
-                        sibling_name = f"{stem}{ext}"
-                        sibling_path = os.path.join(original_dir, sibling_name)
+                                    # 更新文件存在状态
+                                    if ext_variant.lower() == ".dat" and any(".dat" in f for f in missing_files):
+                                        missing_files = [f for f in missing_files if ".dat" not in f.lower()]
+                                    if ext_variant.lower() == ".tab" and any(".tab" in f for f in missing_files):
+                                        missing_files = [f for f in missing_files if ".tab" not in f.lower()]
+                                break  # 找到一个就跳过其他大小写变体
 
-                        if os.path.exists(sibling_path):
-                            target_sibling = data_dir / sibling_name
-                            shutil.copy2(sibling_path, target_sibling)
-                            print(f"[DataService] 已复制关联文件: {sibling_name}")
+                    print(f"[DataService] 📊 共复制 {copied_count} 个关联文件")
+
                 except Exception as e:
-                    print(f"[DataService] 复制关联文件失败: {e}")
+                    print(f"[DataService] ⚠️ 从原始路径复制关联文件失败: {e}")
+
+            # 如果仍然缺少文件，尝试从 uploads 目录查找
+            if missing_files:
+                try:
+                    uploads_dir = settings.UPLOAD_DIR
+                    print(f"[DataService] 🔍 尝试从 uploads 目录查找关联文件: {uploads_dir}")
+
+                    all_extensions = [
+                        ".dat", ".DAT",
+                        ".map", ".MAP",
+                        ".id", ".ID",
+                        ".ind", ".IND",
+                        ".mid", ".MID"
+                    ]
+
+                    for ext in all_extensions:
+                        for ext_variant in [ext.lower(), ext.upper(), ext]:
+                            sibling_path = uploads_dir / f"{stem}{ext_variant}"
+                            if sibling_path.exists():
+                                target_sibling = data_dir / sibling_path.name
+                                if not target_sibling.exists():
+                                    shutil.copy2(sibling_path, target_sibling)
+                                    print(f"[DataService] ✅ 从 uploads 复制: {sibling_path.name}")
+
+                                    # 更新文件存在状态
+                                    if ext_variant.lower() == ".dat":
+                                        missing_files = [f for f in missing_files if ".dat" not in f.lower()]
+                                    if ext_variant.lower() == ".tab":
+                                        missing_files = [f for f in missing_files if ".tab" not in f.lower()]
+
+                except Exception as e:
+                    print(f"[DataService] ⚠️ 从 uploads 目录复制关联文件失败: {e}")
+
+            # 检查是否仍然缺少关键文件
+            if missing_files:
+                print(f"[DataService] ❌ 缺少关键文件: {missing_files}")
+                raise ValueError(
+                    f"MapInfo 文件缺少配套文件，无法正确解析。\n"
+                    f"缺少文件: {', '.join(missing_files)}\n\n"
+                    f"MapInfo TAB 格式需要以下配套文件：\n"
+                    f"  • {stem}.tab - 表结构定义\n"
+                    f"  • {stem}.dat - 实际数据（必需！）\n"
+                    f"  • {stem}.map - 样式定义（可选）\n"
+                    f"  • {stem}.id - 索引文件（可选）\n\n"
+                    f"解决方案：\n"
+                    f"  1. 上传所有配套文件（推荐）\n"
+                    f"  2. 或打包成 ZIP 文件上传（最佳）"
+                )
+
+            # 重新检查文件是否都已复制成功
+            tab_file = find_file_ignore_case(data_dir, stem, [".tab", ".TAB"])
+            dat_file = find_file_ignore_case(data_dir, stem, [".dat", ".DAT"])
+
+            print(f"[DataService] 📁 文件检查结果:")
+            print(f"  - TAB 文件: {'✅ ' + str(tab_file) if tab_file else '❌ 缺失'}")
+            print(f"  - DAT 文件: {'✅ ' + str(dat_file) if dat_file else '❌ 缺失'}")
+
+            # 列出 data_dir 中的所有文件（用于调试）
+            try:
+                all_files = list(data_dir.glob("*"))
+                print(f"  - 数据目录文件列表: {[f.name for f in all_files if f.is_file()]}")
+            except Exception as e:
+                print(f"  - 列出文件失败: {e}")
 
             # 解析 MapInfo 图层
+            import json
             from app.services.mapinfo_service import parse_mapinfo_files
 
-            layers = parse_mapinfo_files(target_file)
+            try:
+                layers = parse_mapinfo_files(target_file)
+            except ImportError as e:
+                # 缺少 geopandas 库
+                print(f"[DataService] ❌ 缺少必要的地理数据处理库")
+                print(f"[DataService] 错误详情: {e}")
+
+                # 保存空的 layers.json
+                with open(data_dir / "layers.json", "w", encoding="utf-8") as f:
+                    json.dump([], f)
+
+                # 标记为错误状态
+                self.index[data_id] = {
+                    "id": data_id,
+                    "name": filename,
+                    "type": "map",
+                    "subType": "mapinfo",
+                    "size": file_path.stat().st_size,
+                    "originalPath": original_path,
+                    "uploadDate": datetime.now().isoformat(),
+                    "status": "error",
+                    "metadata": {
+                        "fileCount": 1,
+                        "layerCount": 0,
+                        "layers": [],
+                        "error": "缺少必要的地理数据处理库 (geopandas)",
+                        "errorDetail": str(e),
+                    },
+                }
+                self._save_index()
+                raise ValueError(
+                    f"MapInfo 文件解析失败：缺少必要的地理数据处理库。\n"
+                    f"请运行以下命令安装依赖：\n"
+                    f"  pip install geopandas shapely\n\n"
+                    f"Windows 用户可能需要先安装 GDAL，推荐使用 conda：\n"
+                    f"  conda install -c conda-forge geopandas"
+                )
 
             # 检查解析结果
             if not layers:
@@ -2956,8 +3176,6 @@ class DataService:
                         print(f"[DataService] 无法读取文件内容预览")
 
             # 保存图层元数据（即使为空也保存，便于调试）
-            import json
-
             with open(data_dir / "layers.json", "w", encoding="utf-8") as f:
                 json.dump(layers, f, ensure_ascii=False, indent=2)
 

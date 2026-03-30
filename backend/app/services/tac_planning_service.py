@@ -113,17 +113,55 @@ class TACPlanningService:
             # 直接从 data_service 获取图层文件路径
             from app.services.data_service import data_service
             items = data_service.list_data()
-            
+
             tac_file = None
             for item in items:
-                # 检查是否是地图文件且包含该文件名
-                if item.type.value == "map" and tac_filename in item.name:
-                    data_dir = self.data_dir / item.id
-                    # 查找对应名称的 .TAB 文件 (可能在二级目录)
+                if item.type.value != "map":
+                    continue
+
+                data_dir = self.data_dir / item.id
+
+                # 方法1: 检查图层元数据中的layer名称（更可靠）
+                if hasattr(item, 'metadata') and item.metadata:
+                    metadata_dict = item.metadata.model_dump() if hasattr(item.metadata, 'model_dump') else item.metadata
+                    layers = metadata_dict.get('layers', [])
+                    for layer in layers:
+                        layer_name = layer.get('name', '')
+                        # 检查layer名称是否匹配预期的TAC图层名称
+                        # 4G: 匹配 "4G_TAC" 或包含 "4G" 和 "TAC"
+                        # 5G: 匹配 "5G_TAC" 或 "河源5G-TAC" 等变体
+                        if network_type == "LTE":
+                            if "4G_TAC" in layer_name or ("4G" in layer_name and "TAC" in layer_name):
+                                # 在数据目录中查找实际的.TAB文件
+                                candidate = next(data_dir.rglob("*.TAB"), None)
+                                if candidate:
+                                    tac_file = candidate
+                                    break
+                        else:  # NR / 5G
+                            if "5G_TAC" in layer_name or ("5G" in layer_name and "TAC" in layer_name) or "河源5G" in layer_name:
+                                candidate = next(data_dir.rglob("*.TAB"), None)
+                                if candidate:
+                                    tac_file = candidate
+                                    break
+                    if tac_file:
+                        break
+
+                # 方法2: 文件名直接匹配（保持向后兼容）
+                if tac_file is None and tac_filename in item.name:
                     candidate = next(data_dir.rglob(tac_filename), None)
                     if candidate:
                         tac_file = candidate
                         break
+
+                # 方法3: 对5G进行更宽松的匹配（处理河源5G-TAC等变体）
+                if tac_file is None and network_type == "NR":
+                    # 检查是否包含5G和TAC关键词（忽略下划线/连字符差异）
+                    name_normalized = item.name.replace("-", "_").replace(" ", "")
+                    if "5G" in name_normalized and "TAC" in name_normalized:
+                        candidate = next(data_dir.rglob("*.TAB"), None)
+                        if candidate:
+                            tac_file = candidate
+                            break
             
             # 如果在 data_service 中没找到，保留原有深度搜索逻辑作为备份
             if tac_file is None:

@@ -611,8 +611,16 @@ class MapInfoParser:
         try:
             import geopandas as gpd
             from shapely.geometry import Point, LineString, Polygon, MultiPoint, MultiLineString, MultiPolygon
-        except ImportError:
-            raise ImportError("请先安装 geopandas 和 shapely 库")
+        except ImportError as e:
+            raise ImportError(
+                "缺少必要的地理数据处理库！\n"
+                "请运行以下命令安装依赖：\n"
+                "  pip install geopandas shapely\n\n"
+                "注意：geopandas 依赖 GDAL，Windows 用户可能需要先安装 GDAL。\n"
+                "推荐使用 conda 安装：\n"
+                "  conda install -c conda-forge geopandas\n\n"
+                f"详细错误: {e}"
+            )
 
         try:
             # 确保路径为字符串
@@ -746,30 +754,58 @@ class MapInfoParser:
     
     @staticmethod
     def parse_directory(dir_path: Path) -> List[MapInfoLayer]:
-        """解析目录中的所有 MapInfo 文件"""
+        """
+        解析目录中的所有 MapInfo 文件
+
+        支持的文件格式：
+        - .tab 文件（MapInfo TAB 格式）
+        - .mif 文件（MapInfo MIF 格式）
+
+        使用 geopandas 统一解析所有格式
+        """
         layers = []
+        processed_files = set()  # 跟踪已处理的文件（避免重复）
 
-        # 查找所有 MIF 文件
-        for mif_file in dir_path.glob('*.mif'):
-            try:
-                layer = MapInfoParser._parse_mif(mif_file)
-                layers.append(layer)
-            except Exception as e:
-                continue
-
-        # 查找所有 TAB 文件（如果找不到对应的 MIF）
+        # 首先查找所有 .tab 文件（这是最常用的 MapInfo 格式）
         for tab_file in dir_path.glob('*.tab'):
-            # 检查是否已经通过 MIF 解析
-            mif_file = tab_file.with_suffix('.mif')
-            if mif_file.exists():
+            try:
+                print(f"[MapInfoParser] 解析 TAB 文件: {tab_file.name}")
+                layer = MapInfoParser.parse_file(tab_file)
+                layers.append(layer)
+                processed_files.add(tab_file.stem)  # 记录文件名（不含扩展名）
+            except ImportError as e:
+                # ImportError 表示缺少 geopandas 库
+                print(f"[MapInfoParser] ❌ 缺少必要的库: {e}")
+                print(f"[MapInfoParser] 提示: 请运行 'pip install geopandas shapely' 安装依赖")
+                # 不继续解析其他文件，因为都会失败
+                break
+            except Exception as e:
+                print(f"[MapInfoParser] 解析 TAB 文件失败 {tab_file.name}: {e}")
+                import traceback
+                traceback.print_exc()
+
+        # 然后查找 .mif 文件（只处理没有对应 .tab 文件的）
+        for mif_file in dir_path.glob('*.mif'):
+            # 检查是否已经处理过同名的 .tab 文件
+            if mif_file.stem in processed_files:
+                print(f"[MapInfoParser] 跳过 {mif_file.name}（已存在同名 TAB 文件）")
                 continue
 
             try:
-                layer = MapInfoParser._parse_tab(tab_file)
+                print(f"[MapInfoParser] 解析 MIF 文件: {mif_file.name}")
+                layer = MapInfoParser.parse_file(mif_file)
                 layers.append(layer)
+            except ImportError as e:
+                # ImportError 表示缺少 geopandas 库
+                print(f"[MapInfoParser] ❌ 缺少必要的库: {e}")
+                print(f"[MapInfoParser] 提示: 请运行 'pip install geopandas shapely' 安装依赖")
+                break
             except Exception as e:
-                continue
+                print(f"[MapInfoParser] 解析 MIF 文件失败 {mif_file.name}: {e}")
+                import traceback
+                traceback.print_exc()
 
+        print(f"[MapInfoParser] 目录解析完成，共解析 {len(layers)} 个图层")
         return layers
 
 

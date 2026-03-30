@@ -1,0 +1,25 @@
+[
+  {
+    "id": "a45fb2eb-569a-4015-b2d2-4c2c132948fa",
+    "name": "4G_TAC",
+    "type": "polygon",
+    "feature_count": 23,
+    "metadata": {
+      "source_file": "D:\\mycode\\NetworkPlanningTooV3\\data\\c290c5f8-b6b2-4013-b3ce-304017d6fd5e\\4G_TAC.TAB",
+      "feature_count": 23,
+      "name": "4G_TAC",
+      "coord_sys": "unknown",
+      "fields": [
+        "WindowsSimpChinese",
+        "\\MapInfo",
+        "\\MapInfo\\TableID",
+        "b0ed1b40-1c42-4041-b406-7740fca0f3f7",
+        "\\MapInfo\\ParentTableID",
+        "c943d661-a665-42e4-9186-38a9313e1cf2",
+        "\\IsReadOnly",
+        "FALSE"
+      ],
+      "description": ""
+    }
+  }
+]

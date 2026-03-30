@@ -276,7 +276,7 @@ export function TACPage() {
 
     // 跳转地图到该小区位置
     const coords = [syncedSector.displayLat || syncedSector.latitude, syncedSector.displayLng || syncedSector.longitude]
-    mapRef.current?.flyTo(coords as [number, number], 16)
+    mapRef.current?.flyTo(coords as [number, number], 16, 0)
 
     console.log('[TACPage] 点击结果行，跳转地图', {
       siteId,
@@ -795,7 +795,7 @@ export function TACPage() {
                           {COLUMNS.map((column) => (
                             <th
                               key={column.key}
-                              className="text-left p-2 font-medium bg-background z-20 relative group"
+                              className="text-left p-2 font-medium bg-background z-20 relative group border-r border-border"
                               style={{ width: `${columnWidths[column.key]}px`, minWidth: `${columnWidths[column.key]}px` }}
                             >
                               <span className="block pr-3">{t(`tac.column.${column.key}`) || column.label}</span>
@@ -842,7 +842,7 @@ export function TACPage() {
                               {COLUMNS.map((column) => {
                                 const width = columnWidths[column.key]
                                 let cellContent: any
-                                let cellClassName = 'p-2'
+                                let cellClassName = 'p-2 border-r border-border'
 
                                 switch (column.key) {
                                   case 'firstGroup':

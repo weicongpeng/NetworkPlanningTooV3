@@ -102,6 +102,7 @@ class DataItem(BaseModel):
     uploadDate: str
     status: DataStatus
     metadata: Optional[Dict[str, Any]] = None
+    geometryType: Optional[str] = None  # 几何类型：point, sector, polygon
 
 
 class SectorData(BaseModel):

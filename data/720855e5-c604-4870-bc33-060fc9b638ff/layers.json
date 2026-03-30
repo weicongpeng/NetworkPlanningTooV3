@@ -1,0 +1,23 @@
+[
+  {
+    "id": "86649370-c31a-4949-9c7d-b84838679072",
+    "name": "河源5G-TAC",
+    "type": "polygon",
+    "feature_count": 51,
+    "metadata": {
+      "source_file": "D:\\mycode\\NetworkPlanningTooV3\\data\\720855e5-c604-4870-bc33-060fc9b638ff\\河源5G-TAC.TAB",
+      "feature_count": 51,
+      "name": "河源5G-TAC",
+      "coord_sys": "unknown",
+      "fields": [
+        "WindowsSimpChinese",
+        "\\IsReadOnly",
+        "FALSE",
+        "\\MapInfo",
+        "\\MapInfo\\TableID",
+        "0208e660-cb34-4ae6-9a86-6be083ed6562"
+      ],
+      "description": ""
+    }
+  }
+]

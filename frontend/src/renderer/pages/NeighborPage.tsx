@@ -779,13 +779,14 @@ export function NeighborPage() {
       else if (maxDiff > 0.01) zoom = 15
       else zoom = 16
 
-      // 飞到计算出的位置和缩放级别
-      mapRef.current.flyTo([centerLat, centerLng], zoom)
+      // 飞到计算出的位置和缩放级别（即时跳转）
+      mapRef.current.flyTo([centerLat, centerLng], zoom, 0)
     } else if (sourceSectorData && sourceSectorData.displayLat && sourceSectorData.displayLng) {
       // 如果没有坐标数据，回退到源小区位置
       mapRef.current?.flyTo(
         [sourceSectorData.displayLat, sourceSectorData.displayLng],
-        14
+        14,
+        0
       )
     }
 
@@ -1403,7 +1404,7 @@ function NeighborTable({
             {tableColumns.map((column) => (
               <th
                 key={column.key}
-                className="text-left p-2 font-medium bg-background z-20 relative group"
+                className="text-left p-2 font-medium bg-background z-20 relative group border-r border-border"
                 style={{ width: `${columnWidths[column.key]}px`, minWidth: `${columnWidths[column.key]}px` }}
               >
                 <span className="block pr-3">{column.label}</span>
@@ -1517,7 +1518,7 @@ function NeighborTable({
                       return (
                         <td
                           key={column.key}
-                          className="p-2 truncate"
+                          className="p-2 truncate border-r border-border"
                           style={{ width: `${width}px`, minWidth: `${width}px`, maxWidth: `${width}px` }}
                           title={column.key.includes('Name') ? cellContent : undefined}
                         >
