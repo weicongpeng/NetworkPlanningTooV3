@@ -251,6 +251,14 @@ export class GeoDataLayer {
     this.leafletLayer = L.layerGroup()
     console.log('[GeoDataLayer] leafletLayer 已创建')
 
+    // 🔧 修复：更新 currentZoom 为当前地图的实际缩放级别
+    // 防止图层关闭期间地图缩放过，重新打开时使用旧值导致渲染错误
+    const currentMapZoom = map.getZoom()
+    if (this.currentZoom !== currentMapZoom) {
+      console.log('[GeoDataLayer] 更新 currentZoom:', this.currentZoom, '->', currentMapZoom)
+      this.currentZoom = currentMapZoom
+    }
+
     switch (this.geometryType) {
       case 'point':
         console.log('[GeoDataLayer] 调用 _renderPoints(false)')
