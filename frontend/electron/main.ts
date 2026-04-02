@@ -95,8 +95,8 @@ function createWindow() {
 
   // 加载应用
   if (isDev) {
-    devLog('Loading development URL: http://localhost:5173')
-    mainWindow.loadURL('http://localhost:5173')
+    devLog('Loading development URL: http://127.0.0.1:5173')
+    mainWindow.loadURL('http://127.0.0.1:5173')
     mainWindow.webContents.openDevTools()
 
     // 在开发环境中，如果加载失败，自动重试
@@ -109,7 +109,7 @@ function createWindow() {
         devLog(`Retrying to load Vite(attempt ${retryCount} / ${maxRetries})...`)
         setTimeout(() => {
           if (mainWindow) {
-            mainWindow.loadURL('http://localhost:5173')
+            mainWindow.loadURL('http://127.0.0.1:5173')
           }
         }, 2000)
       }

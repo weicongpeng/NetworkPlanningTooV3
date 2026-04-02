@@ -12,7 +12,7 @@ from pydantic import field_validator
 def _parse_cors_origins(v: Optional[str]) -> List[str]:
     """解析CORS配置字符串"""
     if v is None:
-        return ["http://localhost:5173", "http://127.0.0.1:5173"]
+        return ["http://localhost:5173", "http://127.0.0.1:5173", "http://0.0.0.0:5173"]
     if isinstance(v, str):
         return [origin.strip() for origin in v.split(",")]
     return v
@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     NPT_CORS_ORIGINS: Optional[str] = None
 
     # 服务器配置 - 从环境变量读取
-    NPT_HOST: str = "127.0.0.1"
+    NPT_HOST: str = "0.0.0.0"
     NPT_PORT: int = 8000
 
     # 目录配置
@@ -110,7 +110,7 @@ class Settings(BaseSettings):
     def validate_cors_origins(cls, v):
         if v is None:
             # 开发环境默认值
-            return "http://localhost:5173,http://127.0.0.1:5173"
+            return "http://localhost:5173,http://127.0.0.1:5173,http://0.0.0.0:5173"
         return v
 
     @field_validator("NPT_AMAP_API_KEY", mode="before")

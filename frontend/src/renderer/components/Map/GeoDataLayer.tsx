@@ -579,35 +579,25 @@ export class GeoDataLayer {
   }
 
   /**
-   * 更新缩放级别
+   * 更新缩放级别（由 OnlineMap 的 zoomend handler 调用）
    *
    * 🔧 修复：L.circle / L.circleMarker 在 Leaflet 缩放动画后不会自动更新路径，
-   * 导致圆形和扇区图在缩放后显示不正确。需要立即强制重绘所有现有图层。
+   * 导致圆形和扇区图在缩放后显示不正确。
+   *
+   * 注意：完整的视口裁剪重渲染由 _handleZoomEnd() 负责（直接调用，无定时器），
+   * 此方法只做立即强制重绘作为补充，避免定时器竞态条件。
    */
   updateZoom(zoom: number, _map: L.Map): void {
-    const zoomChanged = this.currentZoom !== zoom
     this.currentZoom = zoom
 
     if (!this.visible) return
 
-    // 立即强制重绘所有现有图层，解决缩放动画后路径不更新的问题
+    // 立即强制重绘所有现有图层（更新 CircleMarker 投影位置）
     this._forceRedrawLayers()
 
-    if (zoomChanged) {
-      // 取消之前的定时器
-      if (this._geometryRenderTimer) {
-        clearTimeout(this._geometryRenderTimer)
-      }
-      // 延迟后完整重新渲染（处理 LOD 切换和视口裁剪）
-      this._geometryRenderTimer = window.setTimeout(() => {
-        this._reRenderGeometries()
-        this._geometryRenderTimer = null
-      }, 100) as unknown as number
-
-      // 缩放级别变化时，如果标签已启用，使用节流更新
-      if (this.labelsEnabled) {
-        this._updateLabelsThrottled()
-      }
+    // 标签更新
+    if (this.labelsEnabled) {
+      this._updateLabelsThrottled()
     }
   }
 
@@ -640,6 +630,9 @@ export class GeoDataLayer {
    * 1. 更新当前缩放级别（影响 LOD 策略）
    * 2. 重新计算扇形半径（保持像素大小恒定）
    * 3. 应用视口裁剪（只渲染可见区域）
+   *
+   * 🔧 修复：直接调用 _reRenderGeometries() 而非使用定时器，
+   * 避免与 updateZoom() / onMapMove() 的定时器互相取消导致重渲染丢失。
    */
   private _handleZoomEnd(): void {
     if (!this.map || !this.leafletLayer || !this.visible) return
@@ -653,16 +646,15 @@ export class GeoDataLayer {
       this._zoomAnimFrameId = null
     }
 
-    // 取消之前的定时器
+    // 取消之前的定时器（避免与 updateZoom 竞争）
     if (this._geometryRenderTimer) {
       clearTimeout(this._geometryRenderTimer)
+      this._geometryRenderTimer = null
     }
 
-    // 延迟后完整重新渲染（使用视口裁剪，处理 LOD 切换）
-    this._geometryRenderTimer = window.setTimeout(() => {
-      this._reRenderGeometries()
-      this._geometryRenderTimer = null
-    }, 50) as unknown as number
+    // 🔧 修复：直接重新渲染，不使用延迟定时器
+    // zoomend 只在动画完成后触发一次，直接执行是安全的
+    this._reRenderGeometries()
 
     // 更新标签
     if (this.labelsEnabled) {
@@ -704,16 +696,18 @@ export class GeoDataLayer {
       this._updateLabelsThrottled()
     }
 
-    // 纯平移时才在此处调度几何图形重新渲染
-    // 缩放引起的移动已由 updateZoom 处理
+    // 纯平移时直接重新渲染几何图形（视口裁剪需要更新）
+    // 缩放引起的 moveend 不需要在此处理，_handleZoomEnd 已负责
     if (!zoomChanged) {
+      // 取消之前的定时器
       if (this._geometryRenderTimer) {
         clearTimeout(this._geometryRenderTimer)
       }
+      // 使用短延迟合并连续 move 事件，但不再与 zoom 处理共享定时器变量
       this._geometryRenderTimer = window.setTimeout(() => {
         this._reRenderGeometries()
         this._geometryRenderTimer = null
-      }, 200) as unknown as number
+      }, 150) as unknown as number
     }
   }
 

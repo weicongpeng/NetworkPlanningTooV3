@@ -15,7 +15,7 @@ const API_BASE_URL = '/api/v1'
 
 // 开发环境下的直接后端 URL（绕过 Vite 代理的 multipart/form-data 问题）
 // 使用环境变量配置
-const DEV_BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
+const DEV_BACKEND_URL = import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}:8000/api/v1`
 
 // 检测是否是开发环境
 const isDev = import.meta.env.DEV

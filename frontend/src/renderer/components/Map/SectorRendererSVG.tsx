@@ -1633,6 +1633,11 @@ export class SectorSVGLayer extends L.Layer {
 
   /**
    * 缩放过程中实时更新扇区形状（优化版）
+   *
+   * 🔧 修复：同时更新 CircleMarker（siteMarkers）的投影位置，
+   * 解决缩放动画后圆形标记与地图位置错位的问题。
+   * L.CircleMarker 在 Leaflet 缩放动画后不会自动重投影，
+   * 需要手动调用 redraw() 强制更新。
    */
   private _updateSectorShapes(): void {
     if (!this.mapInstance) return
@@ -1666,9 +1671,14 @@ export class SectorSVGLayer extends L.Layer {
       cached.zoom = currentZoom
     }
 
-    // 同样更新圆点标记的缩放级别
+    // 🔧 修复：同步更新 CircleMarker 的缩放级别并强制重绘
+    // CircleMarker 在缩放动画后投影位置可能不正确，需要 redraw()
     for (const cached of this.siteMarkers.values()) {
       cached.zoom = currentZoom
+      // 强制重绘 CircleMarker，使其重新计算投影坐标
+      if (typeof cached.marker.redraw === 'function') {
+        cached.marker.redraw()
+      }
     }
 
     // 缩放过程中保持高亮样式
