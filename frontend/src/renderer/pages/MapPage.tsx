@@ -1231,6 +1231,7 @@ export function MapPage() {
               <div className="absolute top-full left-0 mt-1 z-[3000] bg-card border border-border rounded-lg shadow-lg w-32 overflow-hidden">
                 <button
                   onClick={() => {
+                    if (captureMode) setCaptureMode(false)
                     setShowPositionMenu(false)
                     locationModalPosRef.current = { x: window.innerWidth / 2, y: window.innerHeight / 2 }
                     setShowLocationModal(true)
@@ -1242,6 +1243,7 @@ export function MapPage() {
                 </button>
                 <button
                   onClick={() => {
+                    if (showLocationModal) setShowLocationModal(false)
                     const newMode = !captureMode
                     setCaptureMode(newMode)
                     setMeasureMode(false)
