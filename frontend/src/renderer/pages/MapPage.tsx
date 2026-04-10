@@ -1231,8 +1231,9 @@ export function MapPage() {
               <div className="absolute top-full left-0 mt-1 z-[3000] bg-card border border-border rounded-lg shadow-lg w-32 overflow-hidden">
                 <button
                   onClick={() => {
-setShowPositionMenu(false)
-                    locationModalPosRef.current = { x: window.innerWidth / 2, y
+                    setShowPositionMenu(false)
+                    locationModalPosRef.current = { x: window.innerWidth / 2, y: window.innerHeight / 2 }
+                    setShowLocationModal(true)
                   }}
                   className="w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors flex items-center gap-2"
                 >
