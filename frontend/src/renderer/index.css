@@ -94,18 +94,18 @@
 }
 
 /* 通用弹窗样式（非定位标记、非抓取弹窗） */
-.leaflet-popup-content-wrapper:not(.location-popup):not(.capture-popup-white) {
+.leaflet-popup-content-wrapper:not(.capture-popup-white) {
   background: rgba(30, 41, 59, 0.95);
   backdrop-filter: blur(8px);
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius);
 }
 
-.leaflet-popup-tip:not(.location-popup):not(.capture-popup-white) {
+.leaflet-popup-tip:not(.capture-popup-white) {
   background: rgba(30, 41, 59, 0.95);
 }
 
-.leaflet-popup-content-wrapper:not(.location-popup):not(.capture-popup-white) .leaflet-popup-content {
+.leaflet-popup-content-wrapper:not(.capture-popup-white) .leaflet-popup-content {
   margin: 12px;
   color: hsl(var(--foreground));
 }
