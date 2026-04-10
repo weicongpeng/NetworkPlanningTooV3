@@ -1477,40 +1477,46 @@ export function MapPage() {
         </div>
       </div>
 
-      {/* 定位弹窗 - 悬浮不遮罩地图，可拖动，单行逗号分隔输入 */}
+      {/* 定位弹窗 - 悬浮不遮罩地图，仅标题栏可拖动，单行逗号分隔输入 */}
       {showLocationModal && (
         <div
           className="fixed z-[4000]"
           style={{ left: locationModalPosRef.current.x || '50%', top: locationModalPosRef.current.y || '50%', transform: 'translate(-50%, -50%)' }}
-          onMouseDown={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect()
-            locationModalDragRef.current = {
-              dragging: true,
-              startX: e.clientX,
-              startY: e.clientY,
-              startLeft: rect.left,
-              startTop: rect.top
-            }
-          }}
-          onMouseMove={(e) => {
-            if (!locationModalDragRef.current.dragging) return
-            const d = locationModalDragRef.current
-            const dx = e.clientX - d.startX
-            const dy = e.clientY - d.startY
-            locationModalPosRef.current = {
-              x: d.startLeft + dx,
-              y: d.startTop + dy
-            }
-            // 强制刷新
-            setShowLocationModal(false)
-            setTimeout(() => setShowLocationModal(true), 0)
-          }}
-          onMouseUp={() => { locationModalDragRef.current.dragging = false }}
-          onMouseLeave={() => { locationModalDragRef.current.dragging = false }}
         >
           <div className="bg-card border border-border rounded-lg shadow-xl p-3 w-72">
-            {/* 可拖动手柄 */}
-            <div className="text-[10px] text-muted-foreground mb-2 select-none cursor-move">{t('map.latLngLocation') || '输入经纬度定位'} (拖动)</div>
+            {/* 仅标题栏可拖动 */}
+            <div
+              className="text-[10px] text-muted-foreground mb-2 select-none cursor-move flex items-center gap-1"
+              onMouseDown={(e) => {
+                const rect = e.currentTarget.parentElement!.getBoundingClientRect()
+                locationModalDragRef.current = {
+                  dragging: true,
+                  startX: e.clientX,
+                  startY: e.clientY,
+                  startLeft: rect.left,
+                  startTop: rect.top
+                }
+                e.stopPropagation()
+              }}
+              onMouseMove={(e) => {
+                if (!locationModalDragRef.current.dragging) return
+                const d = locationModalDragRef.current
+                const dx = e.clientX - d.startX
+                const dy = e.clientY - d.startY
+                locationModalPosRef.current = {
+                  x: d.startLeft + dx,
+                  y: d.startTop + dy
+                }
+                // 强制刷新
+                setShowLocationModal(false)
+                setTimeout(() => setShowLocationModal(true), 0)
+              }}
+              onMouseUp={() => { locationModalDragRef.current.dragging = false }}
+              onMouseLeave={() => { locationModalDragRef.current.dragging = false }}
+            >
+              <span>{t('map.latLngLocation') || '输入经纬度定位'}</span>
+              <span className="opacity-50">(拖动)</span>
+            </div>
             <input
               type="text"
               value={locationInput}
@@ -1564,7 +1570,7 @@ export function MapPage() {
                 }}
                 className="flex-1 px-3 py-1.5 text-xs bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
               >
-                {t('common.ok') || '确定'}
+                {'执行'}
               </button>
             </div>
           </div>
