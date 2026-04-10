@@ -1,0 +1,150 @@
+{
+  "LTE": [
+    {
+      "id": "936521",
+      "name": "Site_936521",
+      "longitude": 0.0,
+      "latitude": 0.0,
+      "networkType": "LTE",
+      "sectors": [
+        {
+          "id": "936521_48",
+          "siteId": "936521",
+          "name": "Cell_936521_48",
+          "longitude": 0.0,
+          "latitude": 0.0,
+          "azimuth": 0,
+          "beamwidth": 65,
+          "height": 30,
+          "pci": 0,
+          "earfcn": 0
+        }
+      ]
+    },
+    {
+      "id": "542654",
+      "name": "Site_542654",
+      "longitude": 0.0,
+      "latitude": 0.0,
+      "networkType": "LTE",
+      "sectors": [
+        {
+          "id": "542654_20",
+          "siteId": "542654",
+          "name": "Cell_542654_20",
+          "longitude": 0.0,
+          "latitude": 0.0,
+          "azimuth": 0,
+          "beamwidth": 65,
+          "height": 30,
+          "pci": 0,
+          "earfcn": 0
+        },
+        {
+          "id": "542654_21",
+          "siteId": "542654",
+          "name": "Cell_542654_21",
+          "longitude": 0.0,
+          "latitude": 0.0,
+          "azimuth": 0,
+          "beamwidth": 65,
+          "height": 30,
+          "pci": 0,
+          "earfcn": 0
+        },
+        {
+          "id": "542654_22",
+          "siteId": "542654",
+          "name": "Cell_542654_22",
+          "longitude": 0.0,
+          "latitude": 0.0,
+          "azimuth": 0,
+          "beamwidth": 65,
+          "height": 30,
+          "pci": 0,
+          "earfcn": 0
+        },
+        {
+          "id": "542654_23",
+          "siteId": "542654",
+          "name": "Cell_542654_23",
+          "longitude": 0.0,
+          "latitude": 0.0,
+          "azimuth": 0,
+          "beamwidth": 65,
+          "height": 30,
+          "pci": 0,
+          "earfcn": 0
+        },
+        {
+          "id": "542654_16",
+          "siteId": "542654",
+          "name": "Cell_542654_16",
+          "longitude": 0.0,
+          "latitude": 0.0,
+          "azimuth": 0,
+          "beamwidth": 65,
+          "height": 30,
+          "pci": 0,
+          "earfcn": 0
+        }
+      ]
+    }
+  ],
+  "NR": [
+    {
+      "id": "7906572",
+      "name": "Site_7906572",
+      "longitude": 0.0,
+      "latitude": 0.0,
+      "networkType": "NR",
+      "sectors": [
+        {
+          "id": "7906572_1",
+          "siteId": "7906572",
+          "name": "Cell_7906572_1",
+          "longitude": 0.0,
+          "latitude": 0.0,
+          "azimuth": 0,
+          "beamwidth": 65,
+          "height": 30,
+          "pci": 0,
+          "earfcn": 0
+        },
+        {
+          "id": "7906572_2",
+          "siteId": "7906572",
+          "name": "Cell_7906572_2",
+          "longitude": 0.0,
+          "latitude": 0.0,
+          "azimuth": 0,
+          "beamwidth": 65,
+          "height": 30,
+          "pci": 0,
+          "earfcn": 0
+        }
+      ]
+    },
+    {
+      "id": "7905713",
+      "name": "Site_7905713",
+      "longitude": 0.0,
+      "latitude": 0.0,
+      "networkType": "NR",
+      "sectors": [
+        {
+          "id": "7905713_10",
+          "siteId": "7905713",
+          "name": "Cell_7905713_10",
+          "longitude": 0.0,
+          "latitude": 0.0,
+          "azimuth": 0,
+          "beamwidth": 65,
+          "height": 30,
+          "pci": 0,
+          "earfcn": 0
+        }
+      ]
+    }
+  ]
+}

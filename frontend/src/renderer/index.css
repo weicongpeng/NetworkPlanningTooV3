@@ -108,19 +108,38 @@
   font-size: 10px !important;
 }
 
-/* 通用弹窗样式（非定位标记） */
-.leaflet-popup-content-wrapper:not(.location-popup) {
+/* 抓取坐标弹窗样式 - 白色背景带细边框 */
+.leaflet-popup.capture-popup-white .leaflet-popup-content-wrapper {
+  background: #fff !important;
+  border: 1px solid #d1d5db !important;
+  border-radius: 4px !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12) !important;
+  padding: 0 !important;
+}
+
+.leaflet-popup.capture-popup-white .leaflet-popup-tip {
+  background: #fff !important;
+  border: 1px solid #d1d5db !important;
+}
+
+.leaflet-popup.capture-popup-white .leaflet-popup-content {
+  margin: 0 !important;
+  color: #000 !important;
+}
+
+/* 通用弹窗样式（非定位标记、非抓取弹窗） */
+.leaflet-popup-content-wrapper:not(.location-popup):not(.capture-popup-white) {
   background: rgba(30, 41, 59, 0.95);
   backdrop-filter: blur(8px);
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius);
 }
 
-.leaflet-popup-tip:not(.location-popup) {
+.leaflet-popup-tip:not(.location-popup):not(.capture-popup-white) {
   background: rgba(30, 41, 59, 0.95);
 }
 
-.leaflet-popup-content-wrapper:not(.location-popup) .leaflet-popup-content {
+.leaflet-popup-content-wrapper:not(.location-popup):not(.capture-popup-white) .leaflet-popup-content {
   margin: 12px;
   color: hsl(var(--foreground));
 }

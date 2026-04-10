@@ -355,8 +355,9 @@ export function MapPage() {
     }
 
     setSelectionMode(mode)
-    setMeasureMode(false) // 退出测距模式
-    // 框选功能和拖拽工具互斥：激活框选时禁用拖拽工具
+    setMeasureMode(false)
+    setCaptureMode(false)
+    setCaptureCoord(null)
     if (mapDragTool) {
       setMapDragTool(false)
     }
@@ -383,7 +384,14 @@ export function MapPage() {
   }
   const [totalDistance, setTotalDistance] = useState<number | null>(null)
   const [showLocationModal, setShowLocationModal] = useState(false)
-  const [locationInput, setLocationInput] = useState({ lng: '', lat: '' })
+  const [locationInput, setLocationInput] = useState('')
+  // 拖动悬浮弹窗位置
+  const locationModalPosRef = useRef({ x: 0, y: 0 })
+  const locationModalDragRef = useRef<{ dragging: boolean; startX: number; startY: number; startLeft: number; startTop: number }>({ dragging: false, startX: 0, startY: 0, startLeft: 0, startTop: 0 })
+  const [showPositionMenu, setShowPositionMenu] = useState(false)
+  const [captureMode, setCaptureMode] = useState(false)
+  const [captureCoord, setCaptureCoord] = useState<{ lng: number; lat: number } | null>(null)
+  const positionMenuRef = useRef<HTMLDivElement>(null)
 
 
   // 从mapStore获取定位点数据
@@ -1188,11 +1196,14 @@ export function MapPage() {
             onClick={() => {
               clearAllSearch()
               setSelectionMode('none')
+              setCaptureMode(false)
+              setCaptureCoord(null)
               selectionManager.clearSelection()
               if (onlineMapRef.current) {
                 onlineMapRef.current.clearPCIHighlight()
                 onlineMapRef.current.clearNeighborHighlight()
                 onlineMapRef.current.clearSelectionHighlight()
+                onlineMapRef.current.clearCaptureMarkers()
               }
             }}
             className="px-2 py-1.5 text-xs rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground flex items-center gap-1"
@@ -1204,26 +1215,63 @@ export function MapPage() {
 
 
 
-          {/* 定位按钮 */}
-          <button
-            className="px-2 py-1.5 text-xs rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground flex items-center gap-1"
-            onClick={() => setShowLocationModal(true)}
-            title={t('map.latLngLocation') || '经纬度定位'}
-          >
-            <div className="w-4 h-4 flex items-center justify-center">
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-map-pin"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-            </div>
-            <span>{t('map.location') || '定位'}</span>
-          </button>
+          {/* 位置下拉菜单 */}
+          <div className="relative" ref={positionMenuRef}>
+            <button
+              className={`px-2 py-1.5 text-xs rounded hover:bg-muted transition-colors flex items-center gap-1 ${captureMode ? 'bg-blue-400 text-white' : 'text-muted-foreground hover:text-foreground'}`}
+              onClick={() => setShowPositionMenu(!showPositionMenu)}
+              title={t('map.position') || '位置'}
+            >
+              <div className="w-4 h-4 flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-map-pin"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+              </div>
+              <span>{t('map.position') || '位置'}</span>
+            </button>
+            {showPositionMenu && (
+              <div className="absolute top-full left-0 mt-1 z-[3000] bg-card border border-border rounded-lg shadow-lg w-32 overflow-hidden">
+                <button
+                  onClick={() => {
+                    setShowPositionMenu(false)
+                    setShowLocationModal(true)
+                  }}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors flex items-center gap-2"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+                  {t('map.coordLocation') || '坐标定位'}
+                </button>
+                <button
+                  onClick={() => {
+                    const newMode = !captureMode
+                    setCaptureMode(newMode)
+                    setMeasureMode(false)
+                    setSelectionMode('none')
+                    setMapDragTool(false)
+                    setShowPositionMenu(false)
+                    if (!newMode) setCaptureCoord(null)
+                  }}
+                  className={`w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors flex items-center gap-2 relative group ${captureMode ? 'text-blue-500 font-medium' : ''}`}
+                  title={t('map.captureModeHint') || '点击地图任意位置抓取WGS84坐标'}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                  {captureMode ? (t('map.exitCaptureMode') || '退出提取') : (t('map.extractCoord') || '提取坐标')}
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* 测距按钮 */}
           <button
             className={`px-2 py-1.5 text-xs rounded hover:bg-muted transition-colors flex items-center gap-1 ${measureMode ? 'bg-blue-400 text-white' : 'text-muted-foreground hover:text-foreground'
               }`}
             onClick={() => {
-              setMeasureMode(!measureMode)
-              setSelectionMode('none') // 退出圈选模式
-              setMapDragTool(false) // 退出地图拖拽工具
+              const newState = !measureMode
+              setMeasureMode(newState)
+              if (newState) {
+                setCaptureMode(false)
+                setCaptureCoord(null)
+                setSelectionMode('none')
+                setMapDragTool(false)
+              }
             }}
             title={measureMode ? (t('map.exitDistanceMode') || '退出测距模式') : (t('map.distanceMode') || '测距工具')}
           >
@@ -1382,22 +1430,38 @@ export function MapPage() {
 
         {/* 右侧地图控件 */}
         <div className="flex items-center gap-3 ml-auto">
-          {/* 地图类型切换按钮 */}
+          {/* 地图类型切换按钮：平面图 → 卫星图 → 关闭底图 三态循环 */}
           <button
             onClick={() => {
-              if (onlineMapVisible) {
-                handleMapTypeChange(mapType === 'roadmap' ? 'satellite' : 'roadmap')
+              if (!onlineMapVisible) {
+                // 关闭状态 → 恢复平面图
+                handleOnlineMapToggle(true)
+                handleMapTypeChange('roadmap')
+              } else if (mapType === 'roadmap') {
+                // 平面图 → 卫星图
+                handleMapTypeChange('satellite')
+              } else {
+                // 卫星图 → 关闭底图
+                handleOnlineMapToggle(false)
               }
             }}
             className={`flex items-center gap-1.5 px-2 py-1 text-xs rounded transition-colors ${
               onlineMapVisible
-                ? 'bg-blue-400 text-white hover:bg-blue-500'
-                : 'bg-muted text-muted-foreground opacity-50 cursor-not-allowed'
+                ? 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                : 'text-muted-foreground opacity-60 hover:bg-muted hover:text-foreground'
             }`}
-            disabled={!onlineMapVisible}
-            title={mapType === 'roadmap' ? (t('map.switchToSatellite') || '切换到卫星图') : (t('map.switchToRoadmap') || '切换到平面图')}
+            title={!onlineMapVisible
+              ? (t('map.switchToRoadmap') || '切换到平面图')
+              : mapType === 'roadmap'
+                ? (t('map.switchToSatellite') || '切换到卫星图')
+                : (t('map.emptyMap') || '空地图')}
           >
-            {mapType === 'roadmap' ? (
+            {!onlineMapVisible ? (
+              <>
+                <MapIcon size={14} className="opacity-50" />
+                <span className="opacity-60">{t('map.emptyMap') || '空地图'}</span>
+              </>
+            ) : mapType === 'roadmap' ? (
               <>
                 <MapIcon size={14} />
                 <span>{t('map.vector') || '平面图'}</span>
@@ -1409,113 +1473,98 @@ export function MapPage() {
               </>
             )}
           </button>
-
-          {/* 在线地图开关 */}
-          <div className="flex items-center">
-            <button
-              onClick={() => handleOnlineMapToggle(!onlineMapVisible)}
-              style={{
-                width: '18px',
-                height: '18px',
-                border: onlineMapVisible ? '#22c55e solid 2px' : 'rgba(120, 120, 120, 0.5) solid 2px',
-                borderRadius: '5px',
-                backgroundColor: onlineMapVisible ? '#22c55e' : 'rgba(200, 200, 200, 0.5)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              {onlineMapVisible && (
-                <svg
-                  width="10"
-                  height="10"
-                  viewBox="0 0 10 10"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M1 4L3.5 6.5L9 1"
-                    stroke="white"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              )}
-            </button>
-          </div>
         </div>
       </div>
 
-      {/* 定位弹窗 */}
+      {/* 定位弹窗 - 悬浮不遮罩地图，可拖动，单行逗号分隔输入 */}
       {showLocationModal && (
-        <div className="fixed inset-0 z-[4000] flex items-center justify-center bg-black/20">
-          <div className="bg-card border border-border rounded-lg shadow-lg p-4 w-64">
-            <h3 className="text-sm font-semibold mb-3">{t('map.latLngLocation') || '输入经纬度定位'}</h3>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs text-muted-foreground mb-1">{t('map.longitude') || '经度'}</label>
-                <input
-                  type="text"
-                  value={locationInput.lng}
-                  onChange={(e) => setLocationInput(prev => ({ ...prev, lng: e.target.value }))}
-                  placeholder={t('map.locationExample') || '例如: 116.397428'}
-                  className="w-full px-3 py-2 text-xs border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-muted-foreground mb-1">{t('map.latitude') || '纬度'}</label>
-                <input
-                  type="text"
-                  value={locationInput.lat}
-                  onChange={(e) => setLocationInput(prev => ({ ...prev, lat: e.target.value }))}
-                  placeholder={t('map.latitudeExample') || '例如: 39.90923'}
-                  className="w-full px-3 py-2 text-xs border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-              <div className="flex gap-2 pt-2">
-                <button
-                  onClick={() => {
-                    setShowLocationModal(false);
-                    setLocationInput({ lng: '', lat: '' });
-                  }}
-                  className="flex-1 px-3 py-2 text-xs bg-muted rounded-lg hover:bg-muted/80 transition-colors"
-                >
-                  {t('common.cancel') || '取消'}
-                </button>
-                <button
-                  onClick={async () => {
-                    const lng = parseFloat(locationInput.lng);
-                    const lat = parseFloat(locationInput.lat);
-                    if (isNaN(lng) || isNaN(lat)) return;
-
-                    // 使用纠偏后的经纬度
-                    const [correctedLat, correctedLng] = CoordinateTransformer.wgs84ToGcj02(lat, lng);
-
-                    // 生成唯一ID
-                    const id = `location-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-                    const newPoint = { id, lng: correctedLng, lat: correctedLat };
-
-                    // 添加定位点到全局store
-                    addLocationPoint(newPoint);
-
-                    // 定位到该点并做标记
-                    if (onlineMapRef.current) {
-                      onlineMapRef.current.flyTo([correctedLat, correctedLng], 15);
-                      // 索引从1开始
-                      onlineMapRef.current.addLocationMarker(newPoint, locationPoints.length + 1);
-                    }
-
-                    setShowLocationModal(false);
-                    setLocationInput({ lng: '', lat: '' });
-                  }}
-                  className="flex-1 px-3 py-2 text-xs bg-blue-400 text-white rounded-lg hover:bg-blue-500 transition-colors"
-                >
-                  {t('common.ok') || '确定'}
-                </button>
-              </div>
+        <div
+          className="fixed z-[4000]"
+          style={{ left: locationModalPosRef.current.x || '50%', top: locationModalPosRef.current.y || '50%', transform: 'translate(-50%, -50%)' }}
+          onMouseDown={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect()
+            locationModalDragRef.current = {
+              dragging: true,
+              startX: e.clientX,
+              startY: e.clientY,
+              startLeft: rect.left,
+              startTop: rect.top
+            }
+          }}
+          onMouseMove={(e) => {
+            if (!locationModalDragRef.current.dragging) return
+            const d = locationModalDragRef.current
+            const dx = e.clientX - d.startX
+            const dy = e.clientY - d.startY
+            locationModalPosRef.current = {
+              x: d.startLeft + dx,
+              y: d.startTop + dy
+            }
+            // 强制刷新
+            setShowLocationModal(false)
+            setTimeout(() => setShowLocationModal(true), 0)
+          }}
+          onMouseUp={() => { locationModalDragRef.current.dragging = false }}
+          onMouseLeave={() => { locationModalDragRef.current.dragging = false }}
+        >
+          <div className="bg-card border border-border rounded-lg shadow-xl p-3 w-72">
+            {/* 可拖动手柄 */}
+            <div className="text-[10px] text-muted-foreground mb-2 select-none cursor-move">{t('map.latLngLocation') || '输入经纬度定位'} (拖动)</div>
+            <input
+              type="text"
+              value={locationInput}
+              onChange={(e) => setLocationInput(e.target.value)}
+              placeholder="116.397428, 39.90923"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const parts = locationInput.split(',').map(s => s.trim())
+                  if (parts.length !== 2) return
+                  const lng = parseFloat(parts[0])
+                  const lat = parseFloat(parts[1])
+                  if (isNaN(lng) || isNaN(lat)) return
+                  const [correctedLat, correctedLng] = CoordinateTransformer.wgs84ToGcj02(lat, lng)
+                  const id = `location-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+                  const newPoint = { id, lng: correctedLng, lat: correctedLat }
+                  addLocationPoint(newPoint)
+                  if (onlineMapRef.current) {
+                    onlineMapRef.current.flyTo([correctedLat, correctedLng], 15)
+                    onlineMapRef.current.addLocationMarker(newPoint, locationPoints.length + 1)
+                  }
+                  setShowLocationModal(false)
+                  setLocationInput('')
+                }
+              }}
+              className="w-full px-3 py-2 text-xs border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-mono"
+            />
+            <div className="flex gap-2 mt-2">
+              <button
+                onClick={() => { setShowLocationModal(false); setLocationInput('') }}
+                className="flex-1 px-3 py-1.5 text-xs bg-muted rounded-lg hover:bg-muted/80 transition-colors"
+              >
+                {t('common.cancel') || '取消'}
+              </button>
+              <button
+                onClick={() => {
+                  const parts = locationInput.split(',').map(s => s.trim())
+                  if (parts.length !== 2) return
+                  const lng = parseFloat(parts[0])
+                  const lat = parseFloat(parts[1])
+                  if (isNaN(lng) || isNaN(lat)) return
+                  const [correctedLat, correctedLng] = CoordinateTransformer.wgs84ToGcj02(lat, lng)
+                  const id = `location-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+                  const newPoint = { id, lng: correctedLng, lat: correctedLat }
+                  addLocationPoint(newPoint)
+                  if (onlineMapRef.current) {
+                    onlineMapRef.current.flyTo([correctedLat, correctedLng], 15)
+                    onlineMapRef.current.addLocationMarker(newPoint, locationPoints.length + 1)
+                  }
+                  setShowLocationModal(false)
+                  setLocationInput('')
+                }}
+                className="flex-1 px-3 py-1.5 text-xs bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+              >
+                {t('common.ok') || '确定'}
+              </button>
             </div>
           </div>
         </div>
@@ -1547,6 +1596,8 @@ export function MapPage() {
                 // 框选模式和拖拽工具独立管理
               }}
               mapDragTool={mapDragTool}
+              captureMode={captureMode}
+              onCaptureCoord={(lng, lat) => setCaptureCoord({ lng, lat })}
             />
 
             {/* 图层控制面板 */}
@@ -1574,6 +1625,7 @@ export function MapPage() {
               onLabelSettingsChange={handleLabelSettingsChange}
               labelSettingsMap={labelSettingsMap}
             />
+
           </>
         ) : (
           <OfflineMap data={offlineData} offlinePath={offlinePath} />

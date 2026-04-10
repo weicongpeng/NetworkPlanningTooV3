@@ -122,6 +122,10 @@ interface OnlineMapProps {
   onSelectionModeEnd?: () => void
   /** 地图拖拽工具是否启用 */
   mapDragTool?: boolean
+  /** 抓取坐标模式 */
+  captureMode?: boolean
+  /** 抓取坐标回调 (WGS84经度, WGS84纬度) */
+  onCaptureCoord?: (lng: number, lat: number) => void
 }
 
 /**
@@ -197,6 +201,8 @@ export interface OnlineMapRef {
   getPointFileData: () => Record<string, any[]>
   /** 设置扇区标签配置 */
   setSectorLabelSettings: (settings: any, layerId: string) => void
+  /** 清除所有抓取坐标标记 */
+  clearCaptureMarkers: () => void
 }
 
 export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
@@ -213,7 +219,9 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
   labelSettingsMap = {},
   selectionMode = 'none',
   onSelectionModeEnd,
-  mapDragTool = false
+  mapDragTool = false,
+  captureMode = false,
+  onCaptureCoord
 }, ref) => {
   // Refs
   const customLayerRefs = useRef<Record<string, L.LayerGroup | L.FeatureGroup>>({})
@@ -239,6 +247,8 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
   const initializedRef = useRef(false) // 跟踪是否已初始化过
   const measureModeRef = useRef(measureMode) // 测距模式Ref
   const selectionModeRef = useRef(selectionMode) // 圈选模式Ref
+  const captureModeRef = useRef(captureMode) // 抓取模式Ref
+  const captureMarkersRef = useRef<Array<any>>([]) // 抓取坐标标记数组
   const shadowLineRef = useRef<any>(null) // 测量预览虚线
   const shadowLabelRef = useRef<any>(null) // 测量预览标签
 
@@ -260,6 +270,7 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
   // 同步Ref
   useEffect(() => { measureModeRef.current = measureMode }, [measureMode])
   useEffect(() => { selectionModeRef.current = selectionMode }, [selectionMode])
+  useEffect(() => { captureModeRef.current = captureMode }, [captureMode])
 
   // 使用Ref跟踪上一次的mapDragTool值，用于检测变化
   const prevMapDragToolRef = useRef<boolean>(mapDragTool)
@@ -752,28 +763,34 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
       const L = window.L
       const map = mapInstanceRef.current
 
-      // 创建定位标记图标 - 红色
+      // 创建定位标记图标 - 与抓取坐标小圆点样式一致：红色圆内嵌序号
       const icon = L.divIcon({
-        html: `<div style="background-color: #ef4444; width: 20px; height: 20px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3);"></div>`,
+        html: `<div style="background:#ef4444;color:#fff;font-size:10px;font-weight:bold;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.3);">${index}</div>`,
         className: 'location-marker-icon',
         iconSize: [20, 20],
-        iconAnchor: [10, 20]
+        iconAnchor: [10, 10]
       })
 
       // 创建标记
       const mapMarker = L.marker([marker.lat, marker.lng], { icon })
         .addTo(map)
 
-      // 添加弹窗信息 - 定位点编号和经纬度
+      // 添加弹窗信息 - 白色风格与抓取坐标一致
+      const coordText = `${marker.lng.toFixed(6)}, ${marker.lat.toFixed(6)}`
+      const popupId = `loc-copy-${Date.now()}`
       mapMarker.bindPopup(`
-        <div style="padding: 8px; min-width: 150px;">
-          <h3 style="margin: 0 0 5px 0; font-size: 14px; color: #ef4444;">${t('map.locationPoint')}${index}</h3>
-          <p style="margin: 0; font-size: 12px; color: #666;">
-            ${t('map.longitude')}: ${marker.lng.toFixed(6)}<br>
-            ${t('map.latitude')}: ${marker.lat.toFixed(6)}
-          </p>
+        <div style="padding:6px 8px;min-width:200px;background:#fff;color:#000;border:1px solid #d1d5db;border-radius:4px;">
+          <div style="font-size:11px;color:#888;margin-bottom:4px;">#${index}</div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#000;">
+            <span style="font-family:monospace;white-space:nowrap;color:#000;">Lng: ${marker.lng.toFixed(6)}, Lat: ${marker.lat.toFixed(6)}</span>
+            <button onclick="(function(){navigator.clipboard.writeText('${coordText}');var b=document.getElementById('${popupId}');if(b){b.textContent='✓';setTimeout(function(){b.textContent='复制'},1500)}})()"
+              id="${popupId}"
+              style="padding:2px 8px;font-size:11px;background:#3b82f6;color:#fff;border:none;border-radius:3px;cursor:pointer;white-space:nowrap;">
+              复制
+            </button>
+          </div>
         </div>
-      `)
+      `, { className: 'capture-popup-white' })
 
       // 默认展开弹窗
       mapMarker.openPopup()
@@ -1100,6 +1117,14 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
       console.log('[OnlineMap] setMeasureMode:', enabled)
       measureModeRef.current = enabled
       // useEffect hook会自动处理扇区图层的测距模式更新
+    },
+
+    clearCaptureMarkers: () => {
+      if (!mapInstanceRef.current) return
+      captureMarkersRef.current.forEach(marker => {
+        mapInstanceRef.current?.removeLayer(marker)
+      })
+      captureMarkersRef.current = []
     }
   }))
 
@@ -1201,6 +1226,62 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
    * 处理地图点击事件
    */
   const handleMapClick = useCallback((event: any) => {
+    // 抓取模式：获取点击坐标并转换为WGS84，在地图上添加持久化标记
+    if (captureMode && onCaptureCoord && mapInstanceRef.current && window.L) {
+      const L = window.L
+      const map = mapInstanceRef.current
+      const gcjLat = event.latlng.lat
+      const gcjLng = event.latlng.lng
+      const [wgsLat, wgsLng] = CoordinateTransformer.gcj02ToWgs84(gcjLat, gcjLng)
+
+      // 序号：从1开始
+      const seq = captureMarkersRef.current.length + 1
+      const captureId = `capture-${seq}`
+
+      // 创建带序号的标记（序号嵌入圆点内部）
+      const marker = L.marker([gcjLat, gcjLng], {
+        icon: L.divIcon({
+          html: `<div style="background:#ef4444;color:#fff;font-size:10px;font-weight:bold;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.3);">${seq}</div>`,
+          className: 'capture-marker',
+          iconSize: [20, 20],
+          iconAnchor: [10, 10]
+        })
+      }).addTo(map)
+
+      // 存储属性数据到 marker 上，供圈选工具读取
+      ;(marker as any).captureProperties = {
+        id: captureId,
+        name: captureId,
+        序号: seq,
+        longitude: wgsLng.toFixed(6),
+        latitude: wgsLat.toFixed(6),
+        lng: wgsLng.toFixed(6),
+        lat: wgsLat.toFixed(6),
+        _layerType: 'CapturePoint'
+      }
+
+      // 弹出经纬度信息（一行显示+复制按钮）
+      const coordText = `${wgsLng.toFixed(6)}, ${wgsLat.toFixed(6)}`
+      const popupId = `capture-copy-${Date.now()}`
+      marker.bindPopup(`
+        <div style="padding:6px 8px;min-width:220px;background:#fff;color:#000;border:1px solid #d1d5db;border-radius:4px;">
+          <div style="font-size:11px;color:#888;margin-bottom:4px;">#${seq}</div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#000;">
+            <span style="font-family:monospace;white-space:nowrap;color:#000;">Lng: ${wgsLng.toFixed(6)}, Lat: ${wgsLat.toFixed(6)}</span>
+            <button onclick="(function(){navigator.clipboard.writeText('${coordText}');var b=document.getElementById('${popupId}');if(b){b.textContent='✓';setTimeout(function(){b.textContent='复制'},1500)}})()"
+              id="${popupId}"
+              style="padding:2px 8px;font-size:11px;background:#3b82f6;color:#fff;border:none;border-radius:3px;cursor:pointer;white-space:nowrap;">
+              复制
+            </button>
+          </div>
+        </div>
+      `, { className: 'capture-popup-white' }).openPopup()
+
+      captureMarkersRef.current.push(marker)
+      onCaptureCoord(wgsLng, wgsLat)
+      return
+    }
+
     // 框选模式下不处理地图点击事件
     if (selectionModeRef.current !== 'none') return
 
@@ -1281,7 +1362,7 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
         measurementLinesRef.current.push(polyline)
       }
     }
-  }, [measureMode, measurePoints, hideSectorInfo, hideFeatureInfo])
+  }, [measureMode, measurePoints, hideSectorInfo, hideFeatureInfo, captureMode, onCaptureCoord])
 
   /**
    * 处理地图右键事件，用于结束测量或释放测距模式
@@ -1468,19 +1549,7 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
     if (mapInstanceRef.current) {
       const map = mapInstanceRef.current
 
-      // 清除所有测量线条
-      measurementLinesRef.current.forEach(line => {
-        map.removeLayer(line)
-      })
-      measurementLinesRef.current = []
-
-      // 清除所有测量点标记
-      measurementMarkersRef.current.forEach(m => {
-        map.removeLayer(m)
-      })
-      measurementMarkersRef.current = []
-
-      // 清除预览线
+      // 清除预览线（绘制中的虚线和标签）
       if (shadowLineRef.current) {
         map.removeLayer(shadowLineRef.current)
         shadowLineRef.current = null
@@ -1490,16 +1559,14 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
         shadowLabelRef.current = null
       }
 
-      // 移除距离信息标记
-      if (measurementDistanceRef.current) {
-        map.removeLayer(measurementDistanceRef.current)
-        measurementDistanceRef.current = null
+      // 退出测距模式时：保留已完成的测量轨迹，只重置当前绘制中的点
+      if (!measureMode) {
+        setMeasurePoints([])
+        measurePointsRef.current = []
       }
-
-      // 重置测量状态
-      setMeasurePoints([])
     }
   }, [measureMode])
+
 
   /**
    * 创建扇区图层的辅助函数
@@ -2054,6 +2121,10 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
 
         // 添加测量模式下的十字光标和预览线
         map.on('mousemove', (e: L.LeafletMouseEvent) => {
+          if (captureModeRef.current) {
+            map.getContainer().style.cursor = 'crosshair'
+            return
+          }
           if (measureModeRef.current) {
             map.getContainer().style.cursor = 'crosshair'
 
@@ -2445,6 +2516,18 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
       })
     }
 
+    // 3. 遍历抓取坐标点
+    captureMarkersRef.current.forEach(marker => {
+      if (!mapInstanceRef.current || !mapInstanceRef.current.hasLayer(marker)) return
+      const markerLatLng = marker.getLatLng()
+      if (markerLatLng && latLng.distanceTo(markerLatLng) < 30) {
+        const props = (marker as any).captureProperties
+        if (props) {
+          clickedFeatures.push({ id: props.id, props, layerType: 'CapturePoint' })
+        }
+      }
+    })
+
     // 如果没有点击到任何要素，清除选中状态
     if (clickedFeatures.length === 0) {
       if (!isMultiSelect) {
@@ -2592,6 +2675,19 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
       })
     }
 
+    // 3. 遍历抓取坐标点
+    captureMarkersRef.current.forEach(marker => {
+      if (!mapInstanceRef.current || !mapInstanceRef.current.hasLayer(marker)) return
+      const markerLatLng = marker.getLatLng()
+      if (markerLatLng && center.distanceTo(markerLatLng) <= radius) {
+        const props = (marker as any).captureProperties
+        if (props) {
+          selectedIds.add(props.id)
+          selectedProperties.push({ ...props })
+        }
+      }
+    })
+
     // 应用高亮
     if (selectedIds.size > 0) {
       console.log('[OnlineMap] 圆形框选选中要素总数:', selectedIds.size)
@@ -2681,6 +2777,19 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
         console.log('[OnlineMap] 多边形框选选中NR扇区:', sector.name, sector.id)
       })
     }
+
+    // 3. 遍历抓取坐标点
+    captureMarkersRef.current.forEach(marker => {
+      if (!mapInstanceRef.current || !mapInstanceRef.current.hasLayer(marker)) return
+      const markerLatLng = marker.getLatLng()
+      if (markerLatLng && polygon.contains(markerLatLng)) {
+        const props = (marker as any).captureProperties
+        if (props) {
+          selectedIds.add(props.id)
+          selectedProperties.push({ ...props })
+        }
+      }
+    })
 
     // 应用高亮
     if (selectedIds.size > 0) {
