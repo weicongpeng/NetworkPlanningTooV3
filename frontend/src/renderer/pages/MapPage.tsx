@@ -1430,6 +1430,50 @@ export function MapPage() {
             )}
           </div>
 
+          {/* 地图类型切换按钮：平面图 → 卫星图 → 关闭底图 三态循环 */}
+          <button
+            onClick={() => {
+              if (!onlineMapVisible) {
+                // 关闭状态 → 恢复平面图
+                handleOnlineMapToggle(true)
+                handleMapTypeChange('roadmap')
+              } else if (mapType === 'roadmap') {
+                // 平面图 → 卫星图
+                handleMapTypeChange('satellite')
+              } else {
+                // 卫星图 → 关闭底图
+                handleOnlineMapToggle(false)
+              }
+            }}
+            className={`flex items-center gap-1.5 px-2 py-1 text-xs rounded transition-colors ${
+              onlineMapVisible
+                ? 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                : 'text-muted-foreground opacity-60 hover:bg-muted hover:text-foreground'
+            }`}
+            title={!onlineMapVisible
+              ? (t('map.switchToRoadmap') || '切换到平面图')
+              : mapType === 'roadmap'
+                ? (t('map.switchToSatellite') || '切换到卫星图')
+                : (t('map.emptyMap') || '空地图')}
+          >
+            {!onlineMapVisible ? (
+              <>
+                <MapIcon size={14} className="opacity-50" />
+                <span className="opacity-60">{t('map.emptyMap') || '空地图'}</span>
+              </>
+            ) : mapType === 'roadmap' ? (
+              <>
+                <MapIcon size={14} />
+                <span>{t('map.vector') || '平面图'}</span>
+              </>
+            ) : (
+              <>
+                <Satellite size={14} />
+                <span>{t('map.satellite') || '卫星图'}</span>
+              </>
+            )}
+          </button>
+
           {/* 搜索结果容器 */}
           <div className="absolute top-full left-0 mt-1 z-[2000] w-64">
             {/* 搜索结果下拉框 */}
