@@ -236,6 +236,7 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
   mapDragTool = false,
   captureMode = false,
   onCaptureCoord,
+  onCaptureBlocked,
   decorationLayerVisible = true
 }, ref) => {
   // Refs
