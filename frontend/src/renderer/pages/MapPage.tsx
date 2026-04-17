@@ -153,11 +153,11 @@ export function MapPage() {
   // 自定义图层 (用户创建的点)
   const [customLayers, setCustomLayers] = useState<CustomLayerOption[]>([])
 
-  // 装饰图层（打点、定位标记等）- 默认启用
+  // 装饰图层（打点、定位标记等）- 默认关闭
   const [decorationLayer, setDecorationLayer] = useState<DecorationLayerOption>({
     id: 'decoration-layer',
     name: '装饰图层',
-    visible: true,
+    visible: false,
     count: 0
   })
 
