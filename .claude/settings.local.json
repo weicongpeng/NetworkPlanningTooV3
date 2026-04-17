@@ -76,7 +76,8 @@
       "Bash(grep -rn \"def get_same_site_sectors\" \"d:\\\\mycode\\\\NetworkPlanningTooV3\\\\backend\\\\app\\\\algorithms\"\" --include=\"*.py\" | grep -v \".bak \")",
       "mcp__serena__onboarding",
       "mcp__serena__list_dir",
-      "Bash(npm run lint:*)"
+      "Bash(npm run lint:*)",
+      "Skill(gsd-do)"
     ]
   }
 }

@@ -1,20 +1,4 @@
 {
-  "46ccf350-2e09-4575-a048-be8db879778d": {
-    "id": "46ccf350-2e09-4575-a048-be8db879778d",
-    "name": "ProjectParameter_mongoose河源电联20260416224335.xlsx",
-    "type": "excel",
-    "fileType": "full_params",
-    "size": 4600897,
-    "originalPath": "D:\\mycode\\ProjectParameter_mongoose河源电联20260416224335.xlsx",
-    "uploadDate": "2026-04-17T00:32:27.799776",
-    "status": "ready",
-    "metadata": {
-      "LTESiteCount": 4112,
-      "LTESectorCount": 18778,
-      "NRSiteCount": 1405,
-      "NRSectorCount": 15438
-    }
-  },
   "14e4c450-78f5-49d7-95fc-e25a19365f7c": {
     "id": "14e4c450-78f5-49d7-95fc-e25a19365f7c",
     "name": "4G_TAC.zip",
@@ -107,34 +91,20 @@
       "NRSectorCount": 21
     }
   },
-  "828d3318-b4be-46d5-a107-ecfc319d0c2f": {
-    "id": "828d3318-b4be-46d5-a107-ecfc319d0c2f",
-    "name": "828d3318-b4be-46d5-a107-ecfc319d0c2f.xlsx",
-    "type": "excel",
-    "fileType": "default",
-    "size": 752411,
-    "uploadDate": "2026-04-17T11:32:29.579484",
-    "status": "ready",
-    "metadata": {}
-  },
-  "e7c711e9-4591-4a74-b24d-791e7a0db1ea": {
-    "id": "e7c711e9-4591-4a74-b24d-791e7a0db1ea",
-    "name": "e7c711e9-4591-4a74-b24d-791e7a0db1ea.xlsx",
-    "type": "excel",
-    "fileType": "target_cells",
-    "size": 12190,
-    "uploadDate": "2026-04-17T11:32:29.593007",
-    "status": "ready",
-    "metadata": {}
-  },
-  "f195acd9-5733-47fb-a147-78f5e8c41233": {
-    "id": "f195acd9-5733-47fb-a147-78f5e8c41233",
-    "name": "f195acd9-5733-47fb-a147-78f5e8c41233.xlsx",
+  "9549b714-adb8-4f0b-80e3-d1114987417b": {
+    "id": "9549b714-adb8-4f0b-80e3-d1114987417b",
+    "name": "ProjectParameter_mongoose河源电联20260416224335.xlsx",
     "type": "excel",
     "fileType": "full_params",
-    "size": 4343242,
-    "uploadDate": "2026-04-17T11:32:30.016317",
+    "size": 4399073,
+    "originalPath": "D:\\mycode\\ProjectParameter_mongoose河源电联20260416224335.xlsx",
+    "uploadDate": "2026-04-17T12:14:15.410851",
     "status": "ready",
-    "metadata": {}
+    "metadata": {
+      "LTESiteCount": 4112,
+      "LTESectorCount": 18778,
+      "NRSiteCount": 1405,
+      "NRSectorCount": 15438
+    }
   }
 }

@@ -545,6 +545,10 @@ class DataService:
                             # 标记为已处理（以便后续追加未处理的）
                             updates[key]["_processed"] = True
 
+                            # 设置"是否现网"列：能匹配到现网工参，填"是"
+                            if "是否现网" in col_map:
+                                row[col_map["是否现网"] - 1].value = "是"
+
                             # 检查基站名称是否被更新
                             new_bs_name = None
                             if "基站名称" in col_map:
@@ -553,6 +557,10 @@ class DataService:
                             if current_bs_name != new_bs_name:
                                 safe_print(f"[LTE UPDATE] 基站名称已更新: Key={key}, 原值={current_bs_name}, 新值={new_bs_name}")
                         else:
+                            # 设置"是否现网"列：未匹配到现网工参，填"否"
+                            if "是否现网" in col_map:
+                                row[col_map["是否现网"] - 1].value = "否"
+
                             # LTE Key未找到的调试日志（只记录前几条，避免日志过多）
                             missing_count = getattr(self, '_lte_missing_key_count', 0) + 1
                             self._lte_missing_key_count = missing_count
