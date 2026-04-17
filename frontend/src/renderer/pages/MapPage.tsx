@@ -417,6 +417,12 @@ export function MapPage() {
   const [captureMode, setCaptureMode] = useState(false)
   const [captureCoord, setCaptureCoord] = useState<{ lng: number; lat: number } | null>(null)
 
+  /**
+   * 处理打点功能被阻止（装饰图层未勾选）
+   */
+  const handleCaptureBlocked = useCallback(() => {
+    alert(t('map.captureRequiresDecorationLayer') || '请先勾选装饰图层后再进行打点操作')
+  }, [t])
 
   // 从mapStore获取定位点数据
   const { locationPoints, addLocationPoint, clearLocationPoints } = useMapStore()
