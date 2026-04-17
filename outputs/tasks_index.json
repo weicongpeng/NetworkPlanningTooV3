@@ -2143,5 +2143,62 @@
     "created_at": "2026-04-17T08:51:32.079627",
     "started_at": "2026-04-17T08:51:32.083670",
     "completed_at": null
+  },
+  "3a0934cb-8dcd-4b0f-afa1-f0e43be4a076": {
+    "task_id": "3a0934cb-8dcd-4b0f-afa1-f0e43be4a076",
+    "task_type": "neighbor",
+    "config": {
+      "planningType": "NR-NR",
+      "maxDistance": 3.0,
+      "maxNeighbors": 64,
+      "coverageDistanceFactor": 1.0,
+      "coverageRadiusFactor": 1.0,
+      "customRules": null
+    },
+    "status": "completed",
+    "progress": 100.0,
+    "result": null,
+    "error": null,
+    "created_at": "2026-04-17T10:28:37.829556",
+    "started_at": "2026-04-17T10:28:37.835882",
+    "completed_at": null
+  },
+  "06ff06c6-9a55-415d-8ef9-1708a54011f7": {
+    "task_id": "06ff06c6-9a55-415d-8ef9-1708a54011f7",
+    "task_type": "neighbor",
+    "config": {
+      "planningType": "NR-NR",
+      "maxDistance": 3.0,
+      "maxNeighbors": 12,
+      "coverageDistanceFactor": 1.0,
+      "coverageRadiusFactor": 1.0,
+      "customRules": null
+    },
+    "status": "completed",
+    "progress": 100.0,
+    "result": null,
+    "error": null,
+    "created_at": "2026-04-17T10:29:05.961552",
+    "started_at": "2026-04-17T10:29:05.965366",
+    "completed_at": null
+  },
+  "0639a5bd-122b-4fec-b534-35ccbd381648": {
+    "task_id": "0639a5bd-122b-4fec-b534-35ccbd381648",
+    "task_type": "neighbor",
+    "config": {
+      "planningType": "NR-NR",
+      "maxDistance": 3.0,
+      "maxNeighbors": 5,
+      "coverageDistanceFactor": 1.0,
+      "coverageRadiusFactor": 1.0,
+      "customRules": null
+    },
+    "status": "completed",
+    "progress": 100.0,
+    "result": null,
+    "error": null,
+    "created_at": "2026-04-17T10:29:29.066437",
+    "started_at": "2026-04-17T10:29:29.069895",
+    "completed_at": null
   }
 }
