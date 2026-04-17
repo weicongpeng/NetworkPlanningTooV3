@@ -891,8 +891,8 @@ export function LayerControl({
         .custom-checkbox {
           position: relative;
           display: inline-block;
-          width: 18px;
-          height: 18px;
+          width: 14px;
+          height: 14px;
         }
         .custom-checkbox input {
           opacity: 0;
@@ -903,11 +903,11 @@ export function LayerControl({
           position: absolute;
           top: 0;
           left: 0;
-          width: 18px;
-          height: 18px;
+          width: 14px;
+          height: 14px;
           background-color: #f3f4f6;
           border: 2px solid #d1d5db;
-          border-radius: 5px;
+          border-radius: 4px;
           transition: all 0.2s ease;
         }
         .custom-checkbox:hover input ~ .checkmark {
@@ -922,10 +922,10 @@ export function LayerControl({
           content: "";
           position: absolute;
           display: none;
-          left: 5px;
-          top: 2px;
-          width: 5px;
-          height: 10px;
+          left: 4px;
+          top: 1px;
+          width: 4px;
+          height: 8px;
           border: solid white;
           border-width: 0 2px 2px 0;
           transform: rotate(45deg);
