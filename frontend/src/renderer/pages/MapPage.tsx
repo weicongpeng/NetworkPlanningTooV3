@@ -1516,8 +1516,6 @@ export function MapPage() {
           </div>
         </div>
 
-        {/* 右侧地图控件 */}
-        <div className="flex items-center gap-4 ml-auto">
           {/* 地图类型切换按钮：平面图 → 卫星图 → 关闭底图 三态循环 */}
           <button
             onClick={() => {
@@ -1561,6 +1559,10 @@ export function MapPage() {
               </>
             )}
           </button>
+        </div>
+
+        {/* 右侧地图控件占位 */}
+        <div className="flex items-center gap-4 ml-auto">
         </div>
       </div>
 
