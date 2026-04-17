@@ -651,7 +651,7 @@ class NeighborPlanner:
         # 最终结果 = 强制邻区 + 兜底邻区 + 选中的候选邻区
         final_neighbors = forced_neighbors + fallback_neighbors + selected_candidates
 
-        logger.debug(f"最终结果: 强制邻区={len(forced_neighbors)}, 候选邻区={len(selected_candidates)}, 总计={len(final_neighbors)}")
+        logger.debug(f"最终结果: 强制邻区={len(forced_neighbors)}, 兜底邻区={len(fallback_neighbors)}, 候选邻区={len(selected_candidates)}, 总计={len(final_neighbors)}")
 
         return final_neighbors
     
