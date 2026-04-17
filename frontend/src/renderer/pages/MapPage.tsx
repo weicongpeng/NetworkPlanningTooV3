@@ -11,9 +11,9 @@
  */
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Loader2, Search, X, MapPin, AlertTriangle, Database, Table, Trash2, MousePointer2, Circle as CircleIcon, Pentagon, Hand, Map as MapIcon, Satellite } from 'lucide-react'
+import { Loader2, Search, X, MapPin, AlertTriangle, Database, Trash2, MousePointer2, Circle as CircleIcon, Pentagon, Hand, Map as MapIcon, Satellite } from 'lucide-react'
 import { OnlineMap, OnlineMapRef, CustomLayerOption } from '../components/Map/OnlineMap'
-import { LayerControl, SectorLayerOption, LayerFileOption } from '../components/Map/LayerControl'
+import { LayerControl, SectorLayerOption, LayerFileOption, DecorationLayerOption } from '../components/Map/LayerControl'
 import { OfflineMap, createDefaultLayers } from '../components/Map'
 import type { LayerOption, FrequencyOption } from '../components/Map'
 import { mapStateService } from '../services/mapStateService'
@@ -152,6 +152,22 @@ export function MapPage() {
 
   // 自定义图层 (用户创建的点)
   const [customLayers, setCustomLayers] = useState<CustomLayerOption[]>([])
+
+  // 装饰图层（打点、定位标记等）- 默认启用
+  const [decorationLayer, setDecorationLayer] = useState<DecorationLayerOption>({
+    id: 'decoration-layer',
+    name: '装饰图层',
+    visible: true,
+    count: 0
+  })
+
+  // 当语言变化时更新装饰图层名称
+  useEffect(() => {
+    setDecorationLayer(prev => ({
+      ...prev,
+      name: t('map.decorationLayer') || '装饰图层'
+    }))
+  }, [t])
 
   // 从持久化 store 获取标签设置
   const { labelSettingsMap: persistedLabelSettings, setLabelSettings } = useMapStore()
@@ -310,6 +326,17 @@ export function MapPage() {
   const [showSelectionMenu, setShowSelectionMenu] = useState(false)
   const selectionMenuRef = useRef<HTMLDivElement>(null)
 
+  // 点击外部收起下拉菜单
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (selectionMenuRef.current && !selectionMenuRef.current.contains(e.target as Node)) {
+        setShowSelectionMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
   // 地图拖拽工具状态 - 独立于框选模式
   const [mapDragTool, setMapDragTool] = useState(false)
 
@@ -325,15 +352,17 @@ export function MapPage() {
     count += layerFiles.filter(lf => lf.visible).length
     // 点文件/地理化数据
     count += pointFiles.filter(pf => pf.visible).length
+    // 装饰图层
+    if (decorationLayer.visible) count++
     return count
-  }, [layers, layerFiles, pointFiles])
+  }, [layers, layerFiles, pointFiles, decorationLayer.visible])
 
   /**
    * 处理框选模式切换
    * 框选功能和拖拽工具互斥：激活框选时禁用拖拽工具
    */
   const handleSelectionModeChange = (mode: 'circle' | 'polygon' | 'point') => {
-    // 如果点击当前已激活的模式，则退出框选模式并清除选中状态
+    // 如果点击当前已激活的模式，则退出框选模式（保留选中状态，只有"清除"按钮才清除）
     if (selectionMode === mode) {
       setSelectionMode('none')
       return
@@ -367,35 +396,38 @@ export function MapPage() {
 
   /**
    * 处理地图拖拽工具切换
-   * 框选功能和拖拽工具互斥：激活拖拽时退出框选模式并清除选中状态
+   * 拖拽工具与其他所有操作模式互斥：激活拖拽时退出所有其他模式
    */
   const handleMapDragToolToggle = () => {
     const newState = !mapDragTool
     setMapDragTool(newState)
     
-    if (newState && selectionMode !== 'none') {
-      // 激活拖拽工具时，退出框选模式并清除选中状态
+    if (newState) {
+      // 激活拖拽：关闭所有其他互斥模式
+      setMeasureMode(false)
+      setCaptureMode(false)
+      setCaptureCoord(null)
       setSelectionMode('none')
-      // 清除选中状态和图形
       if (onlineMapRef.current) {
         onlineMapRef.current.clearSelectionHighlight()
       }
     }
   }
   const [totalDistance, setTotalDistance] = useState<number | null>(null)
-  const [showLocationModal, setShowLocationModal] = useState(false)
-  const [locationInput, setLocationInput] = useState('')
-  // 拖动悬浮弹窗位置
-  const locationModalPosRef = useRef({ x: 0, y: 0 })
-  const locationModalDragRef = useRef<{ dragging: boolean; startX: number; startY: number; startLeft: number; startTop: number }>({ dragging: false, startX: 0, startY: 0, startLeft: 0, startTop: 0 })
-  const [showPositionMenu, setShowPositionMenu] = useState(false)
   const [captureMode, setCaptureMode] = useState(false)
   const [captureCoord, setCaptureCoord] = useState<{ lng: number; lat: number } | null>(null)
-  const positionMenuRef = useRef<HTMLDivElement>(null)
 
 
   // 从mapStore获取定位点数据
   const { locationPoints, addLocationPoint, clearLocationPoints } = useMapStore()
+
+  // 更新装饰图层计数（打点数量 + 定位点数量）
+  useEffect(() => {
+    setDecorationLayer(prev => ({
+      ...prev,
+      count: locationPoints.length
+    }))
+  }, [locationPoints])
 
   // 工参数据缓存（用于工参搜索）
   const [sectorDataCache, setSectorDataCache] = useState<{
@@ -529,6 +561,17 @@ export function MapPage() {
     setCustomLayers(prev => prev.filter(layer => layer.id !== layerId))
     if (onlineMapRef.current) {
       onlineMapRef.current.setCustomLayerVisibility(layerId, false)
+    }
+  }, [])
+
+  /**
+   * 处理装饰图层可见性切换
+   */
+  const handleDecorationLayerToggle = useCallback((visible: boolean) => {
+    console.log('[MapPage] 装饰图层切换:', visible)
+    setDecorationLayer(prev => ({ ...prev, visible }))
+    if (onlineMapRef.current) {
+      onlineMapRef.current.setDecorationLayerVisibility(visible)
     }
   }, [])
 
@@ -815,19 +858,72 @@ export function MapPage() {
   }
 
   /**
+   * 检测输入是否为经纬度格式（经度,纬度）
+   * 支持中英文逗号分隔
+   */
+  const isCoordinateInput = useCallback((input: string): { isValid: boolean; lng?: number; lat?: number } => {
+    const trimmed = input.trim()
+    // 匹配经纬度格式：数字,数字 或 数字，数字（支持中英文逗号）
+    const coordRegex = /^\s*(-?\d+\.?\d*)\s*[，,]\s*(-?\d+\.?\d*)\s*$/
+    const match = trimmed.match(coordRegex)
+    if (match) {
+      const lng = parseFloat(match[1])
+      const lat = parseFloat(match[2])
+      // 验证经纬度范围
+      if (!isNaN(lng) && !isNaN(lat) && lng >= -180 && lng <= 180 && lat >= -90 && lat <= 90) {
+        return { isValid: true, lng, lat }
+      }
+    }
+    return { isValid: false }
+  }, [])
+
+  /**
+   * 执行坐标定位
+   */
+  const executeCoordinateLocation = useCallback((lng: number, lat: number) => {
+    // WGS84 转 GCJ02
+    const [correctedLat, correctedLng] = CoordinateTransformer.wgs84ToGcj02(lat, lng)
+    const id = `location-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    const newPoint = { id, lng: correctedLng, lat: correctedLat }
+    addLocationPoint(newPoint)
+    if (onlineMapRef.current) {
+      onlineMapRef.current.flyTo([correctedLat, correctedLng], 15)
+      onlineMapRef.current.addLocationMarker(newPoint, locationPoints.length + 1)
+    }
+  }, [addLocationPoint, locationPoints.length])
+
+  /**
+   * 处理搜索或定位动作（点击放大镜按钮或回车）
+   */
+  const handleSearchAction = useCallback(() => {
+    const keyword = searchKeyword.trim()
+    if (!keyword) return
+
+    // 优先检测是否为经纬度格式
+    const coordCheck = isCoordinateInput(keyword)
+    if (coordCheck.isValid && coordCheck.lng !== undefined && coordCheck.lat !== undefined) {
+      // 是经纬度格式，执行坐标定位
+      executeCoordinateLocation(coordCheck.lng, coordCheck.lat)
+      setSearchResults([])
+      setShowSearchResults(false)
+      return
+    }
+
+    // 不是经纬度格式，执行普通搜索
+    if (searchResults.length > 0) {
+      selectSearchResult(searchResults[0])
+    } else {
+      executeSearch(keyword)
+    }
+  }, [searchKeyword, isCoordinateInput, executeCoordinateLocation, searchResults, selectSearchResult, executeSearch])
+
+  /**
    * 处理回车键
    */
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault()
-      console.log('Enter key pressed, executing search with keyword:', searchKeyword)
-
-      // 如果有搜索结果，默认选择第一条
-      if (searchResults.length > 0) {
-        selectSearchResult(searchResults[0])
-      } else {
-        executeSearch(searchKeyword)
-      }
+      handleSearchAction()
     }
   }
 
@@ -1121,44 +1217,28 @@ export function MapPage() {
 
         {/* 搜索框 */}
         <div className="relative flex items-center gap-2 flex-1 justify-start">
-          {/* 搜索模式切换 */}
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => {
-                setSearchMode('map')
-                setSearchResults([])
-                setShowSearchResults(false)
-              }}
-              className={`text-xs px-2 py-1 rounded transition-colors ${searchMode === 'map'
-                ? 'bg-blue-400 text-white'
-                : 'text-muted-foreground hover:bg-muted'
-                }`}
-            >
-              {t('map.searchPlace') || '地名搜索'}
-            </button>
-            <button
-              onClick={() => {
-                setSearchMode('parameter')
-                setSearchResults([])
-                setShowSearchResults(false)
-              }}
-              className={`text-xs px-2 py-1 rounded transition-colors ${searchMode === 'parameter'
-                ? 'bg-blue-400 text-white'
-                : 'text-muted-foreground hover:bg-muted'
-                }`}
-            >
-              {t('map.searchCell') || '工参搜索'}
-            </button>
-            {searchMode === 'parameter' && missingCoordCount > 0 && (
-              <div className="flex items-center gap-1 ml-2 text-xs text-amber-600" title="部分扇区缺少坐标信息">
-                <AlertTriangle size={12} />
-                <span>{missingCoordCount}{t('map.missingCoordCells') || '个扇区缺坐标'}</span>
-              </div>
-            )}
-          </div>
+          {/* 搜索模式切换 - 单按钮切换 */}
+          <button
+            onClick={() => {
+              const newMode = searchMode === 'parameter' ? 'map' : 'parameter'
+              setSearchMode(newMode)
+              setSearchResults([])
+              setShowSearchResults(false)
+            }}
+            className="text-xs px-2 py-1 rounded bg-blue-400 text-white hover:bg-blue-500 transition-colors"
+            title={t('map.searchModeSwitchHint') || '点击可切换工参搜索、经纬度定位和地图搜索'}
+          >
+            {searchMode === 'parameter' ? (t('map.searchLocation') || '搜索定位') : (t('map.searchPlace') || '地图搜索')}
+          </button>
+          {searchMode === 'parameter' && missingCoordCount > 0 && (
+            <div className="flex items-center gap-1 ml-2 text-xs text-amber-600" title="部分扇区缺少坐标信息">
+              <AlertTriangle size={12} />
+              <span>{missingCoordCount}{t('map.missingCoordCells') || '个扇区缺坐标'}</span>
+            </div>
+          )}
 
           {/* 搜索输入框 */}
-          <div className="relative w-64">
+          <div className="relative w-72">
             <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
               ref={searchInputRef}
@@ -1173,12 +1253,21 @@ export function MapPage() {
                 // 延迟隐藏，以便点击搜索结果
                 setTimeout(() => setShowSearchResults(false), 200)
               }}
-              placeholder={searchMode === 'map' ? (t('map.inputPlaceHint') || '输入地名、道路名称等') : (t('map.inputCellHint') || '输入小区名称、基站ID')}
-              className="w-full pl-8 pr-14 py-1.5 text-xs border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary placeholder:text-xs"
+              placeholder={searchMode === 'map' ? (t('map.inputPlaceHint') || '输入地名、道路名称等') : (t('map.inputLocationHint') || '输入小区名、基站ID或经纬度(经度,纬度)')}
+              className="w-full pl-8 pr-16 py-1.5 text-xs border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary placeholder:text-xs"
             />
 
-            {/* 清除输入按钮 */}
-            <div className="absolute right-1 top-1/2 -translate-y-1/2">
+            {/* 右侧按钮组：搜索/清除 */}
+            <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+              {/* 搜索/定位按钮 */}
+              <button
+                onClick={() => handleSearchAction()}
+                className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                title={t('map.searchOrLocate') || '搜索或定位'}
+              >
+                <Search size={12} />
+              </button>
+              {/* 清除输入按钮 */}
               {searchKeyword && (
                 <button
                   onClick={clearSearchInput}
@@ -1215,61 +1304,38 @@ export function MapPage() {
 
 
 
-          {/* 位置下拉菜单 */}
-          <div className="relative" ref={positionMenuRef}>
-            <button
-              className={`px-2 py-1.5 text-xs rounded hover:bg-muted transition-colors flex items-center gap-1 ${captureMode ? 'bg-blue-400 text-white' : 'text-muted-foreground hover:text-foreground'}`}
-              onClick={() => setShowPositionMenu(!showPositionMenu)}
-              title={t('map.position') || '位置'}
-            >
-              <div className="w-4 h-4 flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-map-pin"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-              </div>
-              <span>{t('map.position') || '位置'}</span>
-            </button>
-            {showPositionMenu && (
-              <div className="absolute top-full left-0 mt-1 z-[3000] bg-card border border-border rounded-lg shadow-lg w-32 overflow-hidden">
-                <button
-                  onClick={() => {
-                    if (captureMode) setCaptureMode(false)
-                    setShowPositionMenu(false)
-                    locationModalPosRef.current = { x: window.innerWidth / 2, y: window.innerHeight / 2 }
-                    setShowLocationModal(true)
-                  }}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors flex items-center gap-2"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
-                  {t('map.coordLocation') || '坐标定位'}
-                </button>
-                <button
-                  onClick={() => {
-                    if (showLocationModal) setShowLocationModal(false)
-                    const newMode = !captureMode
-                    setCaptureMode(newMode)
-                    setMeasureMode(false)
-                    setSelectionMode('none')
-                    setMapDragTool(false)
-                    setShowPositionMenu(false)
-                    if (!newMode) setCaptureCoord(null)
-                  }}
-                  className={`w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors flex items-center gap-2 relative group ${captureMode ? 'text-blue-500 font-medium' : ''}`}
-                  title={t('map.captureModeHint') || '点击地图任意位置抓取WGS84坐标'}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                  {captureMode ? (t('map.exitCaptureMode') || '退出提取') : (t('map.extractCoord') || '提取坐标')}
-                </button>
-              </div>
-            )}
-          </div>
+          {/* 提取坐标按钮 */}
+          <button
+            className={`px-2 py-1.5 text-xs rounded transition-colors flex items-center gap-1 ${captureMode ? 'bg-blue-400 text-white hover:bg-blue-500' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+            onClick={() => {
+              // 激活/关闭提取坐标：激活时关闭所有其他互斥模式
+              const newMode = !captureMode
+              if (newMode) {
+                setMeasureMode(false)
+                setSelectionMode('none')
+                setMapDragTool(false)
+              } else {
+                setCaptureCoord(null)
+              }
+              setCaptureMode(newMode)
+            }}
+            title={captureMode ? (t('map.exitCaptureMode') || '退出打点') : (t('map.captureModeHint') || '点击地图任意位置抓取WGS84坐标')}
+          >
+            <div className="w-4 h-4 flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            </div>
+            <span>{captureMode ? (t('map.exitCaptureMode') || '退出打点') : (t('map.extractCoord') || '打点')}</span>
+          </button>
 
           {/* 测距按钮 */}
           <button
-            className={`px-2 py-1.5 text-xs rounded hover:bg-muted transition-colors flex items-center gap-1 ${measureMode ? 'bg-blue-400 text-white' : 'text-muted-foreground hover:text-foreground'
+            className={`px-2 py-1.5 text-xs rounded transition-colors flex items-center gap-1 ${measureMode ? 'bg-blue-400 text-white hover:bg-blue-500' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               }`}
             onClick={() => {
               const newState = !measureMode
               setMeasureMode(newState)
               if (newState) {
+                // 激活测距：关闭所有其他互斥模式
                 setCaptureMode(false)
                 setCaptureCoord(null)
                 setSelectionMode('none')
@@ -1286,7 +1352,7 @@ export function MapPage() {
 
           {/* 地图拖拽工具按钮 - 始终显示 */}
           <button
-            className={`px-2 py-1.5 text-xs rounded hover:bg-muted transition-colors flex items-center gap-1 ${mapDragTool ? 'bg-blue-400 text-white' : 'text-muted-foreground hover:text-foreground'
+            className={`px-2 py-1.5 text-xs rounded transition-colors flex items-center gap-1 ${mapDragTool ? 'bg-blue-400 text-white hover:bg-blue-500' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               }`}
             onClick={handleMapDragToolToggle}
             title={mapDragTool ? (t('map.disableDrag') || '禁用地图拖拽') : (t('map.enableDrag') || '启用地图拖拽')}
@@ -1298,16 +1364,13 @@ export function MapPage() {
           {/* 圈选按钮 */}
           <div className="relative" ref={selectionMenuRef}>
             <button
-              className={`px-2 py-1.5 text-xs rounded hover:bg-muted transition-colors flex items-center gap-1 ${selectionMode !== 'none' ? 'bg-blue-400 text-white' : 'text-muted-foreground hover:text-foreground'
+              className={`px-2 py-1.5 text-xs rounded transition-colors flex items-center gap-1 ${selectionMode !== 'none' ? 'bg-blue-400 text-white hover:bg-blue-500' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                 }`}
               onClick={() => {
                 if (selectionMode !== 'none') {
-                  // 如果框选模式已激活，点击框选按钮退出框选模式并清除选中状态
+                  // 退出框选模式，但保留已选中的要素高亮（持久化）
+                  // 只有"清除"按钮才清除选中状态
                   setSelectionMode('none')
-                  // 通知OnlineMap组件清除选中状态
-                  if (onlineMapRef.current) {
-                    onlineMapRef.current.clearSelectionHighlight()
-                  }
                 } else {
                   // 否则显示框选菜单
                   setShowSelectionMenu(!showSelectionMenu)
@@ -1315,8 +1378,24 @@ export function MapPage() {
               }}
               title={selectionMode !== 'none' ? (t('map.exitSelectMode') || '退出框选模式（按ESC也可退出）') : (t('map.mapSelectTool') || '地图圈选工具')}
             >
-              <MousePointer2 size={14} />
-              <span>{t('map.select') || '框选'}</span>
+              {selectionMode === 'point' && <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>}
+              {selectionMode === 'circle' && <CircleIcon size={14} />}
+              {selectionMode === 'polygon' && <Pentagon size={14} />}
+              {selectionMode === 'none' && <MousePointer2 size={14} />}
+              <span>
+                {selectionMode === 'point'
+                  ? (t('map.pointSelect') || '框选')
+                  : selectionMode === 'circle'
+                    ? (t('map.circleSelect') || '圆形')
+                    : selectionMode === 'polygon'
+                      ? (t('map.polygonSelect') || '多边形')
+                      : (t('map.select') || '选择')}
+              </span>
+              {selectionMode === 'none' && (
+                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="ml-0.5 opacity-60">
+                  <path d="m6 9 6 6 6-6"/>
+                </svg>
+              )}
             </button>
             {showSelectionMenu && (
               <div className="absolute top-full left-0 mt-1 z-[3000] bg-card border border-border rounded-lg shadow-lg w-32 overflow-hidden">
@@ -1324,8 +1403,8 @@ export function MapPage() {
                   onClick={() => handleSelectionModeChange('point')}
                   className="w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors flex items-center gap-2"
                 >
-                  <MousePointer2 size={12} className="text-orange-500" />
-                  {t('map.pointSelect') || '点选'}
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-orange-500"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                  {t('map.pointSelect') || '框选'}
                 </button>
                 <button
                   onClick={() => handleSelectionModeChange('circle')}
@@ -1479,105 +1558,7 @@ export function MapPage() {
         </div>
       </div>
 
-      {/* 定位弹窗 - 悬浮不遮罩地图，仅标题栏可拖动，单行逗号分隔输入 */}
-      {showLocationModal && (
-        <div
-          className="fixed z-[4000]"
-          style={{ left: locationModalPosRef.current.x || '50%', top: locationModalPosRef.current.y || '50%', transform: 'translate(-50%, -50%)' }}
-        >
-          <div className="bg-card border border-border rounded-lg shadow-xl p-3 w-72">
-            {/* 仅标题栏可拖动 */}
-            <div
-              className="text-[10px] text-muted-foreground mb-2 select-none cursor-move flex items-center gap-1"
-              onMouseDown={(e) => {
-                const rect = e.currentTarget.parentElement!.getBoundingClientRect()
-                locationModalDragRef.current = {
-                  dragging: true,
-                  startX: e.clientX,
-                  startY: e.clientY,
-                  startLeft: rect.left,
-                  startTop: rect.top
-                }
-                e.stopPropagation()
-              }}
-              onMouseMove={(e) => {
-                if (!locationModalDragRef.current.dragging) return
-                const d = locationModalDragRef.current
-                const dx = e.clientX - d.startX
-                const dy = e.clientY - d.startY
-                locationModalPosRef.current = {
-                  x: d.startLeft + dx,
-                  y: d.startTop + dy
-                }
-                // 强制刷新
-                setShowLocationModal(false)
-                setTimeout(() => setShowLocationModal(true), 0)
-              }}
-              onMouseUp={() => { locationModalDragRef.current.dragging = false }}
-              onMouseLeave={() => { locationModalDragRef.current.dragging = false }}
-            >
-              <span>{t('map.latLngLocation') || '输入经纬度定位'}</span>
-              <span className="opacity-50">(拖动)</span>
-            </div>
-            <input
-              type="text"
-              value={locationInput}
-              onChange={(e) => setLocationInput(e.target.value)}
-              placeholder="116.397428, 39.90923"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  const parts = locationInput.split(',').map(s => s.trim())
-                  if (parts.length !== 2) return
-                  const lng = parseFloat(parts[0])
-                  const lat = parseFloat(parts[1])
-                  if (isNaN(lng) || isNaN(lat)) return
-                  const [correctedLat, correctedLng] = CoordinateTransformer.wgs84ToGcj02(lat, lng)
-                  const id = `location-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-                  const newPoint = { id, lng: correctedLng, lat: correctedLat }
-                  addLocationPoint(newPoint)
-                  if (onlineMapRef.current) {
-                    onlineMapRef.current.flyTo([correctedLat, correctedLng], 15)
-                    onlineMapRef.current.addLocationMarker(newPoint, locationPoints.length + 1)
-                  }
-                  setShowLocationModal(false)
-                  setLocationInput('')
-                }
-              }}
-              className="w-full px-3 py-2 text-xs border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary font-mono"
-            />
-            <div className="flex gap-2 mt-2">
-              <button
-                onClick={() => { setShowLocationModal(false); setLocationInput('') }}
-                className="flex-1 px-3 py-1.5 text-xs bg-muted rounded-lg hover:bg-muted/80 transition-colors"
-              >
-                {t('common.cancel') || '取消'}
-              </button>
-              <button
-                onClick={() => {
-                  const parts = locationInput.split(',').map(s => s.trim())
-                  if (parts.length !== 2) return
-                  const lng = parseFloat(parts[0])
-                  const lat = parseFloat(parts[1])
-                  if (isNaN(lng) || isNaN(lat)) return
-                  const [correctedLat, correctedLng] = CoordinateTransformer.wgs84ToGcj02(lat, lng)
-                  const id = `location-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-                  const newPoint = { id, lng: correctedLng, lat: correctedLat }
-                  addLocationPoint(newPoint)
-                  if (onlineMapRef.current) {
-                    onlineMapRef.current.flyTo([correctedLat, correctedLng], 15)
-                    onlineMapRef.current.addLocationMarker(newPoint, locationPoints.length + 1)
-                  }
-                  setShowLocationModal(false)
-                  setLocationInput('')
-                }}
-                className="flex-1 px-3 py-1.5 text-xs bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-              >
-                {'执行'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* 地图内容区域 */}
       <div className="flex-1 relative min-h-0 bg-muted/20 map-container" style={{ overflow: 'hidden' }}>
@@ -1607,6 +1588,7 @@ export function MapPage() {
               mapDragTool={mapDragTool}
               captureMode={captureMode}
               onCaptureCoord={(lng, lat) => setCaptureCoord({ lng, lat })}
+              decorationLayerVisible={decorationLayer.visible}
             />
 
             {/* 图层控制面板 */}
@@ -1633,6 +1615,8 @@ export function MapPage() {
               onCustomLayerRemove={handleRemoveCustomLayer}
               onLabelSettingsChange={handleLabelSettingsChange}
               labelSettingsMap={labelSettingsMap}
+              decorationLayer={decorationLayer}
+              onDecorationLayerToggle={handleDecorationLayerToggle}
             />
 
           </>

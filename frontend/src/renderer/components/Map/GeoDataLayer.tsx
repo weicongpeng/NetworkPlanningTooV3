@@ -162,6 +162,12 @@ export class GeoDataLayer {
   private _onZoomEndBound: (() => void) | null = null
   // 缩放动画帧 ID
   private _zoomAnimFrameId: number | null = null
+  // 交互状态标志
+  private isInteractive: boolean = true
+  // 框选高亮状态
+  private selectionHighlightIds: Set<string> | null = null
+  // 存储原始样式以便恢复
+  private originalStyles: Map<L.Layer, any> = new Map()
 
   constructor(options: GeoDataLayerOptions) {
     this.id = options.id
@@ -327,14 +333,17 @@ export class GeoDataLayer {
         radius: pixelRadius
       })
 
-      if (this.onFeatureClick) {
+      if (this.onFeatureClick && this.isInteractive) {
         marker.on('click', (e) => {
           L.DomEvent.stopPropagation(e)
           this.onFeatureClick!(item.properties, e as L.LeafletMouseEvent, item.name)
         })
       }
 
-      marker.bindTooltip(item.name || `点${i+1}`, { permanent: false, direction: 'top' })
+      // 只在交互启用时绑定 tooltip
+      if (this.isInteractive) {
+        marker.bindTooltip(item.name || `点${i+1}`, { permanent: false, direction: 'top' })
+      }
       marker.addTo(this.leafletLayer!)
       renderedCount++
     }
@@ -393,13 +402,16 @@ export class GeoDataLayer {
       if (is360Degree || coverType === 4 || this.currentZoom <= LOD_THRESHOLD) {
         // 渲染为圆点
         const marker = L.circleMarker([displayLat, displayLng], DEFAULT_POINT_STYLE)
-        if (this.onFeatureClick) {
+        if (this.onFeatureClick && this.isInteractive) {
           marker.on('click', (e) => {
             L.DomEvent.stopPropagation(e)
             this.onFeatureClick!(item.properties, e as L.LeafletMouseEvent, item.name)
           })
         }
-        marker.bindTooltip(item.name || `扇区${i+1}`, { permanent: false, direction: 'top' })
+        // 只在交互启用时绑定 tooltip
+        if (this.isInteractive) {
+          marker.bindTooltip(item.name || `扇区${i+1}`, { permanent: false, direction: 'top' })
+        }
         marker.addTo(this.leafletLayer!)
         renderedCount++
       } else {
@@ -411,13 +423,16 @@ export class GeoDataLayer {
         const points = createSectorPolygon(displayLat, displayLng, azimuth, beamwidth, SECTOR_RADIUS)
         const polygon = L.polygon(points, DEFAULT_SECTOR_STYLE)
 
-        if (this.onFeatureClick) {
+        if (this.onFeatureClick && this.isInteractive) {
           polygon.on('click', (e) => {
             L.DomEvent.stopPropagation(e)
             this.onFeatureClick!(item.properties, e as L.LeafletMouseEvent, item.name)
           })
         }
-        polygon.bindTooltip(item.name || `扇区${i+1}`, { permanent: false, direction: 'top' })
+        // 只在交互启用时绑定 tooltip
+        if (this.isInteractive) {
+          polygon.bindTooltip(item.name || `扇区${i+1}`, { permanent: false, direction: 'top' })
+        }
         polygon.addTo(this.leafletLayer!)
         renderedCount++
       }
@@ -478,14 +493,17 @@ export class GeoDataLayer {
         // 直接使用 L.polygon，path 已经是正确的 [lat, lng] 格式（GCJ02）
         const polygon = L.polygon(item.path as L.LatLngExpression[], DEFAULT_POLYGON_STYLE)
 
-        if (this.onFeatureClick) {
+        if (this.onFeatureClick && this.isInteractive) {
           polygon.on('click', (e) => {
             L.DomEvent.stopPropagation(e)
             this.onFeatureClick!(item.properties, e as L.LeafletMouseEvent, item.name)
           })
         }
 
-        polygon.bindTooltip(item.name || `多边形${i+1}`, { permanent: false, direction: 'top' })
+        // 只在交互启用时绑定 tooltip
+        if (this.isInteractive) {
+          polygon.bindTooltip(item.name || `多边形${i+1}`, { permanent: false, direction: 'top' })
+        }
         polygon.addTo(this.leafletLayer!)
         renderedCount++
       } catch (error) {
@@ -543,6 +561,13 @@ export class GeoDataLayer {
     }
 
     return this
+  }
+
+  /**
+   * 获取可见性
+   */
+  isVisible(): boolean {
+    return this.visible
   }
 
   /**
@@ -921,6 +946,176 @@ export class GeoDataLayer {
   }
 
   /**
+   * 设置是否允许交互
+   * @param interactive 是否允许交互
+   */
+  setInteractive(interactive: boolean): void {
+    this.isInteractive = interactive
+    // 更新所有 Leaflet 图层的交互状态
+    if (this.leafletLayer) {
+      this.leafletLayer.eachLayer((layer: any) => {
+        // 禁用/启用交互
+        if (interactive) {
+          // 恢复交互：重新绑定事件（通过重新渲染实现）
+          if (this.map) {
+            this._reRenderGeometries()
+          }
+        } else {
+          // 禁用交互：关闭 tooltip 并移除事件绑定
+          if (layer.closeTooltip) {
+            layer.closeTooltip()
+          }
+          if (layer.unbindTooltip) {
+            layer.unbindTooltip()
+          }
+          // 禁用 Leaflet 图层的鼠标事件
+          if (layer.off) {
+            layer.off('click mouseover mouseout mouseenter mouseleave')
+          }
+        }
+      })
+    }
+  }
+
+  /**
+   * 设置框选高亮
+   * @param ids 选中的要素ID集合，null表示清除
+   */
+  setSelectionHighlight(ids: Set<string> | null): void {
+    this.selectionHighlightIds = ids
+    if (!this.leafletLayer) return
+
+    this.leafletLayer.eachLayer((layer: any) => {
+      // 获取要素的ID（从options或feature中）
+      const featureId = layer.options?.properties?.name || layer.options?.properties?.id || ''
+      const isSelected = ids?.has(String(featureId))
+
+      if (layer instanceof L.CircleMarker || layer instanceof L.Polygon) {
+        if (isSelected) {
+          // 保存原始样式（如果还没保存）
+          if (!this.originalStyles.has(layer)) {
+            this.originalStyles.set(layer, {
+              color: layer.options.color,
+              weight: layer.options.weight,
+              fillColor: layer.options.fillColor,
+              fillOpacity: layer.options.fillOpacity
+            })
+          }
+          // 应用高亮样式：红色边框
+          layer.setStyle({
+            color: '#ef4444',
+            weight: 3,
+            fillColor: layer.options.fillColor, // 保持原填充色
+            fillOpacity: layer.options.fillOpacity
+          })
+          if (layer.bringToFront) layer.bringToFront()
+        } else {
+          // 恢复原始样式
+          const originalStyle = this.originalStyles.get(layer)
+          if (originalStyle) {
+            layer.setStyle(originalStyle)
+            this.originalStyles.delete(layer)
+          } else {
+            // 如果没有保存的样式，使用默认样式
+            layer.setStyle(this._getDefaultStyle())
+          }
+        }
+      }
+    })
+  }
+
+  /**
+   * 获取默认样式
+   */
+  private _getDefaultStyle(): any {
+    switch (this.geometryType) {
+      case 'point':
+        return DEFAULT_POINT_STYLE
+      case 'sector':
+        return DEFAULT_SECTOR_STYLE
+      case 'polygon':
+        return DEFAULT_POLYGON_STYLE
+      default:
+        return DEFAULT_POINT_STYLE
+    }
+  }
+
+  /**
+   * 获取多边形内的要素（用于框选）
+   * @param polygon Leaflet多边形对象
+   */
+  getFeaturesInPolygon(polygon: L.Polygon): GeoDataItem[] {
+    if (!this.leafletLayer) return []
+    const results: GeoDataItem[] = []
+    const bounds = polygon.getBounds()
+
+    this.leafletLayer.eachLayer((layer: any) => {
+      let isInside = false
+      let layerLatLng: L.LatLng | null = null
+
+      if (layer.getLatLng) {
+        // 点要素（CircleMarker）
+        layerLatLng = layer.getLatLng()
+        if (bounds.contains(layerLatLng)) {
+          isInside = polygon.contains(layerLatLng)
+        }
+      } else if (layer.getBounds) {
+        // 线/面要素：检查中心点
+        const layerBounds = layer.getBounds()
+        layerLatLng = layerBounds.getCenter()
+        if (bounds.contains(layerLatLng)) {
+          isInside = polygon.contains(layerLatLng)
+        }
+      }
+
+      if (isInside && layer.options?.properties) {
+        results.push({
+          name: layer.options.properties.name,
+          properties: layer.options.properties
+        })
+      }
+    })
+
+    return results
+  }
+
+  /**
+   * 获取圆圈内的要素（用于框选）
+   * @param center 中心点
+   * @param radius 半径（米）
+   */
+  getFeaturesInCircle(center: L.LatLng, radius: number): GeoDataItem[] {
+    if (!this.leafletLayer) return []
+    const results: GeoDataItem[] = []
+
+    this.leafletLayer.eachLayer((layer: any) => {
+      let isInside = false
+
+      if (layer.getLatLng) {
+        // 点要素（CircleMarker）
+        const layerLatLng = layer.getLatLng()
+        const distance = center.distanceTo(layerLatLng)
+        isInside = distance <= radius
+      } else if (layer.getBounds) {
+        // 线/面要素：检查中心点
+        const layerBounds = layer.getBounds()
+        const layerCenter = layerBounds.getCenter()
+        const distance = center.distanceTo(layerCenter)
+        isInside = distance <= radius
+      }
+
+      if (isInside && layer.options?.properties) {
+        results.push({
+          name: layer.options.properties.name,
+          properties: layer.options.properties
+        })
+      }
+    })
+
+    return results
+  }
+
+  /**
    * 节流更新标签（用于地图移动和缩放）
    *
    * 🔧 延时显示模式：
@@ -1163,5 +1358,16 @@ export class GeoDataLayerManager {
       })
     }
     this.layers.clear()
+  }
+
+  /**
+   * 设置所有图层的交互状态
+   * @param interactive 是否允许交互
+   */
+  setInteractive(interactive: boolean): void {
+    console.log(`[GeoDataLayerManager] setInteractive: ${interactive}`)
+    this.layers.forEach(layer => {
+      layer.setInteractive(interactive)
+    })
   }
 }

@@ -73,6 +73,27 @@
   background: #1e293b;
 }
 
+/* 打点标记标签样式 - 确保标签框正确包裹文字 */
+.leaflet-marker-icon.marker-label-wrapper {
+  overflow: visible !important;
+  background: transparent !important;
+  border: none !important;
+}
+.marker-label-inner {
+  position: relative;
+  display: inline-block;
+  pointer-events: none;
+  text-shadow: none;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 打点标记 - 确保可点击 */
+.leaflet-marker-icon.capture-marker {
+  cursor: pointer !important;
+}
+
 
 /* 抓取坐标弹窗样式 - 白色背景带细边框 */
 .leaflet-popup.capture-popup-white .leaflet-popup-content-wrapper {

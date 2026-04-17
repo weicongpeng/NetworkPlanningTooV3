@@ -1280,8 +1280,8 @@ export class SectorSVGLayer extends L.Layer {
           const colors = getSectorColor(sector)
           cached.polygon.setStyle({
             fillColor: colors.fillColor,
-            color: '#00ffff', // 青色高亮边框
-            weight: 6,
+            color: '#ef4444', // 红色高亮边框
+            weight: 3,
             fillOpacity: 0.9
           })
           highlightPolygons.push(cached.polygon)
@@ -1329,8 +1329,8 @@ export class SectorSVGLayer extends L.Layer {
           const colors = getSectorColor(sector)
           cached.marker.setStyle({
             fillColor: colors.fillColor,
-            color: '#00ffff',
-            weight: 6,
+            color: '#ef4444', // 红色高亮边框
+            weight: 3,
             fillOpacity: 1
           })
           highlightMarkers.push(cached.marker)
@@ -1427,8 +1427,8 @@ export class SectorSVGLayer extends L.Layer {
         selectedCount++
         cached.polygon.setStyle({
           fillColor: '#ff0000',  // 更亮的红色
-          color: isSelected ? '#00ffff' : '#cc0000',  // 如果被框选，显示青色边框
-          weight: isSelected ? 8 : 6,  // 更粗的边框
+          color: isSelected ? '#ef4444' : '#cc0000',  // 如果被框选，显示红色边框
+          weight: isSelected ? 5 : 6,  // 更粗的边框
           fillOpacity: 1
         })
         highlightPolygons.push(cached.polygon)
@@ -1437,18 +1437,18 @@ export class SectorSVGLayer extends L.Layer {
         relatedCount++
         cached.polygon.setStyle({
           fillColor: '#0066ff',  // 更亮的蓝色
-          color: isSelected ? '#00ffff' : '#0044cc',
-          weight: isSelected ? 8 : 6,
+          color: isSelected ? '#ef4444' : '#0044cc',
+          weight: isSelected ? 5 : 6,
           fillOpacity: 1
         })
         highlightPolygons.push(cached.polygon)
       } else if (isSelected) {
-        // 仅被框选的高亮：保持原色但加粗青色边框
+        // 仅被框选的高亮：保持原色但加红色边框
         const colors = getSectorColor(sector)
         cached.polygon.setStyle({
           fillColor: colors.fillColor,
-          color: '#00ffff', // 青色高亮边框
-          weight: 6,
+          color: '#ef4444', // 红色高亮边框
+          weight: 3,
           fillOpacity: 0.9
         })
         highlightPolygons.push(cached.polygon)
@@ -1503,24 +1503,24 @@ export class SectorSVGLayer extends L.Layer {
         // 选中的扇区：不透明红色，高对比度
         cached.marker.setStyle({
           fillColor: '#ff0000',  // 更亮的红色
-          color: isSelected ? '#00ffff' : '#cc0000',
-          weight: isSelected ? 8 : 6,
+          color: isSelected ? '#ef4444' : '#cc0000',
+          weight: isSelected ? 5 : 6,
           fillOpacity: 1
         })
       } else if (relatedIdsSet.has(sectorId)) {
         // 同频同PCI的扇区：不透明蓝色，高对比度
         cached.marker.setStyle({
           fillColor: '#0066ff',  // 更亮的蓝色
-          color: isSelected ? '#00ffff' : '#0044cc',
-          weight: isSelected ? 8 : 6,
+          color: isSelected ? '#ef4444' : '#0044cc',
+          weight: isSelected ? 5 : 6,
           fillOpacity: 1
         })
       } else if (isSelected) {
         const colors = getSectorColor(sector)
         cached.marker.setStyle({
           fillColor: colors.fillColor,
-          color: '#00ffff',
-          weight: 6,
+          color: '#ef4444', // 红色高亮边框
+          weight: 3,
           fillOpacity: 1
         })
       } else {

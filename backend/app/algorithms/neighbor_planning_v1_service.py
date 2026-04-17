@@ -482,7 +482,50 @@ class NeighborPlanner:
 
         logger.debug(f"第三步站间距筛选后: 候选数={len(step3_candidates)}")
 
-        # ========== 合并三步结果并去重 ==========
+        # ========== 第四步：兜底逻辑 - 站点稀疏时的邻区补充 ==========
+        # 当站点稀疏（周边站点数量少）时，按"距离 <= 平均站间距"添加兜底邻区
+        # 规则：
+        # 1. 如果当前候选邻区数量少于周边站点数，说明站点稀疏
+        # 2. 对于满足距离 <= 平均站间距的候选小区，补充添加为邻区
+        step4_fallback_neighbors = []
+
+        if step2_candidates and step3_candidates:
+            # 计算周边站点数量（第二步候选中不同站点的数量）
+            unique_target_sites = set()
+            for target_row, _ in step2_candidates:
+                target_enodeb_id = str(target_row.get('enodeb_id', ''))
+                unique_target_sites.add(target_enodeb_id)
+
+            site_count = len(unique_target_sites)
+            candidate_count = len(step3_candidates)
+
+            # 如果候选邻区数量少于周边站点数的1/2，认为站点稀疏，需要兜底
+            # 同时确保候选数量本身也不够多
+            if candidate_count < max(3, site_count // 2):
+                site_spacing = self.calculate_site_spacing(source_row)
+
+                logger.debug(f"第四步兜底逻辑: 源小区={source_key}, 站点数={site_count}, 候选数={candidate_count}, 站间距={site_spacing:.3f}km")
+
+                for target_row, distance in step2_candidates:
+                    target_key = self.get_cell_key(target_row)
+                    target_cover_type = target_row.get('cell_cover_type', 1)
+                    is_target_indoor = (target_cover_type == 4)
+
+                    # 跳过已在强制邻区中的
+                    if target_key in forced_neighbor_keys:
+                        continue
+
+                    # 跳过室分到室分（已在第二步限制160米内）
+                    if is_source_indoor and is_target_indoor:
+                        continue
+
+                    # 兜底条件：距离 <= 平均站间距
+                    if distance <= site_spacing:
+                        step4_fallback_neighbors.append((target_row, distance))
+
+        logger.debug(f"第四步兜底逻辑后: 补充邻区数={len(step4_fallback_neighbors)}")
+
+        # ========== 合并结果并去重 ==========
         # 最终结果 = 第一步 + 第三步的合集（第二步是中间过程）
         # 注意：强制邻区（第一步）应该无条件保留，不受max_neighbors限制
 

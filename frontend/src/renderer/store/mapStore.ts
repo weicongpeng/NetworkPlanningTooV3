@@ -9,12 +9,15 @@ export interface LocationPoint {
   id: string
   lng: number
   lat: number
+  label?: string  // 用户自定义标签名称
+  createdAt?: number  // 创建时间戳
 }
 
 interface MapState {
   locationPoints: LocationPoint[]
   addLocationPoint: (point: LocationPoint) => void
   clearLocationPoints: () => void
+  updateLocationPointLabel: (id: string, label: string) => void
   // 标签设置映射 - 持久化
   labelSettingsMap: Record<string, LabelSettings>
   setLabelSettings: (layerId: string, settings: LabelSettings) => void
@@ -33,6 +36,13 @@ export const useMapStore = create<MapState>()(
       },
       clearLocationPoints: () => {
         set({ locationPoints: [] })
+      },
+      updateLocationPointLabel: (id: string, label: string) => {
+        set((state) => ({
+          locationPoints: state.locationPoints.map(p =>
+            p.id === id ? { ...p, label } : p
+          )
+        }))
       },
       // 标签设置相关状态
       labelSettingsMap: {},

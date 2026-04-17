@@ -87,6 +87,14 @@ export interface CustomLayerOption {
   data: any[] // 点坐标或GeoJSON
 }
 
+/**
+ * 标记点自定义标签存储
+ */
+interface MarkerLabelData {
+  id: string
+  name: string
+  label?: string
+}
 
 /**
  * 在线地图组件属性
@@ -126,6 +134,8 @@ interface OnlineMapProps {
   captureMode?: boolean
   /** 抓取坐标回调 (WGS84经度, WGS84纬度) */
   onCaptureCoord?: (lng: number, lat: number) => void
+  /** 装饰图层可见性 */
+  decorationLayerVisible?: boolean
 }
 
 /**
@@ -167,6 +177,8 @@ export interface OnlineMapRef {
   setFrequencyVisibility: (networkType: 'LTE' | 'NR', frequency: number, visible: boolean) => void
   /** 设置自定义图层可见性 */
   setCustomLayerVisibility: (layerId: string, visible: boolean) => void
+  /** 设置装饰图层可见性 */
+  setDecorationLayerVisibility: (visible: boolean) => void
   /** 设置底图可见性 */
   setBaseMapVisibility: (visible: boolean) => void
   /** 刷新地图数据 */
@@ -221,7 +233,8 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
   onSelectionModeEnd,
   mapDragTool = false,
   captureMode = false,
-  onCaptureCoord
+  onCaptureCoord,
+  decorationLayerVisible = true
 }, ref) => {
   // Refs
   const customLayerRefs = useRef<Record<string, L.LayerGroup | L.FeatureGroup>>({})
@@ -233,6 +246,8 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
   const measurementLinesRef = useRef<Array<any>>([]) // 测量线条数组
   const measurementMarkersRef = useRef<Array<any>>([]) // 测量点标记数组
   const measurementDistanceRef = useRef<any>(null) // 距离显示标签
+  const measurementLineStartIndexRef = useRef<number>(0) // 当前测量线条的起始索引
+  const measurementMarkerStartIndexRef = useRef<number>(0) // 当前测量标记的起始索引
   const tileLayerRef = useRef<any>(null)
   const tileLoadTimeoutRef = useRef<NodeJS.Timeout | null>(null) // 瓦片加载超时定时器
   const networkEventListenersRef = useRef<{
@@ -253,16 +268,25 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
   const shadowLabelRef = useRef<any>(null) // 测量预览标签
 
   // 框选功能状态
-  const selectionShapeRef = useRef<L.Circle | L.Polygon | null>(null) // 框选形状
+  const selectionShapeRef = useRef<L.Circle | L.Polygon | L.FeatureGroup | null>(null) // 框选形状（支持多选时使用FeatureGroup）
+  const selectionRectRef = useRef<L.Rectangle | L.FeatureGroup | null>(null) // 矩形框选预览形状（支持多选时使用FeatureGroup）
   const selectionDrawingRef = useRef(false) // 是否正在绘制框选
   const selectionPointsRef = useRef<L.LatLng[]>([]) // 多边形框选的点
   const selectionStartPointRef = useRef<L.LatLng | null>(null) // 框选起点
+  const pointModeIsDragging = useRef(false) // point 模式：是否正在拖拽（框选矩形）
+  const pointModeDragThreshold = 5 // point 模式：拖拽阈值（像素），超过此值才视为拖拽
   const selectedFeaturesRef = useRef<any[]>([]) // 选中的要素属性数据
   const selectedIdsRef = useRef<Set<string>>(new Set()) // 选中的要素ID集合
   const polygonTempLayerRef = useRef<L.Polyline | null>(null) // 多边形绘制临时线
   const [selectionTip, setSelectionTip] = useState<string>('') // 框选提示信息
   const preserveSelectionRef = useRef<boolean>(false) // 同步跟踪保留状态，避免 state 异步更新问题
   const [customLayerVisibility, setCustomLayerVisibilityState] = useState<Record<string, boolean>>({})
+  const [decorationLayerVisibility, setDecorationLayerVisibility] = useState<boolean>(decorationLayerVisible)
+  const decorationLayerRef = useRef<L.LayerGroup | null>(null) // 装饰图层引用
+
+  // 标记点自定义标签存储
+  const markerLabelsRef = useRef<Map<string, MarkerLabelData>>(new Map())
+  const markerLabelElementsRef = useRef<Map<string, L.Marker>>(new Map())
 
   // i18n translation
   const { t } = useTranslation()
@@ -271,6 +295,7 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
   useEffect(() => { measureModeRef.current = measureMode }, [measureMode])
   useEffect(() => { selectionModeRef.current = selectionMode }, [selectionMode])
   useEffect(() => { captureModeRef.current = captureMode }, [captureMode])
+  useEffect(() => { setDecorationLayerVisibility(decorationLayerVisible) }, [decorationLayerVisible])
 
   // 使用Ref跟踪上一次的mapDragTool值，用于检测变化
   const prevMapDragToolRef = useRef<boolean>(mapDragTool)
@@ -340,34 +365,9 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
       // 使用 ref 来判断，因为 state 更新是异步的
       const shouldPreserve = preserveSelectionRef.current
       if (!shouldPreserve) {
-        // 不保留选中状态，清除所有选中状态和图形
-        console.log('[OnlineMap] 退出框选模式，清除选中状态')
-        selectedFeaturesRef.current = []
-        selectedIdsRef.current = new Set()
-        selectionPointsRef.current = []
-        // 清除扇区图层高亮
-        if (lteSectorLayerRef.current) {
-          lteSectorLayerRef.current.setSelectionHighlight(null)
-        }
-        if (nrSectorLayerRef.current) {
-          nrSectorLayerRef.current.setSelectionHighlight(null)
-        }
-        // 清除MapInfo图层高亮
-        mapInfoLayerRefsRef.current.forEach(({ mapInfoLayer }) => {
-          mapInfoLayer.setSelectionHighlight(null)
-        })
-        // 清除框选形状
-        const map = mapInstanceRef.current
-        if (map) {
-          if (selectionShapeRef.current) {
-            map.removeLayer(selectionShapeRef.current)
-            selectionShapeRef.current = null
-          }
-          if (polygonTempLayerRef.current) {
-            map.removeLayer(polygonTempLayerRef.current)
-            polygonTempLayerRef.current = null
-          }
-        }
+        // 退出框选模式时，保留已圈选的图形和高亮（标记持久化，只有清除按钮才删除）
+        // 只清除工具提示，不清除图形和高亮
+        console.log('[OnlineMap] 退出框选模式，保留圈选图形（标记持久化）')
         setSelectionTip('')
       } else {
         // 保留选中状态，恢复之前保存的状态
@@ -735,6 +735,10 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
       }))
     },
 
+    setDecorationLayerVisibility: (visible: boolean) => {
+      setDecorationLayerVisibility(visible)
+    },
+
     setBaseMapVisibility: (visible: boolean) => {
       console.log('[OnlineMap] setBaseMapVisibility called:', visible)
       setBaseMapVisibleState(visible)  // 更新本地状态
@@ -762,38 +766,220 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
 
       const L = window.L
       const map = mapInstanceRef.current
+      const locationId = `location-${marker.id}`
 
-      // 创建定位标记图标 - 与抓取坐标小圆点样式一致：红色圆内嵌序号
+      // 生成默认标签名（如"定位1"、"定位2"）
+      const defaultLabel = `${t('map.locationPoint') || '定位'}${index}`
+
+      // 创建定位标记图标 - 与抓取坐标小圆点样式一致：纯色红圆点
       const icon = L.divIcon({
-        html: `<div style="background:#ef4444;color:#fff;font-size:10px;font-weight:bold;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.3);">${index}</div>`,
+        html: `<div style="background:#ef4444;width:16px;height:16px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.3);"></div>`,
         className: 'location-marker-icon',
-        iconSize: [20, 20],
-        iconAnchor: [10, 10]
+        iconSize: [16, 16],
+        iconAnchor: [8, 8]
       })
 
       // 创建标记
       const mapMarker = L.marker([marker.lat, marker.lng], { icon })
-        .addTo(map)
 
-      // 添加弹窗信息 - 白色风格与抓取坐标一致
-      const coordText = `${marker.lng.toFixed(6)}, ${marker.lat.toFixed(6)}`
-      const popupId = `loc-copy-${Date.now()}`
-      mapMarker.bindPopup(`
-        <div style="padding:6px 8px;min-width:200px;background:#fff;color:#000;border:1px solid #d1d5db;border-radius:4px;">
-          <div style="font-size:11px;color:#888;margin-bottom:4px;">#${index}</div>
-          <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#000;">
-            <span style="font-family:monospace;white-space:nowrap;color:#000;">Lng: ${marker.lng.toFixed(6)}, Lat: ${marker.lat.toFixed(6)}</span>
-            <button onclick="(function(){navigator.clipboard.writeText('${coordText}');var b=document.getElementById('${popupId}');if(b){b.textContent='✓';setTimeout(function(){b.textContent='复制'},1500)}})()"
-              id="${popupId}"
-              style="padding:2px 8px;font-size:11px;background:#3b82f6;color:#fff;border:none;border-radius:3px;cursor:pointer;white-space:nowrap;">
-              复制
-            </button>
+      // 存储属性数据到 marker 上，供圈选工具读取
+      ;(mapMarker as any).captureProperties = {
+        id: locationId,
+        name: defaultLabel,  // 使用默认标签名作为名称
+        标签: defaultLabel,  // 添加标签字段
+        longitude: marker.lng.toFixed(6),
+        latitude: marker.lat.toFixed(6),
+        lng: marker.lng.toFixed(6),
+        lat: marker.lat.toFixed(6),
+        _layerType: 'LocationPoint'
+      }
+
+      // 保存默认标签到 markerLabelsRef
+      markerLabelsRef.current.set(locationId, {
+        id: locationId,
+        name: locationId,
+        label: defaultLabel
+      })
+
+      // 始终添加到装饰图层（装饰图层会自动处理可见性）
+      if (decorationLayerRef.current) {
+        mapMarker.addTo(decorationLayerRef.current)
+      } else {
+        mapMarker.addTo(map)
+      }
+
+      // 立即显示默认标签
+      updateMarkerLabel(locationId, index, defaultLabel, marker.lat, marker.lng)
+
+      // 左键点击：弹出可编辑属性框
+      mapMarker.on('click', () => {
+        const labelData = markerLabelsRef.current.get(locationId)
+        const currentLabel = labelData?.label || defaultLabel
+        const inputId = `location-label-input-${locationId}`
+        const lngInputId = `location-lng-input-${locationId}`
+        const latInputId = `location-lat-input-${locationId}`
+        const inputStyle = `padding:4px 8px;border:1px solid #d1d5db;border-radius:4px;font-size:12px;width:100%;color:#111;outline:none;font-family:monospace;`
+        const inputFocus = `onfocus="this.style.borderColor='#3b82f6';this.style.boxShadow='0 0 0 2px rgba(59,130,246,0.2)'" onblur="this.style.borderColor='#d1d5db';this.style.boxShadow='none'"`
+        const deleteBtnText = t('map.delete') || '删除'
+        const copyBtnText = t('map.copy') || '复制'
+        const propertiesText = t('map.properties') || '属性'
+        const labelNameText = t('map.labelName') || '标签'
+        const longitudeText = t('map.longitude') || '经度'
+        const latitudeText = t('map.latitude') || '纬度'
+
+        const popupContent = `
+          <div style="padding:10px 12px;min-width:280px;background:#fff;color:#000;border:1px solid #d1d5db;border-radius:8px;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,0.15);" onclick="event.stopPropagation()">
+            <div style="font-size:14px;font-weight:600;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #e5e7eb;color:#111;">${propertiesText}</div>
+            <div style="display:grid;grid-template-columns:50px 1fr;gap:8px 12px;align-items:center;line-height:1.6;">
+              <span style="color:#888;font-size:11px;">${labelNameText}</span>
+              <input id="${inputId}" type="text" value="${currentLabel.replace(/"/g, '&quot;')}"
+                style="${inputStyle}" ${inputFocus} />
+              <span style="color:#888;font-size:11px;">${longitudeText}</span>
+              <input id="${lngInputId}" type="text" value="${marker.lng.toFixed(6)}"
+                style="${inputStyle}" ${inputFocus} />
+              <span style="color:#888;font-size:11px;">${latitudeText}</span>
+              <input id="${latInputId}" type="text" value="${marker.lat.toFixed(6)}"
+                style="${inputStyle}" ${inputFocus} />
+            </div>
+            <div style="margin-top:10px;padding-top:8px;border-top:1px solid #e5e7eb;text-align:right;">
+              <button class="cp-all-btn" style="background:#3b82f6;border:1px solid #3b82f6;cursor:pointer;color:#fff;font-size:12px;padding:4px 14px;border-radius:4px;transition:all 0.15s;">${copyBtnText}</button>
+              <button class="del-btn" style="background:#ef4444;border:1px solid #ef4444;cursor:pointer;color:#fff;font-size:12px;padding:4px 14px;border-radius:4px;transition:all 0.15s;margin-left:8px;">${deleteBtnText}</button>
+            </div>
           </div>
-        </div>
-      `, { className: 'capture-popup-white' })
+        `
 
-      // 默认展开弹窗
-      mapMarker.openPopup()
+        // 每次都先解绑再重新绑定，确保 popup 状态干净
+        mapMarker.unbindPopup()
+        mapMarker.bindPopup(popupContent, {
+          className: 'capture-popup-white',
+          closeButton: true,
+          autoPan: true,
+          offset: [0, -20]
+        }).openPopup()
+
+        // 绑定事件
+        setTimeout(() => {
+          // 复制按钮事件 — 制表符分隔（粘贴到Excel为横向3列）
+          document.querySelectorAll('.capture-popup-white .cp-all-btn').forEach(btn => {
+            btn.addEventListener('click', function(this: HTMLButtonElement) {
+              const labelInput = document.getElementById(inputId) as HTMLInputElement
+              const lngInput = document.getElementById(lngInputId) as HTMLInputElement
+              const latInput = document.getElementById(latInputId) as HTMLInputElement
+              const labelVal = labelInput?.value.trim() || currentLabel
+              const lngVal = lngInput?.value.trim() || marker.lng.toFixed(6)
+              const latVal = latInput?.value.trim() || marker.lat.toFixed(6)
+              const allText = `${labelVal}\t${lngVal}\t${latVal}`
+              navigator.clipboard.writeText(allText).then(() => {
+                this.textContent = (window as any).__gsdT?.('map.copied') || '已复制'
+                this.style.background = '#16a34a'
+                this.style.borderColor = '#16a34a'
+                setTimeout(() => {
+                  this.textContent = (window as any).__gsdT?.('map.copy') || '复制'
+                  this.style.background = '#3b82f6'
+                  this.style.borderColor = '#3b82f6'
+                }, 1200)
+              })
+            })
+          })
+
+          // 删除按钮事件
+          document.querySelectorAll('.capture-popup-white .del-btn').forEach(btn => {
+            btn.addEventListener('click', function(this: HTMLButtonElement) {
+              // 关闭弹框
+              mapMarker.closePopup()
+              // 移除地图标记
+              map.removeLayer(mapMarker)
+              // 移除标签标记
+              const labelMarker = markerLabelElementsRef.current.get(locationId)
+              if (labelMarker) {
+                map.removeLayer(labelMarker)
+                markerLabelElementsRef.current.delete(locationId)
+              }
+              // 清除数据
+              markerLabelsRef.current.delete(locationId)
+              // 从数组中移除引用
+              const idx = mapMarkersRef.current.findIndex(m => m === mapMarker)
+              if (idx > -1) {
+                mapMarkersRef.current.splice(idx, 1)
+              }
+            })
+          })
+
+          // 标签输入框保存事件
+          const input = document.getElementById(inputId) as HTMLInputElement
+          if (!input) return
+
+          const saveLabel = () => {
+            const newLabel = input.value.trim() || defaultLabel
+            markerLabelsRef.current.set(locationId, {
+              id: locationId,
+              name: locationId,
+              label: newLabel
+            })
+            const props = (mapMarker as any).captureProperties
+            if (props) {
+              props.name = newLabel
+              props.标签 = newLabel
+            }
+            updateMarkerLabel(locationId, index, newLabel, marker.lat, marker.lng)
+          }
+
+          // 经度输入框保存事件
+          const lngInput = document.getElementById(lngInputId) as HTMLInputElement
+          if (lngInput) {
+            const saveLng = () => {
+              const val = parseFloat(lngInput.value.trim())
+              if (!isNaN(val)) {
+                const props = (mapMarker as any).captureProperties
+                if (props) {
+                  props.longitude = val.toFixed(6)
+                  props.lng = val.toFixed(6)
+                }
+              }
+            }
+            lngInput.addEventListener('blur', saveLng)
+            lngInput.addEventListener('keydown', (e: KeyboardEvent) => {
+              if (e.key === 'Enter') { e.preventDefault(); saveLng(); lngInput.blur() }
+            })
+          }
+
+          // 纬度输入框保存事件
+          const latInput = document.getElementById(latInputId) as HTMLInputElement
+          if (latInput) {
+            const saveLat = () => {
+              const val = parseFloat(latInput.value.trim())
+              if (!isNaN(val)) {
+                const props = (mapMarker as any).captureProperties
+                if (props) {
+                  props.latitude = val.toFixed(6)
+                  props.lat = val.toFixed(6)
+                }
+              }
+            }
+            latInput.addEventListener('blur', saveLat)
+            latInput.addEventListener('keydown', (e: KeyboardEvent) => {
+              if (e.key === 'Enter') { e.preventDefault(); saveLat(); latInput.blur() }
+            })
+          }
+
+          input.addEventListener('blur', saveLabel)
+          input.addEventListener('keydown', (e: KeyboardEvent) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              saveLabel()
+              input.blur()
+            }
+          })
+          input.focus()
+          input.select()
+        }, 100)
+      })
+
+      // 右键点击：阻止默认行为（不再弹出编辑框，编辑已整合到左键属性框）
+      mapMarker.on('contextmenu', (e: L.LeafletMouseEvent) => {
+        L.DomEvent.stopPropagation(e)
+        L.DomEvent.preventDefault(e)
+      })
 
       // 添加到定位标记数组
       locationMarkersRef.current.push(mapMarker)
@@ -802,8 +988,25 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
     clearLocationMarkers: () => {
       if (!mapInstanceRef.current) return
 
-      // 移除所有定位标记
+      // 从装饰图层中移除所有定位标记及其标签
       locationMarkersRef.current.forEach(marker => {
+        // 获取标记的ID以清除对应的标签
+        const props = (marker as any).captureProperties
+        if (props?.id) {
+          const labelMarker = markerLabelElementsRef.current.get(props.id)
+          if (labelMarker) {
+            if (decorationLayerRef.current) {
+              decorationLayerRef.current.removeLayer(labelMarker)
+            }
+            mapInstanceRef.current?.removeLayer(labelMarker)
+            markerLabelElementsRef.current.delete(props.id)
+          }
+          markerLabelsRef.current.delete(props.id)
+        }
+
+        if (decorationLayerRef.current) {
+          decorationLayerRef.current.removeLayer(marker)
+        }
         mapInstanceRef.current?.removeLayer(marker)
       })
       locationMarkersRef.current = []
@@ -823,6 +1026,8 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
         mapInstanceRef.current?.removeLayer(marker)
       })
       measurementMarkersRef.current = []
+      measurementLineStartIndexRef.current = 0
+      measurementMarkerStartIndexRef.current = 0
 
       // 移除距离显示标签
       if (measurementDistanceRef.current) {
@@ -1052,13 +1257,34 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
       mapInfoLayerRefsRef.current.forEach(({ mapInfoLayer }) => {
         mapInfoLayer.setSelectionHighlight(null)
       })
-      // 清除框选形状
+      // 清除GeoDataLayer高亮
+      if (geoDataLayerManagerRef.current) {
+        geoDataLayerManagerRef.current.getAllLayers().forEach(geoLayer => {
+          geoLayer.setSelectionHighlight(null)
+        })
+      }
+      // 清除框选形状（包括圆形/多边形框选图形和矩形框选图形）
       const map = mapInstanceRef.current
       if (map) {
+        // 清除圆形/多边形选择形状（包括FeatureGroup中的多个形状）
         if (selectionShapeRef.current) {
+          // 如果是FeatureGroup，需要清除其中的所有图层
+          if (selectionShapeRef.current instanceof L.FeatureGroup) {
+            selectionShapeRef.current.clearLayers()
+          }
           map.removeLayer(selectionShapeRef.current)
           selectionShapeRef.current = null
         }
+        // 清除矩形选择框（包括FeatureGroup中的多个矩形）
+        if (selectionRectRef.current) {
+          // 如果是FeatureGroup，需要清除其中的所有图层
+          if (selectionRectRef.current instanceof L.FeatureGroup) {
+            selectionRectRef.current.clearLayers()
+          }
+          map.removeLayer(selectionRectRef.current)
+          selectionRectRef.current = null
+        }
+        // 清除多边形临时绘制线
         if (polygonTempLayerRef.current) {
           map.removeLayer(polygonTempLayerRef.current)
           polygonTempLayerRef.current = null
@@ -1122,6 +1348,24 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
     clearCaptureMarkers: () => {
       if (!mapInstanceRef.current) return
       captureMarkersRef.current.forEach(marker => {
+        // 获取标记的ID以清除对应的标签
+        const props = (marker as any).captureProperties
+        if (props?.id) {
+          const labelMarker = markerLabelElementsRef.current.get(props.id)
+          if (labelMarker) {
+            if (decorationLayerRef.current) {
+              decorationLayerRef.current.removeLayer(labelMarker)
+            }
+            mapInstanceRef.current?.removeLayer(labelMarker)
+            markerLabelElementsRef.current.delete(props.id)
+          }
+          markerLabelsRef.current.delete(props.id)
+        }
+
+        // 从装饰图层中移除
+        if (decorationLayerRef.current) {
+          decorationLayerRef.current.removeLayer(marker)
+        }
         mapInstanceRef.current?.removeLayer(marker)
       })
       captureMarkersRef.current = []
@@ -1164,8 +1408,10 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
    * 处理扇区点击事件 - 支持重叠扇区选择
    */
   const handleSectorClick = useCallback((sector: RenderSectorData, event: L.LeafletMouseEvent) => {
-    // 测距模式或圈选模式下不显示扇区属性
-    if (measureModeRef.current || selectionModeRef.current !== 'none') return;
+    // 拖拽工具激活时不处理扇区点击，只允许地图拖拽
+    if (mapDragTool) return;
+    // 测距模式、圈选模式或打点模式下不显示扇区属性
+    if (measureModeRef.current || selectionModeRef.current !== 'none' || captureModeRef.current) return;
 
     // PCI规划模式下不显示扇区属性面板，只调用点击回调
     if (mode === 'pci-planning') {
@@ -1203,9 +1449,53 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
     if (onSectorClick) {
       onSectorClick(sector)
     }
-  }, [showSectorInfo, layerVisibility, onSectorClick, mode])
+  }, [mapDragTool, showSectorInfo, layerVisibility, onSectorClick, mode])
 
   // 移除悬停事件处理函数，仅使用点击事件
+
+  /**
+   * 更新标记标签显示
+   */
+  const updateMarkerLabel = (captureId: string, _seq: number, label: string, lat: number, lng: number) => {
+    if (!mapInstanceRef.current || !window.L) return
+
+    const L = window.L
+    const map = mapInstanceRef.current
+
+    // 移除旧标签
+    const oldLabelMarker = markerLabelElementsRef.current.get(captureId)
+    if (oldLabelMarker) {
+      if (decorationLayerRef.current) {
+        decorationLayerRef.current.removeLayer(oldLabelMarker)
+      }
+      map.removeLayer(oldLabelMarker)
+      markerLabelElementsRef.current.delete(captureId)
+    }
+
+    // 如果标签为空，不显示
+    if (!label) return
+
+    // 创建新标签标记（显示在圆点右侧）
+    const labelMarker = L.marker([lat, lng], {
+      icon: L.divIcon({
+        html: `<div class="marker-label-inner" style="background:rgba(0,0,0,0.75);color:#fff;font-size:12px;padding:2px 8px;border-radius:4px;white-space:nowrap;display:inline-block;line-height:1.6;box-sizing:border-box;margin-left:8px;">${label}</div>`,
+        className: 'marker-label-wrapper',
+        iconSize: undefined as any,
+        // iconAnchor 设置为图标左侧中心点，使标签显示在圆点右侧
+        iconAnchor: [0, -10]
+      }),
+      interactive: false,
+      zIndexOffset: -100
+    })
+
+    if (decorationLayerRef.current) {
+      labelMarker.addTo(decorationLayerRef.current)
+    } else {
+      labelMarker.addTo(map)
+    }
+
+    markerLabelElementsRef.current.set(captureId, labelMarker)
+  }
 
   /**
    * 计算两点之间的距离
@@ -1226,6 +1516,9 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
    * 处理地图点击事件
    */
   const handleMapClick = useCallback((event: any) => {
+    // 拖拽工具激活时不处理任何点击操作，只允许地图拖拽
+    if (mapDragTool) return
+
     // 抓取模式：获取点击坐标并转换为WGS84，在地图上添加持久化标记
     if (captureMode && onCaptureCoord && mapInstanceRef.current && window.L) {
       const L = window.L
@@ -1236,23 +1529,26 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
 
       // 序号：从1开始
       const seq = captureMarkersRef.current.length + 1
-      const captureId = `capture-${seq}`
+      const captureId = `capture-${Date.now()}-${seq}`
 
-      // 创建带序号的标记（序号嵌入圆点内部）
+      // 生成默认标签名（如"打点1"、"打点2"）
+      const defaultLabel = `${t('map.capturePoint') || '打点'}${seq}`
+
+      // 创建标记（纯色圆点，无序号）
       const marker = L.marker([gcjLat, gcjLng], {
         icon: L.divIcon({
-          html: `<div style="background:#ef4444;color:#fff;font-size:10px;font-weight:bold;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.3);">${seq}</div>`,
+          html: `<div style="background:#ef4444;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.3);"></div>`,
           className: 'capture-marker',
-          iconSize: [20, 20],
-          iconAnchor: [10, 10]
+          iconSize: [16, 16],
+          iconAnchor: [8, 8]
         })
-      }).addTo(map)
+      })
 
       // 存储属性数据到 marker 上，供圈选工具读取
       ;(marker as any).captureProperties = {
         id: captureId,
-        name: captureId,
-        序号: seq,
+        name: defaultLabel,  // 使用默认标签名作为名称
+        标签: defaultLabel,  // 添加标签字段
         longitude: wgsLng.toFixed(6),
         latitude: wgsLat.toFixed(6),
         lng: wgsLng.toFixed(6),
@@ -1260,24 +1556,195 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
         _layerType: 'CapturePoint'
       }
 
-      // 弹出经纬度信息（一行显示+复制按钮）
-      const coordText = `${wgsLng.toFixed(6)}, ${wgsLat.toFixed(6)}`
-      const popupId = `capture-copy-${Date.now()}`
-      marker.bindPopup(`
-        <div style="padding:6px 8px;min-width:220px;background:#fff;color:#000;border:1px solid #d1d5db;border-radius:4px;">
-          <div style="font-size:11px;color:#888;margin-bottom:4px;">#${seq}</div>
-          <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#000;">
-            <span style="font-family:monospace;white-space:nowrap;color:#000;">Lng: ${wgsLng.toFixed(6)}, Lat: ${wgsLat.toFixed(6)}</span>
-            <button onclick="(function(){navigator.clipboard.writeText('${coordText}');var b=document.getElementById('${popupId}');if(b){b.textContent='✓';setTimeout(function(){b.textContent='复制'},1500)}})()"
-              id="${popupId}"
-              style="padding:2px 8px;font-size:11px;background:#3b82f6;color:#fff;border:none;border-radius:3px;cursor:pointer;white-space:nowrap;">
-              复制
-            </button>
+      // 保存默认标签到 markerLabelsRef
+      markerLabelsRef.current.set(captureId, {
+        id: captureId,
+        name: captureId,
+        label: defaultLabel
+      })
+
+      // 立即显示默认标签
+      updateMarkerLabel(captureId, seq, defaultLabel, gcjLat, gcjLng)
+
+      // 左键点击：弹出可编辑属性框
+      marker.on('click', () => {
+        const labelData = markerLabelsRef.current.get(captureId)
+        const currentLabel = labelData?.label || defaultLabel
+        const inputId = `capture-label-input-${captureId}`
+        const lngInputId = `capture-lng-input-${captureId}`
+        const latInputId = `capture-lat-input-${captureId}`
+        const inputStyle = `padding:4px 8px;border:1px solid #d1d5db;border-radius:4px;font-size:12px;width:100%;color:#111;outline:none;font-family:monospace;`
+        const inputFocus = `onfocus="this.style.borderColor='#3b82f6';this.style.boxShadow='0 0 0 2px rgba(59,130,246,0.2)'" onblur="this.style.borderColor='#d1d5db';this.style.boxShadow='none'"`
+        const deleteBtnText = t('map.delete') || '删除'
+        const copyBtnText = t('map.copy') || '复制'
+        const propertiesText = t('map.properties') || '属性'
+        const labelNameText = t('map.labelName') || '标签'
+        const longitudeText = t('map.longitude') || '经度'
+        const latitudeText = t('map.latitude') || '纬度'
+
+        const popupContent = `
+          <div style="padding:10px 12px;min-width:280px;background:#fff;color:#000;border:1px solid #d1d5db;border-radius:8px;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,0.15);" onclick="event.stopPropagation()">
+            <div style="font-size:14px;font-weight:600;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #e5e7eb;color:#111;">${propertiesText}</div>
+            <div style="display:grid;grid-template-columns:50px 1fr;gap:8px 12px;align-items:center;line-height:1.6;">
+              <span style="color:#888;font-size:11px;">${labelNameText}</span>
+              <input id="${inputId}" type="text" value="${currentLabel.replace(/"/g, '&quot;')}"
+                style="${inputStyle}" ${inputFocus} />
+              <span style="color:#888;font-size:11px;">${longitudeText}</span>
+              <input id="${lngInputId}" type="text" value="${wgsLng.toFixed(6)}"
+                style="${inputStyle}" ${inputFocus} />
+              <span style="color:#888;font-size:11px;">${latitudeText}</span>
+              <input id="${latInputId}" type="text" value="${wgsLat.toFixed(6)}"
+                style="${inputStyle}" ${inputFocus} />
+            </div>
+            <div style="margin-top:10px;padding-top:8px;border-top:1px solid #e5e7eb;text-align:right;">
+              <button class="cp-all-btn" style="background:#3b82f6;border:1px solid #3b82f6;cursor:pointer;color:#fff;font-size:12px;padding:4px 14px;border-radius:4px;transition:all 0.15s;">${copyBtnText}</button>
+              <button class="del-btn" style="background:#ef4444;border:1px solid #ef4444;cursor:pointer;color:#fff;font-size:12px;padding:4px 14px;border-radius:4px;transition:all 0.15s;margin-left:8px;">${deleteBtnText}</button>
+            </div>
           </div>
-        </div>
-      `, { className: 'capture-popup-white' }).openPopup()
+        `
+
+        // 每次都先解绑再重新绑定，确保 popup 状态干净
+        marker.unbindPopup()
+        marker.bindPopup(popupContent, {
+          className: 'capture-popup-white',
+          closeButton: true,
+          autoPan: true,
+          offset: [0, -20]
+        }).openPopup()
+
+        // 绑定事件
+        setTimeout(() => {
+          // 复制按钮事件 — 制表符分隔（粘贴到Excel为横向3列）
+          document.querySelectorAll('.capture-popup-white .cp-all-btn').forEach(btn => {
+            btn.addEventListener('click', function(this: HTMLButtonElement) {
+              const labelInput = document.getElementById(inputId) as HTMLInputElement
+              const lngInput = document.getElementById(lngInputId) as HTMLInputElement
+              const latInput = document.getElementById(latInputId) as HTMLInputElement
+              const labelVal = labelInput?.value.trim() || currentLabel
+              const lngVal = lngInput?.value.trim() || wgsLng.toFixed(6)
+              const latVal = latInput?.value.trim() || wgsLat.toFixed(6)
+              const allText = `${labelVal}\t${lngVal}\t${latVal}`
+              navigator.clipboard.writeText(allText).then(() => {
+                this.textContent = (window as any).__gsdT?.('map.copied') || '已复制'
+                this.style.background = '#16a34a'
+                this.style.borderColor = '#16a34a'
+                setTimeout(() => {
+                  this.textContent = (window as any).__gsdT?.('map.copy') || '复制'
+                  this.style.background = '#3b82f6'
+                  this.style.borderColor = '#3b82f6'
+                }, 1200)
+              })
+            })
+          })
+
+          // 删除按钮事件
+          document.querySelectorAll('.capture-popup-white .del-btn').forEach(btn => {
+            btn.addEventListener('click', function(this: HTMLButtonElement) {
+              // 关闭弹框
+              marker.closePopup()
+              // 移除地图标记
+              map.removeLayer(marker)
+              // 移除标签标记
+              const labelMarker = markerLabelElementsRef.current.get(captureId)
+              if (labelMarker) {
+                map.removeLayer(labelMarker)
+                markerLabelElementsRef.current.delete(captureId)
+              }
+              // 清除数据
+              markerLabelsRef.current.delete(captureId)
+              // 从数组中移除引用
+              const idx = captureMarkersRef.current.findIndex(m => m === marker)
+              if (idx > -1) {
+                captureMarkersRef.current.splice(idx, 1)
+              }
+            })
+          })
+
+          // 标签输入框保存事件
+          const input = document.getElementById(inputId) as HTMLInputElement
+          if (!input) return
+
+          const saveLabel = () => {
+            const newLabel = input.value.trim() || defaultLabel
+            markerLabelsRef.current.set(captureId, {
+              id: captureId,
+              name: captureId,
+              label: newLabel
+            })
+            const props = (marker as any).captureProperties
+            if (props) {
+              props.name = newLabel
+              props.标签 = newLabel
+            }
+            updateMarkerLabel(captureId, seq, newLabel, gcjLat, gcjLng)
+          }
+
+          // 经度输入框保存事件
+          const lngInput = document.getElementById(lngInputId) as HTMLInputElement
+          if (lngInput) {
+            const saveLng = () => {
+              const val = parseFloat(lngInput.value.trim())
+              if (!isNaN(val)) {
+                const props = (marker as any).captureProperties
+                if (props) {
+                  props.longitude = val.toFixed(6)
+                  props.lng = val.toFixed(6)
+                }
+              }
+            }
+            lngInput.addEventListener('blur', saveLng)
+            lngInput.addEventListener('keydown', (e: KeyboardEvent) => {
+              if (e.key === 'Enter') { e.preventDefault(); saveLng(); lngInput.blur() }
+            })
+          }
+
+          // 纬度输入框保存事件
+          const latInput = document.getElementById(latInputId) as HTMLInputElement
+          if (latInput) {
+            const saveLat = () => {
+              const val = parseFloat(latInput.value.trim())
+              if (!isNaN(val)) {
+                const props = (marker as any).captureProperties
+                if (props) {
+                  props.latitude = val.toFixed(6)
+                  props.lat = val.toFixed(6)
+                }
+              }
+            }
+            latInput.addEventListener('blur', saveLat)
+            latInput.addEventListener('keydown', (e: KeyboardEvent) => {
+              if (e.key === 'Enter') { e.preventDefault(); saveLat(); latInput.blur() }
+            })
+          }
+
+          input.addEventListener('blur', saveLabel)
+          input.addEventListener('keydown', (e: KeyboardEvent) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              saveLabel()
+              input.blur()
+            }
+          })
+          input.focus()
+          input.select()
+        }, 100)
+      })
+
+      // 右键点击：阻止默认行为（不再弹出编辑框，编辑已整合到左键属性框）
+      marker.on('contextmenu', (e: L.LeafletMouseEvent) => {
+        L.DomEvent.stopPropagation(e)
+        L.DomEvent.preventDefault(e)
+      })
 
       captureMarkersRef.current.push(marker)
+
+      // 将标记添加到装饰图层或地图
+      if (decorationLayerRef.current) {
+        marker.addTo(decorationLayerRef.current)
+      } else {
+        marker.addTo(map)
+      }
+
       onCaptureCoord(wgsLng, wgsLat)
       return
     }
@@ -1305,7 +1772,9 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
 
       // 添加测量点
       const newPoint = { lng: latLng.lng, lat: latLng.lat }
-      const updatedPoints = [...measurePoints, newPoint]
+      // 使用 ref 获取最新的点数据，避免双击时闭包值过期
+      const currentMeasurePoints = measurePointsRef.current
+      const updatedPoints = [...currentMeasurePoints, newPoint]
       setMeasurePoints(updatedPoints)
       measurePointsRef.current = updatedPoints // 立即更新 ref 供 mousemove 使用
 
@@ -1362,7 +1831,7 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
         measurementLinesRef.current.push(polyline)
       }
     }
-  }, [measureMode, measurePoints, hideSectorInfo, hideFeatureInfo, captureMode, onCaptureCoord])
+  }, [mapDragTool, measureMode, hideSectorInfo, hideFeatureInfo, captureMode, onCaptureCoord])
 
   /**
    * 处理地图右键事件，用于结束测量或释放测距模式
@@ -1376,13 +1845,15 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
    * 结束当前测距
    */
   const finishMeasurement = useCallback(() => {
-    if (!mapInstanceRef.current || measurePoints.length < 2) return
+    // 使用 ref 获取最新的点数据，避免双击时闭包值过期
+    const currentPoints = measurePointsRef.current
+    if (!mapInstanceRef.current || currentPoints.length < 2) return
 
     const L = (window as any).L
     const map = mapInstanceRef.current
 
-    // 复制点数组进行处理
-    let points = [...measurePoints]
+    // 复制点数组进行处理（使用 ref 中的最新数据）
+    let points = [...currentPoints]
 
     // 如果最后两个点坐标一致（通常是双击导致的），移除最后一个重复点
     if (points.length >= 2) {
@@ -1398,7 +1869,7 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
       }
     }
 
-    // 现在移除最后一个有效点的数字标签，准备替换为“总长”
+    // 现在移除最后一个有效点的数字标签，准备替换为"总长"
     const lastLabel = measurementMarkersRef.current.pop()
     if (lastLabel) {
       map.removeLayer(lastLabel)
@@ -1411,6 +1882,38 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
     for (let i = 0; i < points.length - 1; i++) {
       totalDist += calculateDistance(points[i].lat, points[i].lng, points[i + 1].lat, points[i + 1].lng)
     }
+
+    // 清理中间状态的线条，只保留最后一条完整的线
+    // 在测量过程中，每次点击都会添加一条包含所有点的折线
+    // 现在需要清理之前的中间状态线，只保留最后一条
+    const lineStartIndex = measurementLineStartIndexRef.current
+    const currentLineCount = measurementLinesRef.current.length
+
+    // 移除除最后一条外的所有中间状态线
+    for (let i = lineStartIndex; i < currentLineCount - 1; i++) {
+      const line = measurementLinesRef.current[i]
+      if (line) map.removeLayer(line)
+    }
+    // 只保留最后一条线
+    if (currentLineCount > lineStartIndex) {
+      const lastLine = measurementLinesRef.current[currentLineCount - 1]
+      measurementLinesRef.current = [
+        ...measurementLinesRef.current.slice(0, lineStartIndex),
+        lastLine
+      ]
+    }
+
+    // 记录当前测量的线条（直接存储引用，而不是索引）
+    const currentMeasurementLine = measurementLinesRef.current[measurementLinesRef.current.length - 1]
+
+    // 记录当前测量添加的所有标记引用
+    // 在 finishMeasurement 被调用时，measurementMarkersRef 中已经包含了：
+    // 1. 所有测量点的标记（每个点一个）- 在点击时添加
+    // 2. 所有距离标签（每个点一个，除了最后一个点）- 在点击时添加
+    // 3. 总长标签 - 在下面添加
+    // 4. 删除按钮 - 在下面添加
+    // 我们需要记录当前测量添加的标记，以便删除时能准确定位
+    const markerStartIndex = measurementMarkerStartIndexRef.current
 
     // 绘制最终的总长标签
     const totalLabel = L.marker([lastPoint.lat, lastPoint.lng], {
@@ -1426,6 +1929,68 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
     }).addTo(map)
     measurementMarkersRef.current.push(totalLabel)
 
+    // 在结束端添加删除按钮（X样式）
+    const deleteButton = L.marker([lastPoint.lat, lastPoint.lng], {
+      icon: L.divIcon({
+        html: `<div class="measure-delete-btn" style="
+          width: 18px;
+          height: 18px;
+          background: #ef4444;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+          border: 2px solid white;
+          font-size: 12px;
+          font-weight: bold;
+          color: white;
+          line-height: 1;
+        " title="${t('map.deleteMeasurement') || '删除测量'}">×</div>`,
+        className: 'measure-delete-button',
+        iconSize: [18, 18],
+        iconAnchor: [22, 10] // 偏移到总长标签右侧
+      }),
+      pane: 'measurement'
+    }).addTo(map)
+    measurementMarkersRef.current.push(deleteButton)
+
+    // 为删除按钮添加点击事件
+    deleteButton.getElement()?.addEventListener('click', (e: Event) => {
+      e.stopPropagation()
+      e.preventDefault()
+
+      // 移除当前测量的线条
+      if (currentMeasurementLine) {
+        map.removeLayer(currentMeasurementLine)
+        const lineIndex = measurementLinesRef.current.indexOf(currentMeasurementLine)
+        if (lineIndex > -1) {
+          measurementLinesRef.current.splice(lineIndex, 1)
+        }
+      }
+
+      // 使用记录的标记起始索引，精确移除当前测量的所有标记
+      const markerStartIdx = markerStartIndex
+      const markerEndIdx = measurementMarkersRef.current.length
+      for (let i = markerEndIdx - 1; i >= markerStartIdx; i--) {
+        const m = measurementMarkersRef.current[i]
+        if (m) {
+          map.removeLayer(m)
+        }
+      }
+      measurementMarkersRef.current.splice(markerStartIdx, markerEndIdx - markerStartIdx)
+
+      // 重置起始索引为当前数组长度（删除后数组已更新）
+      measurementLineStartIndexRef.current = measurementLinesRef.current.length
+      measurementMarkerStartIndexRef.current = measurementMarkersRef.current.length
+    })
+
+    // 更新线条起始索引，为下一次测量做准备
+    measurementLineStartIndexRef.current = measurementLinesRef.current.length
+    // 更新标记起始索引，为下一次测量做准备
+    measurementMarkerStartIndexRef.current = measurementMarkersRef.current.length
+
     // 清除预览线
     if (shadowLineRef.current) {
       map.removeLayer(shadowLineRef.current)
@@ -1438,18 +2003,20 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
 
     setMeasurePoints([])
     measurePointsRef.current = [] // 立即更新 ref
-  }, [measurePoints, calculateDistance])
+  }, [calculateDistance])
 
   /**
    * 撤销上一个测量点
    */
   const undoLastPoint = useCallback(() => {
-    if (!mapInstanceRef.current || measurePoints.length <= 1) return
+    // 使用 ref 获取最新的点数据
+    const currentPoints = measurePointsRef.current
+    if (!mapInstanceRef.current || currentPoints.length <= 1) return
 
     const map = mapInstanceRef.current
 
     // 移除最后一个点的数据
-    const updatedPoints = [...measurePoints]
+    const updatedPoints = [...currentPoints]
     updatedPoints.pop()
     setMeasurePoints(updatedPoints)
     measurePointsRef.current = updatedPoints
@@ -1477,7 +2044,7 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
         shadowLabelRef.current = null
       }
     }
-  }, [measurePoints])
+  }, [])
 
   /**
    * 处理全键盘事件，支持 Esc 退出测距/框选，Ctrl+C 复制选中要素，Backspace 删除多边形最后一个点
@@ -2393,7 +2960,8 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
           nrSectorLayerRef.current.setMeasureMode(true)
         }
       } else {
-        map.getContainer().style.cursor = mapDragTool ? 'default' : 'default' // 保持默认
+        // 非测距模式：根据 mapDragTool 设置光标
+        map.getContainer().style.cursor = mapDragTool ? 'grab' : ''
         map.dragging.enable()
         map.doubleClickZoom.enable()
 
@@ -2410,18 +2978,77 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
 
   /**
    * 监听地图拖拽工具状态
+   * 激活时：始终保持手型光标，禁用双击缩放，只允许拖拽地图
+   * 同时禁用所有图层交互（悬停提示、点击事件等）
    */
   useEffect(() => {
     if (mapInstanceRef.current) {
       const map = mapInstanceRef.current
       if (mapDragTool) {
         map.dragging.enable()
-      } else if (!measureMode && selectionMode === 'none') {
-        // 只有在非测量且非圈选模式下，才根据拖拽工具状态禁用（如果需要的话，但通常地图都需要拖拽）
-        // 这里根据需求逻辑决定是否禁用
+        map.doubleClickZoom.disable()
+        // 强制设置容器 cursor 为 grab（不被测距等其他效果覆盖）
+        map.getContainer().style.cursor = 'grab'
+        // 监听鼠标按下/抬起时的光标状态
+        const onMouseDown = () => { map.getContainer().style.cursor = 'grabbing' }
+        const onMouseUp = () => { map.getContainer().style.cursor = 'grab' }
+        // 监听鼠标离开/进入地图容器，确保光标状态正确
+        const onMouseLeave = () => { map.getContainer().style.cursor = 'grab' }
+        const onMouseEnter = () => { map.getContainer().style.cursor = 'grab' }
+        map.getContainer().addEventListener('mousedown', onMouseDown)
+        map.getContainer().addEventListener('mouseup', onMouseUp)
+        map.getContainer().addEventListener('mouseleave', onMouseLeave)
+        map.getContainer().addEventListener('mouseenter', onMouseEnter)
+
+        // 禁用扇区图层的悬停提示和点击交互
+        if (lteSectorLayerRef.current) lteSectorLayerRef.current.updateSelectionMode(true)
+        if (nrSectorLayerRef.current) nrSectorLayerRef.current.updateSelectionMode(true)
+
+        // 禁用 MapInfoLayer 的点击交互
+        mapInfoLayerRefsRef.current.forEach(({ mapInfoLayer }) => {
+          mapInfoLayer.setInteractive(false)
+        })
+
+        // 禁用 GeoDataLayer 的点击交互
+        if (geoDataLayerManagerRef.current) {
+          geoDataLayerManagerRef.current.setInteractive(false)
+        }
+
+        // 返回清理函数（存储在 ref 中，在 mapDragTool 变为 false 时调用）
+        ;(map as any)._dragToolCleanup = () => {
+          map.getContainer().removeEventListener('mousedown', onMouseDown)
+          map.getContainer().removeEventListener('mouseup', onMouseUp)
+          map.getContainer().removeEventListener('mouseleave', onMouseLeave)
+          map.getContainer().removeEventListener('mouseenter', onMouseEnter)
+        }
+      } else {
+        // 关闭拖拽工具：恢复正常状态
+        if ((map as any)._dragToolCleanup) {
+          ;(map as any)._dragToolCleanup()
+          delete (map as any)._dragToolCleanup
+        }
+        map.dragging.enable()
+        if (!measureMode) {
+          map.doubleClickZoom.enable()
+          map.getContainer().style.cursor = ''
+        }
+
+        // 恢复扇区图层的悬停提示和点击交互
+        if (lteSectorLayerRef.current) lteSectorLayerRef.current.updateSelectionMode(false)
+        if (nrSectorLayerRef.current) nrSectorLayerRef.current.updateSelectionMode(false)
+
+        // 恢复 MapInfoLayer 的点击交互
+        mapInfoLayerRefsRef.current.forEach(({ mapInfoLayer }) => {
+          mapInfoLayer.setInteractive(true)
+        })
+
+        // 恢复 GeoDataLayer 的点击交互
+        if (geoDataLayerManagerRef.current) {
+          geoDataLayerManagerRef.current.setInteractive(true)
+        }
       }
     }
-  }, [mapDragTool, measureMode, selectionMode])
+  }, [mapDragTool, measureMode])
 
   /**
    * 框选功能辅助函数
@@ -2439,6 +3066,12 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
     }
     if (nrSectorLayerRef.current) {
       nrSectorLayerRef.current.setSelectionHighlight(null)
+    }
+    // 清除GeoDataLayer高亮
+    if (geoDataLayerManagerRef.current) {
+      geoDataLayerManagerRef.current.getAllLayers().forEach(geoLayer => {
+        geoLayer.setSelectionHighlight(null)
+      })
     }
     // 清除MapInfo图层高亮
     mapInfoLayerRefsRef.current.forEach(({ mapInfoLayer }) => {
@@ -2495,7 +3128,24 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
       })
     })
 
-    // 2. 遍历扇区图层 (LTE/NR) - 只选择可见图层
+    // 2. 遍历 GeoDataLayer（装饰图层）
+    if (geoDataLayerManagerRef.current) {
+      geoDataLayerManagerRef.current.getAllLayers().forEach(geoLayer => {
+        if (!geoLayer.isVisible()) return
+        // 创建一个临时的小圆来查询（模拟点选）
+        const L = window.L
+        const tempCircle = L.circle(latLng, { radius: 30 }) // 30米容差
+        const features = geoLayer.getFeaturesInCircle(latLng, 30)
+        features.forEach(item => {
+          const id = item.name || item.properties?.id || ''
+          if (id) {
+            clickedFeatures.push({ id: String(id), props: { ...item.properties, _layerType: 'GeoData', _geoDataName: item.name }, layerType: 'GeoData' })
+          }
+        })
+      })
+    }
+
+    // 3. 遍历扇区图层 (LTE/NR) - 只选择可见图层
     if (visibility.lte && lteSectorLayerRef.current) {
       let sectorsAtPoint: RenderSectorData[] = []
       if (clientX !== undefined && clientY !== undefined) {
@@ -2516,7 +3166,7 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
       })
     }
 
-    // 3. 遍历抓取坐标点
+    // 4. 遍历抓取坐标点
     captureMarkersRef.current.forEach(marker => {
       if (!mapInstanceRef.current || !mapInstanceRef.current.hasLayer(marker)) return
       const markerLatLng = marker.getLatLng()
@@ -2528,11 +3178,29 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
       }
     })
 
-    // 如果没有点击到任何要素，清除选中状态
+    // 如果没有点击到任何要素
     if (clickedFeatures.length === 0) {
       if (!isMultiSelect) {
+        // 非多选模式下点击空白区域：清除所有选择状态和图形
         clearSelectionState()
-        setSelectionTip('点击选择要素（再次点击取消），Shift+点击多选，按 Ctrl+C 复制')
+        // 清除框选图形（圆形/多边形/矩形）
+        const map = mapInstanceRef.current
+        if (map) {
+          if (selectionShapeRef.current) {
+            map.removeLayer(selectionShapeRef.current)
+            selectionShapeRef.current = null
+          }
+          if (selectionRectRef.current) {
+            map.removeLayer(selectionRectRef.current)
+            selectionRectRef.current = null
+          }
+          if (polygonTempLayerRef.current) {
+            map.removeLayer(polygonTempLayerRef.current)
+            polygonTempLayerRef.current = null
+          }
+        }
+        // 清除提示信息
+        setSelectionTip('')
       }
       return { ids: new Set(), properties: [] }
     }
@@ -2542,15 +3210,24 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
     let selectedProperties: any[]
 
     if (isMultiSelect) {
-      // 多选模式：从现有选中集合开始，添加新要素
+      // 多选模式：从现有选中集合开始，添加/移除新要素（支持toggle）
       selectedIds = new Set(selectedIdsRef.current)
       selectedProperties = [...selectedFeaturesRef.current]
 
       clickedFeatures.forEach(feature => {
-        if (!selectedIds.has(feature.id)) {
+        if (selectedIds.has(feature.id)) {
+          // 已选中，取消选择
+          selectedIds.delete(feature.id)
+          selectedProperties = selectedProperties.filter(p => {
+            const pid = p.id || p.name || p.小区名称 || p.OBJECTID || ''
+            return String(pid) !== feature.id
+          })
+          console.log('[OnlineMap] Shift+点选取消要素:', feature.props.name || feature.id, 'from', feature.layerType)
+        } else {
+          // 未选中，添加选择
           selectedIds.add(feature.id)
           selectedProperties.push(feature.props)
-          console.log('[OnlineMap] 点选添加要素:', feature.props.name || feature.id, 'from', feature.layerType)
+          console.log('[OnlineMap] Shift+点选添加要素:', feature.props.name || feature.id, 'from', feature.layerType)
         }
       })
     } else {
@@ -2593,6 +3270,13 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
       mapInfoLayer.setSelectionHighlight(selectedIds)
     })
 
+    // 对GeoDataLayer应用高亮
+    if (geoDataLayerManagerRef.current) {
+      geoDataLayerManagerRef.current.getAllLayers().forEach(geoLayer => {
+        geoLayer.setSelectionHighlight(selectedIds)
+      })
+    }
+
     // 对扇区图层应用高亮
     if (lteSectorLayerRef.current) {
       lteSectorLayerRef.current.setSelectionHighlight(selectedIds)
@@ -2619,14 +3303,15 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
    * 圆形选择：选择圆内的所有要素
    * @param center 圆心 (GCJ-02渲染坐标)
    * @param radius 半径 (米)
+   * @param isMultiSelect 是否多选（Shift键），true时叠加到已有选中
    * @returns 选中的要素及其属性
    */
-  const selectFeaturesInCircle = useCallback((center: L.LatLng, radius: number): { ids: Set<string>, properties: any[] } => {
+  const selectFeaturesInCircle = useCallback((center: L.LatLng, radius: number, isMultiSelect: boolean = false): { ids: Set<string>, properties: any[] } => {
     // 获取当前图层可见性
     const visibility = layerVisibilityRef.current
 
-    const selectedIds = new Set<string>()
-    const selectedProperties: any[] = []
+    const newIds = new Set<string>()
+    const newProperties: any[] = []
 
     // 1. 遍历所有MapInfoLayer（只选择可见图层）
     mapInfoLayerRefsRef.current.forEach(({ mapInfoLayer }) => {
@@ -2648,19 +3333,35 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
         const id = props.id || props.name || props.小区名称 || props.OBJECTID || ''
         console.log('[OnlineMap] 处理要素:', { id, props })
         if (id) {
-          selectedIds.add(String(id))
-          selectedProperties.push({ ...props, _layerType: 'MapInfo' })
+          newIds.add(String(id))
+          newProperties.push({ ...props, _layerType: 'MapInfo' })
         }
       })
     })
 
-    // 2. 遍历扇区图层 (LTE/NR) - 只选择可见图层
+    // 2. 遍历 GeoDataLayer（装饰图层）
+    if (geoDataLayerManagerRef.current) {
+      geoDataLayerManagerRef.current.getAllLayers().forEach(geoLayer => {
+        if (!geoLayer.isVisible()) return
+        const features = geoLayer.getFeaturesInCircle(center, radius)
+        features.forEach(item => {
+          const id = item.name || item.properties?.id || ''
+          if (id) {
+            newIds.add(String(id))
+            newProperties.push({ ...item.properties, _layerType: 'GeoData', _geoDataName: item.name })
+            console.log('[OnlineMap] 圆形框选选中GeoData要素:', item.name || id)
+          }
+        })
+      })
+    }
+
+    // 3. 遍历扇区图层 (LTE/NR) - 只选择可见图层
     if (visibility.lte && lteSectorLayerRef.current) {
       const sectorsInCircle = lteSectorLayerRef.current.getSectorsInCircle(center, radius)
       sectorsInCircle.forEach(sector => {
         const id = String(sector.id)
-        selectedIds.add(id)
-        selectedProperties.push({ ...sector, _layerType: 'LTE' })
+        newIds.add(id)
+        newProperties.push({ ...sector, _layerType: 'LTE' })
         console.log('[OnlineMap] 圆形框选选中LTE扇区:', sector.name, sector.id)
       })
     }
@@ -2669,47 +3370,88 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
       const sectorsInCircle = nrSectorLayerRef.current.getSectorsInCircle(center, radius)
       sectorsInCircle.forEach(sector => {
         const id = String(sector.id)
-        selectedIds.add(id)
-        selectedProperties.push({ ...sector, _layerType: 'NR' })
+        newIds.add(id)
+        newProperties.push({ ...sector, _layerType: 'NR' })
         console.log('[OnlineMap] 圆形框选选中NR扇区:', sector.name, sector.id)
       })
     }
 
-    // 3. 遍历抓取坐标点
+    // 4. 遍历抓取坐标点
     captureMarkersRef.current.forEach(marker => {
       if (!mapInstanceRef.current || !mapInstanceRef.current.hasLayer(marker)) return
       const markerLatLng = marker.getLatLng()
       if (markerLatLng && center.distanceTo(markerLatLng) <= radius) {
         const props = (marker as any).captureProperties
         if (props) {
-          selectedIds.add(props.id)
-          selectedProperties.push({ ...props })
+          newIds.add(props.id)
+          newProperties.push({ ...props })
         }
       }
     })
 
+    // 5. 遍历定位标记点
+    locationMarkersRef.current.forEach(marker => {
+      if (!mapInstanceRef.current || !mapInstanceRef.current.hasLayer(marker)) return
+      const markerLatLng = marker.getLatLng()
+      if (markerLatLng && center.distanceTo(markerLatLng) <= radius) {
+        const props = (marker as any).captureProperties
+        if (props) {
+          newIds.add(props.id)
+          newProperties.push({ ...props })
+        }
+      }
+    })
+
+    // 合并选中状态（多选时叠加，单选时替换）
+    let selectedIds: Set<string>
+    let selectedProperties: any[]
+
+    if (isMultiSelect) {
+      // Shift模式：叠加到已有选中
+      selectedIds = new Set(selectedIdsRef.current)
+      selectedProperties = [...selectedFeaturesRef.current]
+      newIds.forEach(id => {
+        if (!selectedIds.has(id)) {
+          selectedIds.add(id)
+          const prop = newProperties.find(p => {
+            const pid = p.id || p.name || p.小区名称 || p.OBJECTID || ''
+            return String(pid) === id
+          })
+          if (prop) selectedProperties.push(prop)
+        }
+      })
+    } else {
+      selectedIds = newIds
+      selectedProperties = newProperties
+    }
+
     // 应用高亮
+    // 对MapInfoLayer应用高亮
+    mapInfoLayerRefsRef.current.forEach(({ mapInfoLayer }) => {
+      mapInfoLayer.setSelectionHighlight(selectedIds)
+    })
+
+    // 对GeoDataLayer应用高亮
+    if (geoDataLayerManagerRef.current) {
+      geoDataLayerManagerRef.current.getAllLayers().forEach(geoLayer => {
+        geoLayer.setSelectionHighlight(selectedIds)
+      })
+    }
+
+    // 对扇区图层应用高亮
+    if (lteSectorLayerRef.current) {
+      lteSectorLayerRef.current.setSelectionHighlight(selectedIds)
+    }
+    if (nrSectorLayerRef.current) {
+      nrSectorLayerRef.current.setSelectionHighlight(selectedIds)
+    }
+
+    // 保存选中状态到 Ref
+    selectedFeaturesRef.current = selectedProperties
+    selectedIdsRef.current = selectedIds
+
     if (selectedIds.size > 0) {
       console.log('[OnlineMap] 圆形框选选中要素总数:', selectedIds.size)
-
-      // 对MapInfoLayer应用高亮
-      mapInfoLayerRefsRef.current.forEach(({ mapInfoLayer }) => {
-        mapInfoLayer.setSelectionHighlight(selectedIds)
-      })
-
-      // 对扇区图层应用高亮
-      if (lteSectorLayerRef.current) {
-        lteSectorLayerRef.current.setSelectionHighlight(selectedIds)
-      }
-      if (nrSectorLayerRef.current) {
-        nrSectorLayerRef.current.setSelectionHighlight(selectedIds)
-      }
-
-      // 保存选中状态到 Ref
-      selectedFeaturesRef.current = selectedProperties
-      selectedIdsRef.current = selectedIds
-
-      // 更新提示信息
       setSelectionTip(`${t('map.featuresSelected', { count: selectedIds.size })}，${t('map.pressEscClear')}`)
     } else {
       setSelectionTip(t('map.noFeatureSelected'))
@@ -2721,19 +3463,20 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
   /**
    * 多边形选择：选择多边形内的所有要素
    * @param points 多边形顶点 (GCJ-02渲染坐标)
+   * @param isMultiSelect 是否多选（Shift键），true时叠加到已有选中
    * @returns 选中的要素及其属性
    */
-  const selectFeaturesInPolygon = useCallback((points: L.LatLng[]): { ids: Set<string>, properties: any[] } => {
+  const selectFeaturesInPolygon = useCallback((points: L.LatLng[], isMultiSelect: boolean = false): { ids: Set<string>, properties: any[] } => {
     const L = window.L
     // 获取当前图层可见性
     const visibility = layerVisibilityRef.current
 
-    const selectedIds = new Set<string>()
-    const selectedProperties: any[] = []
+    const newIds = new Set<string>()
+    const newProperties: any[] = []
 
     if (points.length < 3) {
       console.warn('[OnlineMap] 多边形至少需要3个点')
-      return { ids: selectedIds, properties: selectedProperties }
+      return { ids: newIds, properties: newProperties }
     }
 
     // 创建临时多边形对象用于查询
@@ -2751,19 +3494,35 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
       features.forEach(props => {
         const id = props.id || props.name || props.小区名称 || props.OBJECTID || ''
         if (id) {
-          selectedIds.add(String(id))
-          selectedProperties.push({ ...props, _layerType: 'MapInfo' })
+          newIds.add(String(id))
+          newProperties.push({ ...props, _layerType: 'MapInfo' })
         }
       })
     })
 
-    // 2. 遍历扇区图层 (LTE/NR) - 只选择可见图层
+    // 2. 遍历 GeoDataLayer（装饰图层）
+    if (geoDataLayerManagerRef.current) {
+      geoDataLayerManagerRef.current.getAllLayers().forEach(geoLayer => {
+        if (!geoLayer.isVisible()) return
+        const features = geoLayer.getFeaturesInPolygon(polygon)
+        features.forEach(item => {
+          const id = item.name || item.properties?.id || ''
+          if (id) {
+            newIds.add(String(id))
+            newProperties.push({ ...item.properties, _layerType: 'GeoData', _geoDataName: item.name })
+            console.log('[OnlineMap] 多边形框选选中GeoData要素:', item.name || id)
+          }
+        })
+      })
+    }
+
+    // 3. 遍历扇区图层 (LTE/NR) - 只选择可见图层
     if (visibility.lte && lteSectorLayerRef.current) {
       const sectorsInPolygon = lteSectorLayerRef.current.getSectorsInPolygon(polygon)
       sectorsInPolygon.forEach(sector => {
         const id = String(sector.id)
-        selectedIds.add(id)
-        selectedProperties.push({ ...sector, _layerType: 'LTE' })
+        newIds.add(id)
+        newProperties.push({ ...sector, _layerType: 'LTE' })
         console.log('[OnlineMap] 多边形框选选中LTE扇区:', sector.name, sector.id)
       })
     }
@@ -2772,47 +3531,257 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
       const sectorsInPolygon = nrSectorLayerRef.current.getSectorsInPolygon(polygon)
       sectorsInPolygon.forEach(sector => {
         const id = String(sector.id)
-        selectedIds.add(id)
-        selectedProperties.push({ ...sector, _layerType: 'NR' })
+        newIds.add(id)
+        newProperties.push({ ...sector, _layerType: 'NR' })
         console.log('[OnlineMap] 多边形框选选中NR扇区:', sector.name, sector.id)
       })
     }
 
-    // 3. 遍历抓取坐标点
+    // 4. 遍历抓取坐标点
     captureMarkersRef.current.forEach(marker => {
       if (!mapInstanceRef.current || !mapInstanceRef.current.hasLayer(marker)) return
       const markerLatLng = marker.getLatLng()
-      if (markerLatLng && polygon.contains(markerLatLng)) {
-        const props = (marker as any).captureProperties
-        if (props) {
-          selectedIds.add(props.id)
-          selectedProperties.push({ ...props })
+      if (markerLatLng) {
+        // 使用 Leaflet 的 getBounds().contains() 检查点是否在多边形内
+        const isInside = polygon.getBounds().contains(markerLatLng)
+        if (isInside) {
+          const props = (marker as any).captureProperties
+          if (props) {
+            newIds.add(props.id)
+            newProperties.push({ ...props })
+          }
         }
       }
     })
 
+    // 5. 遍历定位标记点
+    locationMarkersRef.current.forEach(marker => {
+      if (!mapInstanceRef.current || !mapInstanceRef.current.hasLayer(marker)) return
+      const markerLatLng = marker.getLatLng()
+      if (markerLatLng) {
+        // 使用 Leaflet 的 getBounds().contains() 检查点是否在多边形内
+        const isInside = polygon.getBounds().contains(markerLatLng)
+        if (isInside) {
+          const props = (marker as any).captureProperties
+          if (props) {
+            newIds.add(props.id)
+            newProperties.push({ ...props })
+          }
+        }
+      }
+    })
+
+    // 合并选中状态（多选时叠加，单选时替换）
+    let selectedIds: Set<string>
+    let selectedProperties: any[]
+
+    if (isMultiSelect) {
+      // Shift模式：叠加到已有选中
+      selectedIds = new Set(selectedIdsRef.current)
+      selectedProperties = [...selectedFeaturesRef.current]
+      newIds.forEach(id => {
+        if (!selectedIds.has(id)) {
+          selectedIds.add(id)
+          const prop = newProperties.find(p => {
+            const pid = p.id || p.name || p.小区名称 || p.OBJECTID || ''
+            return String(pid) === id
+          })
+          if (prop) selectedProperties.push(prop)
+        }
+      })
+    } else {
+      selectedIds = newIds
+      selectedProperties = newProperties
+    }
+
     // 应用高亮
+    // 对MapInfoLayer应用高亮
+    mapInfoLayerRefsRef.current.forEach(({ mapInfoLayer }) => {
+      mapInfoLayer.setSelectionHighlight(selectedIds)
+    })
+
+    // 对GeoDataLayer应用高亮
+    if (geoDataLayerManagerRef.current) {
+      geoDataLayerManagerRef.current.getAllLayers().forEach(geoLayer => {
+        geoLayer.setSelectionHighlight(selectedIds)
+      })
+    }
+
+    // 对扇区图层应用高亮
+    if (lteSectorLayerRef.current) {
+      lteSectorLayerRef.current.setSelectionHighlight(selectedIds)
+    }
+    if (nrSectorLayerRef.current) {
+      nrSectorLayerRef.current.setSelectionHighlight(selectedIds)
+    }
+
+    // 保存选中状态到 Ref
+    selectedFeaturesRef.current = selectedProperties
+    selectedIdsRef.current = selectedIds
+
     if (selectedIds.size > 0) {
       console.log('[OnlineMap] 多边形框选选中要素总数:', selectedIds.size)
+      setSelectionTip(`${t('map.featuresSelected', { count: selectedIds.size })}，${t('map.pressEscClear')}`)
+    } else {
+      setSelectionTip(t('map.noFeatureSelected'))
+    }
 
-      // 对MapInfoLayer应用高亮
-      mapInfoLayerRefsRef.current.forEach(({ mapInfoLayer }) => {
-        mapInfoLayer.setSelectionHighlight(selectedIds)
+    return { ids: selectedIds, properties: selectedProperties }
+  }, [])
+
+  /**
+   * 矩形选择：选择矩形范围内的所有要素（复用多边形逻辑，将矩形转为四边形）
+   * @param sw 矩形西南角 (GCJ-02渲染坐标)
+   * @param ne 矩形东北角 (GCJ-02渲染坐标)
+   * @param isMultiSelect 是否多选（Shift键），true时叠加到已有选中
+   */
+  const selectFeaturesInRectangle = useCallback((sw: L.LatLng, ne: L.LatLng, isMultiSelect: boolean = false): { ids: Set<string>, properties: any[] } => {
+    const L = window.L
+    // 将矩形转为四个顶点的多边形
+    const points = [
+      L.latLng(sw.lat, sw.lng),
+      L.latLng(sw.lat, ne.lng),
+      L.latLng(ne.lat, ne.lng),
+      L.latLng(ne.lat, sw.lng),
+    ]
+
+    // 获取当前图层可见性
+    const visibility = layerVisibilityRef.current
+
+    // 多选模式下从已有选中开始，否则重置
+    const newIds = new Set<string>()
+    const newProperties: any[] = []
+
+    const polygon = L.polygon(points.map(p => [p.lat, p.lng]))
+
+    // 1. 遍历所有 MapInfoLayer
+    mapInfoLayerRefsRef.current.forEach(({ mapInfoLayer }) => {
+      const isVisible = mapInfoLayer.isVisible()
+      console.log('[OnlineMap] 矩形框选检查MapInfo图层:', {
+        id: (mapInfoLayer as any).id,
+        name: (mapInfoLayer as any).name,
+        isVisible
       })
+      if (!isVisible) return
+      const features = mapInfoLayer.getFeaturesInPolygon(polygon)
+      console.log('[OnlineMap] MapInfo图层矩形框选返回要素数量:', features.length)
+      features.forEach(props => {
+        const id = props.id || props.name || props.小区名称 || props.OBJECTID || ''
+        if (id) {
+          newIds.add(String(id))
+          newProperties.push({ ...props, _layerType: 'MapInfo' })
+          console.log('[OnlineMap] 矩形框选选中MapInfo要素:', props.name || id)
+        }
+      })
+    })
 
-      // 对扇区图层应用高亮
-      if (lteSectorLayerRef.current) {
-        lteSectorLayerRef.current.setSelectionHighlight(selectedIds)
+    // 2. 遍历 GeoDataLayer（装饰图层）
+    if (geoDataLayerManagerRef.current) {
+      geoDataLayerManagerRef.current.getAllLayers().forEach(geoLayer => {
+        if (!geoLayer.isVisible()) return
+        const features = geoLayer.getFeaturesInPolygon(polygon)
+        console.log('[OnlineMap] GeoDataLayer矩形框选返回要素数量:', features.length)
+        features.forEach(item => {
+          const id = item.name || item.properties?.id || ''
+          if (id) {
+            newIds.add(String(id))
+            newProperties.push({ ...item.properties, _layerType: 'GeoData', _geoDataName: item.name })
+            console.log('[OnlineMap] 矩形框选选中GeoData要素:', item.name || id)
+          }
+        })
+      })
+    }
+
+    // 3. 扇区图层 (LTE/NR)
+    if (visibility.lte && lteSectorLayerRef.current) {
+      const sectorsIn = lteSectorLayerRef.current.getSectorsInPolygon(polygon)
+      sectorsIn.forEach(sector => {
+        newIds.add(String(sector.id))
+        newProperties.push({ ...sector, _layerType: 'LTE' })
+      })
+    }
+    if (visibility.nr && nrSectorLayerRef.current) {
+      const sectorsIn = nrSectorLayerRef.current.getSectorsInPolygon(polygon)
+      sectorsIn.forEach(sector => {
+        newIds.add(String(sector.id))
+        newProperties.push({ ...sector, _layerType: 'NR' })
+      })
+    }
+
+    // 3. 抓取坐标点
+    captureMarkersRef.current.forEach(marker => {
+      if (!mapInstanceRef.current || !mapInstanceRef.current.hasLayer(marker)) return
+      const markerLatLng = marker.getLatLng()
+      if (markerLatLng) {
+        // 使用 Leaflet 的 getBounds().contains() 检查点是否在多边形内
+        const isInside = polygon.getBounds().contains(markerLatLng)
+        if (isInside) {
+          const props = (marker as any).captureProperties
+          if (props) {
+            newIds.add(props.id)
+            newProperties.push({ ...props })
+          }
+        }
       }
-      if (nrSectorLayerRef.current) {
-        nrSectorLayerRef.current.setSelectionHighlight(selectedIds)
+    })
+
+    // 4. 遍历定位标记点
+    locationMarkersRef.current.forEach(marker => {
+      if (!mapInstanceRef.current || !mapInstanceRef.current.hasLayer(marker)) return
+      const markerLatLng = marker.getLatLng()
+      if (markerLatLng) {
+        // 使用 Leaflet 的 getBounds().contains() 检查点是否在多边形内
+        const isInside = polygon.getBounds().contains(markerLatLng)
+        if (isInside) {
+          const props = (marker as any).captureProperties
+          if (props) {
+            newIds.add(props.id)
+            newProperties.push({ ...props })
+          }
+        }
       }
+    })
 
-      // 保存选中状态到 Ref
-      selectedFeaturesRef.current = selectedProperties
-      selectedIdsRef.current = selectedIds
+    // 合并选中状态（多选时叠加，单选时替换）
+    let selectedIds: Set<string>
+    let selectedProperties: any[]
 
-      // 更新提示信息
+    if (isMultiSelect) {
+      // Shift模式：叠加到已有选中
+      selectedIds = new Set(selectedIdsRef.current)
+      selectedProperties = [...selectedFeaturesRef.current]
+      newIds.forEach(id => {
+        if (!selectedIds.has(id)) {
+          selectedIds.add(id)
+          const prop = newProperties.find(p => {
+            const pid = p.id || p.name || p.小区名称 || p.OBJECTID || ''
+            return String(pid) === id
+          })
+          if (prop) selectedProperties.push(prop)
+        }
+      })
+    } else {
+      selectedIds = newIds
+      selectedProperties = newProperties
+    }
+
+    // 应用高亮
+    mapInfoLayerRefsRef.current.forEach(({ mapInfoLayer }) => {
+      mapInfoLayer.setSelectionHighlight(selectedIds)
+    })
+    // 对GeoDataLayer应用高亮
+    if (geoDataLayerManagerRef.current) {
+      geoDataLayerManagerRef.current.getAllLayers().forEach(geoLayer => {
+        geoLayer.setSelectionHighlight(selectedIds)
+      })
+    }
+    if (lteSectorLayerRef.current) lteSectorLayerRef.current.setSelectionHighlight(selectedIds)
+    if (nrSectorLayerRef.current) nrSectorLayerRef.current.setSelectionHighlight(selectedIds)
+
+    selectedFeaturesRef.current = selectedProperties
+    selectedIdsRef.current = selectedIds
+
+    if (selectedIds.size > 0) {
       setSelectionTip(`${t('map.featuresSelected', { count: selectedIds.size })}，${t('map.pressEscClear')}`)
     } else {
       setSelectionTip(t('map.noFeatureSelected'))
@@ -2878,37 +3847,39 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
     if (lteSectorLayerRef.current) lteSectorLayerRef.current.updateSelectionMode(isSelectionActive)
     if (nrSectorLayerRef.current) nrSectorLayerRef.current.updateSelectionMode(isSelectionActive)
 
-    // 框选模式下禁用 MapInfoLayer 的点击交互
+    // 框选模式下禁用 MapInfoLayer 和 GeoDataLayer 的点击交互（避免属性框弹出）
     mapInfoLayerRefsRef.current.forEach(({ mapInfoLayer }) => {
       mapInfoLayer.setInteractive(!isSelectionActive)
     })
+    if (geoDataLayerManagerRef.current) {
+      geoDataLayerManagerRef.current.setInteractive(!isSelectionActive)
+    }
 
     if (mapInstanceRef.current) {
       const map = mapInstanceRef.current
       if (isSelectionActive) {
-        // 只有圆形模式需要禁用地图拖拽（因为需要拖拽绘制圆形）
-        // 点选和多边形模式允许拖拽地图
-        if (selectionMode === 'circle') {
-          map.dragging.disable()
-        } else {
-          map.dragging.enable()
-        }
+        // 框选模式下禁用地图拖拽，确保鼠标操作仅服务于选择功能
+        // 但保留滚轮缩放功能，方便用户在选择时调整地图视角
+        map.dragging.disable()
         map.doubleClickZoom.disable() // 圈选时禁用双击放大
         // 根据模式设置提示
         if (selectionMode === 'point') {
-          setSelectionTip('点击选择要素（再次点击取消），Shift+点击多选，按 Ctrl+C 复制')
+          setSelectionTip('点击选择要素，或按住鼠标拖拽绘制矩形批量选择，按 Ctrl+C 复制')
         } else if (selectionMode === 'circle') {
-          setSelectionTip('按住鼠标左键拖动绘制圆形')
+          setSelectionTip('按住鼠标左键拖动绘制圆形，按 Ctrl+C 复制')
         } else if (selectionMode === 'polygon') {
-          setSelectionTip('点击添加多边形顶点，双击完成绘制，按 Backspace 删除上一个点')
+          setSelectionTip('点击添加多边形顶点，双击完成绘制，按 Backspace 删除上一个点，按 Ctrl+C 复制')
         }
-        // 进入框选模式时，清除保留状态标志
+        // 进入框选模式时，重置临时标志（不清除已有选中）
         preserveSelectionRef.current = false
       } else if (!measureMode) {
         // 退出框选模式时，恢复地图交互
         // 注意：选中状态和图形的清除逻辑在另一个useEffect中处理
         map.dragging.enable()
         map.doubleClickZoom.enable()
+        map.scrollWheelZoom.enable()
+        // 恢复光标样式（根据mapDragTool状态）
+        map.getContainer().style.cursor = mapDragTool ? 'grab' : ''
       }
     }
   }, [selectionMode, measureMode])
@@ -2923,8 +3894,20 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
     // 清除之前的框选形状
     const clearSelectionShape = () => {
       if (selectionShapeRef.current) {
+        // 如果是FeatureGroup，需要清除其中的所有图层
+        if (selectionShapeRef.current instanceof L.FeatureGroup) {
+          selectionShapeRef.current.clearLayers()
+        }
         map.removeLayer(selectionShapeRef.current)
         selectionShapeRef.current = null
+      }
+      if (selectionRectRef.current) {
+        // 如果是FeatureGroup，需要清除其中的所有图层
+        if (selectionRectRef.current instanceof L.FeatureGroup) {
+          selectionRectRef.current.clearLayers()
+        }
+        map.removeLayer(selectionRectRef.current)
+        selectionRectRef.current = null
       }
       if (polygonTempLayerRef.current) {
         map.removeLayer(polygonTempLayerRef.current)
@@ -2932,6 +3915,7 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
       }
       selectionStartPointRef.current = null
       selectionDrawingRef.current = false
+      pointModeIsDragging.current = false
     }
 
     // 清除多边形临时点（保留已绘制的点）
@@ -2950,22 +3934,35 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
       const originalEvent = e.originalEvent
 
       if (selectionModeRef.current === 'point') {
-        // 点选模式：支持 Shift 多选
-        const isMultiSelect = originalEvent.shiftKey
-        selectFeaturesAtPoint(latLng, originalEvent.clientX, originalEvent.clientY, isMultiSelect)
+        // 框选模式：记录起点，等待鼠标移动判断是拖拽还是点击
+        const isShift = originalEvent.shiftKey
+        // 非Shift模式下清除上一次的矩形预览；Shift模式下保留（多区域叠加）
+        if (!isShift && selectionRectRef.current) {
+          map.removeLayer(selectionRectRef.current)
+          selectionRectRef.current = null
+        }
+        selectionStartPointRef.current = latLng
+        pointModeIsDragging.current = false
+        // 禁用地图拖拽，避免地图随鼠标移动
+        map.dragging.disable()
+        // 阻止事件冒泡和默认行为，防止Shift键触发地图缩放
         L.DomEvent.stopPropagation(e)
+        L.DomEvent.preventDefault(e)
       } else if (selectionModeRef.current === 'circle') {
         // 圆形模式：开始绘制
         clearSelectionShape()
         selectionStartPointRef.current = latLng
         selectionDrawingRef.current = true
+        // 禁用地图拖拽，避免地图随鼠标移动
+        map.dragging.disable()
         setSelectionTip('拖动鼠标绘制圆形，松开完成选择')
         L.DomEvent.stopPropagation(e)
+        L.DomEvent.preventDefault(e)
       } else if (selectionModeRef.current === 'polygon') {
         // 多边形模式：单击添加点
         selectionPointsRef.current.push(latLng)
         clearPolygonTempLine()
-        
+
         // 绘制临时线段
         const L = window.L
         if (selectionPointsRef.current.length >= 1) {
@@ -2979,9 +3976,10 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
             }).addTo(map)
           }
         }
-        
+
         setSelectionTip(`${t('map.pointsAdded', { count: selectionPointsRef.current.length })}，${t('map.doubleClickFinish')}`)
         L.DomEvent.stopPropagation(e)
+        L.DomEvent.preventDefault(e)
       }
     }
 
@@ -2990,7 +3988,38 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
       const latLng = e.latlng
       const startPoint = selectionStartPointRef.current
 
-      if (selectionModeRef.current === 'circle' && selectionDrawingRef.current && startPoint) {
+      if (selectionModeRef.current === 'point' && startPoint) {
+        // 框选模式：检查是否达到拖拽阈值，如果是则绘制矩形预览
+        const containerPoint = map.latLngToContainerPoint(latLng)
+        const startContainerPoint = map.latLngToContainerPoint(startPoint)
+        const dx = Math.abs(containerPoint.x - startContainerPoint.x)
+        const dy = Math.abs(containerPoint.y - startContainerPoint.y)
+
+        if (!pointModeIsDragging.current && (dx > pointModeDragThreshold || dy > pointModeDragThreshold)) {
+          pointModeIsDragging.current = true
+          setSelectionTip('拖动鼠标绘制矩形，松开完成选择')
+        }
+
+        if (pointModeIsDragging.current) {
+          // 更新矩形预览
+          if (selectionRectRef.current) {
+            map.removeLayer(selectionRectRef.current)
+          }
+          const L = window.L
+          const bounds = L.latLngBounds(startPoint, latLng)
+          selectionRectRef.current = L.rectangle(bounds, {
+            color: '#00ffff',
+            weight: 2,
+            fillColor: '#00ffff',
+            fillOpacity: 0.1,
+            dashArray: '5, 5',
+            interactive: false
+          }).addTo(map)
+        }
+        // 阻止事件冒泡和默认行为，防止Shift键触发地图缩放
+        L.DomEvent.stopPropagation(e)
+        L.DomEvent.preventDefault(e)
+      } else if (selectionModeRef.current === 'circle' && selectionDrawingRef.current && startPoint) {
         // 清除之前的预览形状
         if (selectionShapeRef.current) {
           map.removeLayer(selectionShapeRef.current)
@@ -3033,29 +4062,87 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
       const latLng = e.latlng
       const startPoint = selectionStartPointRef.current
 
-      if (selectionModeRef.current === 'circle' && selectionDrawingRef.current && startPoint) {
+      if (selectionModeRef.current === 'point' && startPoint) {
+        const originalEvent = e.originalEvent
+        // 删除Shift多选功能，isMultiSelect固定为false
+        const isMultiSelect = false
+
+        if (pointModeIsDragging.current) {
+          // 拖拽结束：执行矩形框选
+          const L = window.L
+          const bounds = L.latLngBounds(startPoint, latLng)
+          // 检查矩形是否足够大（避免误触）
+          const sw = bounds.getSouthWest()
+          const ne = bounds.getNorthEast()
+          const widthM = sw.distanceTo(L.latLng(sw.lat, ne.lng))
+          const heightM = sw.distanceTo(L.latLng(ne.lat, sw.lng))
+
+          if (widthM > 5 || heightM > 5) {
+            // 清除之前的矩形
+            if (selectionRectRef.current) {
+              map.removeLayer(selectionRectRef.current)
+              selectionRectRef.current = null
+            }
+
+            selectFeaturesInRectangle(sw, ne, isMultiSelect)
+
+            // 绘制最终矩形（青色框）
+            const newRect = L.rectangle(bounds, {
+              color: '#00ffff',
+              weight: 2,
+              fillColor: '#00ffff',
+              fillOpacity: 0.1,
+              interactive: false
+            }).addTo(map)
+            
+            selectionRectRef.current = newRect
+          } else {
+            const tip = selectedIdsRef.current.size > 0
+              ? `${t('map.featuresSelected', { count: selectedIdsRef.current.size })}，${t('map.pressEscClear')}`
+              : '点击选择要素，或按住鼠标拖拽绘制矩形批量选择'
+            setSelectionTip(tip)
+          }
+        } else {
+          // 未拖拽：执行点击点选
+          selectFeaturesAtPoint(latLng, originalEvent.clientX, originalEvent.clientY, isMultiSelect)
+        }
+
+        selectionStartPointRef.current = null
+        pointModeIsDragging.current = false
+        // 恢复地图拖拽功能（点选/框选操作完成后）
+        map.dragging.enable()
+        // 阻止事件冒泡和默认行为，防止地图缩放等干扰
+        L.DomEvent.stopPropagation(e)
+        L.DomEvent.preventDefault(e)
+      } else if (selectionModeRef.current === 'circle' && selectionDrawingRef.current && startPoint) {
         // 圆形模式：完成选择
         const radius = startPoint.distanceTo(latLng)
+        // 删除Shift多选功能，isMultiSelect固定为false
+        const isMultiSelect = false
         if (radius > 10) { // 最小半径10米
-          selectFeaturesInCircle(startPoint, radius)
-          
-          // 保留最终圆形形状
+          // 清除之前的形状
           if (selectionShapeRef.current) {
             map.removeLayer(selectionShapeRef.current)
+            selectionShapeRef.current = null
           }
+          
+          selectFeaturesInCircle(startPoint, radius, isMultiSelect)
+          
+          // 绘制最终圆形形状
           const L = window.L
-          selectionShapeRef.current = L.circle(startPoint, {
+          const newCircle = L.circle(startPoint, {
             radius: radius, color: '#00ffff', weight: 2, fillColor: '#00ffff', fillOpacity: 0.1,
             interactive: false // 禁止交互，避免拦截鼠标事件
           }).addTo(map)
           
-          // 注意：不要在这里恢复地图拖拽，因为用户仍在圆形框选模式下
-          // 地图拖拽状态由 selectionMode 变化的 useEffect 控制
+          selectionShapeRef.current = newCircle
         } else {
           setSelectionTip('半径太小，请重新绘制')
         }
-        selectionDrawingRef.current = false
+          selectionDrawingRef.current = false
         selectionStartPointRef.current = null
+        // 恢复地图拖拽功能（圆形选择操作完成后）
+        map.dragging.enable()
       }
       L.DomEvent.stopPropagation(e)
     }
@@ -3073,20 +4160,40 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
       }
 
       if (selectionPointsRef.current.length >= 3) {
-        clearPolygonTempLine()
-        selectFeaturesInPolygon(selectionPointsRef.current)
+        const isMultiSelect = e.originalEvent.shiftKey
         
-        // 保留最终多边形形状
-        if (selectionShapeRef.current) {
+        // 非Shift模式下清除之前的形状；Shift模式下保留（多区域叠加）
+        if (!isMultiSelect && selectionShapeRef.current) {
           map.removeLayer(selectionShapeRef.current)
+          selectionShapeRef.current = null
         }
+        
+        clearPolygonTempLine()
+        selectFeaturesInPolygon(selectionPointsRef.current, isMultiSelect)
+        
+        // 绘制最终多边形形状
         const L = window.L
-        selectionShapeRef.current = L.polygon(selectionPointsRef.current, {
+        const newPolygon = L.polygon(selectionPointsRef.current, {
           color: '#00ffff', weight: 2, fillColor: '#00ffff', fillOpacity: 0.1,
           interactive: false // 禁止交互，避免拦截鼠标事件
         }).addTo(map)
         
+        // Shift模式下：将新多边形添加到选择形状中（使用FeatureGroup管理多个形状）
+        if (isMultiSelect && selectionShapeRef.current) {
+          // 如果已有选择形状，创建FeatureGroup来管理多个形状
+          if (selectionShapeRef.current instanceof L.FeatureGroup) {
+            selectionShapeRef.current.addLayer(newPolygon)
+          } else {
+            const featureGroup = L.featureGroup([selectionShapeRef.current, newPolygon])
+            selectionShapeRef.current = featureGroup as any
+          }
+        } else {
+          selectionShapeRef.current = newPolygon
+        }
+        
         selectionPointsRef.current = []
+        // 注意：不要在这里恢复地图拖拽，因为用户仍在多边形圈选模式下
+        // 地图拖拽状态由 selectionMode 变化的 useEffect 控制
       } else {
         setSelectionTip('多边形至少需要3个点')
       }
@@ -3107,8 +4214,10 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
       map.off('dblclick', handleDoubleClick)
       // 清理框选形状
       clearSelectionShape()
+      // 恢复地图拖拽（防止切换模式时遗留禁用状态）
+      map.dragging.enable()
     }
-  }, [selectionMode, selectFeaturesAtPoint, selectFeaturesInCircle, selectFeaturesInPolygon])
+  }, [selectionMode, selectFeaturesAtPoint, selectFeaturesInCircle, selectFeaturesInPolygon, selectFeaturesInRectangle])
 
   /**
    * 当地图类型改变时更新瓦片图层
@@ -3411,6 +4520,48 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
       }
     })
   }, [customLayers, customLayerVisibility])
+
+  /**
+   * 装饰图层管理 - 包含打点标记和定位标记
+   */
+  useEffect(() => {
+    if (!mapInstanceRef.current) return
+    const map = mapInstanceRef.current
+    const L = window.L
+
+    // 创建或获取装饰图层
+    if (!decorationLayerRef.current) {
+      decorationLayerRef.current = L.layerGroup()
+      console.log('[OnlineMap] 创建装饰图层')
+
+      // 将已有的打点标记添加到装饰图层
+      captureMarkersRef.current.forEach(marker => {
+        if (!decorationLayerRef.current?.hasLayer(marker)) {
+          marker.addTo(decorationLayerRef.current!)
+        }
+      })
+
+      // 将已有的定位标记添加到装饰图层
+      locationMarkersRef.current.forEach(marker => {
+        if (!decorationLayerRef.current?.hasLayer(marker)) {
+          marker.addTo(decorationLayerRef.current!)
+        }
+      })
+    }
+
+    // 根据可见性控制图层
+    if (decorationLayerVisibility) {
+      if (!map.hasLayer(decorationLayerRef.current)) {
+        decorationLayerRef.current.addTo(map)
+        console.log('[OnlineMap] 显示装饰图层')
+      }
+    } else {
+      if (map.hasLayer(decorationLayerRef.current)) {
+        map.removeLayer(decorationLayerRef.current)
+        console.log('[OnlineMap] 隐藏装饰图层')
+      }
+    }
+  }, [decorationLayerVisibility])
 
   /**
    * 当图层可见性变化时更新

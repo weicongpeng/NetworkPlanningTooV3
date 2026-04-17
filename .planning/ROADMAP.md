@@ -27,4 +27,14 @@
 - `frontend/src/renderer/i18n/locales/zh.json` — 中文翻译
 - `frontend/src/renderer/i18n/locales/en.json` — 英文翻译
 
+### Phase 2: 地图工具互斥模式重构：坐标定位/提取坐标/测量/圈选/拖拽互斥，标记持久化，手形拖拽专注模式
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 1
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 2 to break down)
+
 ---

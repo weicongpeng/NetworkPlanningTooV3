@@ -60,7 +60,7 @@ const SectorIcon = ({ color }: { color: string }) => (
 /**
  * 树节点类型
  */
-type TreeNodeType = 'root' | 'sector-group' | 'layer-files' | 'sector-layer' | 'sector-label' | 'layer-file' | 'layer-file-label' | 'map-type' | 'frequency' | 'custom-group' | 'custom-layer'
+type TreeNodeType = 'root' | 'sector-group' | 'layer-files' | 'sector-layer' | 'sector-label' | 'layer-file' | 'layer-file-label' | 'map-type' | 'frequency' | 'custom-group' | 'custom-layer' | 'decoration-group' | 'decoration-layer'
 
 /**
  * 扇区图层选项
@@ -95,6 +95,16 @@ export interface CustomLayerOption {
   name: string
   type: 'point' | 'line' | 'polygon'
   visible: boolean
+}
+
+/**
+ * 装饰图层选项（用于打点、定位标记等装饰性元素）
+ */
+export interface DecorationLayerOption {
+  id: string
+  name: string
+  visible: boolean
+  count?: number // 装饰点数量
 }
 
 /**
@@ -152,6 +162,8 @@ export interface TreeNode {
   frequency?: FrequencyOption
   // 自定义图层专用
   customLayer?: CustomLayerOption
+  // 装饰图层专用
+  decorationLayer?: DecorationLayerOption
   // 单选
   radio?: boolean
 }
@@ -204,6 +216,10 @@ export interface LayerControlProps {
   onLabelSettingsChange?: (node: TreeNode, settings: LabelSettings) => void
   /** 标签设置映射 */
   labelSettingsMap?: Record<string, LabelSettings>
+  /** 装饰图层 */
+  decorationLayer?: DecorationLayerOption
+  /** 装饰图层可见性变化回调 */
+  onDecorationLayerToggle?: (visible: boolean) => void
 }
 
 /**
@@ -230,7 +246,9 @@ export function LayerControl({
   onCustomLayerToggle,
   onLayerFileRemove,
   onCustomLayerRemove,
-  onLabelSettingsChange
+  onLabelSettingsChange,
+  decorationLayer,
+  onDecorationLayerToggle
 }: LayerControlProps) {
   const { t } = useTranslation()
 
@@ -542,7 +560,16 @@ export function LayerControl({
                 customLayer: layer
               }))
             ]
-          }
+          },
+          // 装饰图层（打点、定位标记等）- 无子节点，复选框直接在标题旁
+          ...(decorationLayer ? [
+            {
+              id: 'decoration-layer',
+              type: 'decoration-layer' as TreeNodeType,
+              label: decorationLayer.name,
+              decorationLayer: decorationLayer
+            }
+          ] : [])
         ]
       }
     ]
@@ -553,7 +580,7 @@ export function LayerControl({
   // 当外部数据变化时更新树
   useEffect(() => {
     setTree(buildTree())
-  }, [sectors, layerFiles, pointFiles, mapType, sectorLabelVisibility, layerFileLabelVisibility, pointFileLabelVisibility, frequencies, customLayers])
+  }, [sectors, layerFiles, pointFiles, mapType, sectorLabelVisibility, layerFileLabelVisibility, pointFileLabelVisibility, frequencies, customLayers, decorationLayer])
 
   /**
    * 切换节点展开状态
@@ -1090,6 +1117,7 @@ export function LayerControl({
               onCustomLayerRemove={onCustomLayerRemove}
               onPointFileLabelToggle={onPointFileLabelToggle}
               onLayerFileLabelToggle={onLayerFileLabelToggle}
+              onDecorationLayerToggle={onDecorationLayerToggle}
               onContextMenu={handleContextMenu}
               mapType={mapType}
               pointFileLabelVisibility={pointFileLabelVisibility}
@@ -1181,6 +1209,7 @@ interface TreeNodeComponentProps {
   onCustomLayerRemove?: (layerId: string) => void;
   onPointFileLabelToggle?: (fileId: string, visible: boolean) => void;
   onLayerFileLabelToggle?: (fileId: string, visible: boolean) => void;
+  onDecorationLayerToggle?: (visible: boolean) => void;
   onContextMenu: (e: React.MouseEvent, node: TreeNode) => void;
   mapType: 'roadmap' | 'satellite';
   pointFileLabelVisibility: Record<string, boolean>;
@@ -1204,6 +1233,7 @@ function TreeNodeComponent({
   onCustomLayerRemove,
   onPointFileLabelToggle,
   onLayerFileLabelToggle,
+  onDecorationLayerToggle,
   onContextMenu,
   mapType,
   pointFileLabelVisibility,
@@ -1290,6 +1320,8 @@ function TreeNodeComponent({
         return <Folder size={14} color="#666" />
       case 'custom-layer':
         return <File size={12} color="#666" />
+      case 'decoration-layer':
+        return <Folder size={14} color="#666" />
       default:
         return null
     }
@@ -1674,6 +1706,19 @@ function TreeNodeComponent({
             onToggle={(visible: boolean) => onCustomLayerToggle?.(node.customLayer!.id, visible)}
           />
         )}
+
+        {/* 装饰图层 - 复选框（与上面图层的复选框对齐） */}
+        {node.type === 'decoration-layer' && node.decorationLayer && (
+          <DecorationLayerCheckbox
+            layer={node.decorationLayer}
+            onToggle={(visible: boolean) => onDecorationLayerToggle?.(visible)}
+          />
+        )}
+
+        {/* 装饰图层 - 占位符（与上面图层的标签按钮对齐） */}
+        {node.type === 'decoration-layer' && node.decorationLayer && (
+          <div style={{ width: '20px', height: '20px' }} />
+        )}
       </div>
 
       {/* 子节点 */}
@@ -1695,6 +1740,7 @@ function TreeNodeComponent({
               onCustomLayerRemove={onCustomLayerRemove}
               onPointFileLabelToggle={onPointFileLabelToggle}
               onLayerFileLabelToggle={onLayerFileLabelToggle}
+              onDecorationLayerToggle={onDecorationLayerToggle}
               onContextMenu={onContextMenu}
               mapType={mapType}
               pointFileLabelVisibility={pointFileLabelVisibility}
@@ -1918,6 +1964,35 @@ export function createDefaultLayers(): LayerOption[] {
  * 自定义图层复选框组件
  */
 function CustomLayerCheckbox({ layer, onToggle }: { layer: CustomLayerOption; onToggle: (visible: boolean) => void }) {
+  const [isChecked, setIsChecked] = useState(layer.visible);
+
+  useEffect(() => {
+    setIsChecked(layer.visible);
+  }, [layer.visible]);
+
+  const handleToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+    const newValue = e.target.checked;
+    setIsChecked(newValue);
+    onToggle(newValue);
+  };
+
+  return (
+    <label className="custom-checkbox">
+      <input
+        type="checkbox"
+        checked={isChecked}
+        onChange={handleToggle}
+      />
+      <span className="checkmark"></span>
+    </label>
+  );
+}
+
+/**
+ * 装饰图层复选框组件
+ */
+function DecorationLayerCheckbox({ layer, onToggle }: { layer: DecorationLayerOption; onToggle: (visible: boolean) => void }) {
   const [isChecked, setIsChecked] = useState(layer.visible);
 
   useEffect(() => {

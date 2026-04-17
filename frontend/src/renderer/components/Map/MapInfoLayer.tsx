@@ -327,29 +327,49 @@ export class MapInfoLayer {
    * @param polygon Leaflet 多边形对象 (坐标为渲染坐标/GCJ02)
    */
   getFeaturesInPolygon(polygon: L.Polygon): any[] {
-    if (!this.geoJSONLayer) return []
+    if (!this.geoJSONLayer) {
+      console.log('[MapInfoLayer] getFeaturesInPolygon: geoJSONLayer不存在', this.id)
+      return []
+    }
     const results: any[] = []
     const bounds = polygon.getBounds()
     const points = (polygon.getLatLngs()[0] as L.LatLng[]).map(p => [p.lat, p.lng])
+    let layerCount = 0
+
+    console.log('[MapInfoLayer] getFeaturesInPolygon:', {
+      id: this.id,
+      name: this.name,
+      polygonBounds: bounds,
+      polygonPoints: points
+    })
 
     this.geoJSONLayer.eachLayer((layer: any) => {
+      layerCount++
       if (layer.getLatLng) {
         const latlng = layer.getLatLng()
-        if (bounds.contains(latlng)) {
-          if (this._isPointInPolygon([latlng.lat, latlng.lng], points)) {
-            results.push(layer.feature.properties)
-          }
+        const inBounds = bounds.contains(latlng)
+        const inPolygon = inBounds && this._isPointInPolygon([latlng.lat, latlng.lng], points)
+        if (inPolygon) {
+          results.push(layer.feature.properties)
+          console.log('[MapInfoLayer] 点要素在多边形内:', layer.feature.properties.name || layer.feature.properties.id, latlng)
         }
       } else if (layer.getBounds) {
         // 对于线和面，检查其边界中心是否在多边形内
         const layerBounds = layer.getBounds()
         const center = layerBounds.getCenter()
-        if (bounds.contains(center)) {
-          if (this._isPointInPolygon([center.lat, center.lng], points)) {
-            results.push(layer.feature.properties)
-          }
+        const inBounds = bounds.contains(center)
+        const inPolygon = inBounds && this._isPointInPolygon([center.lat, center.lng], points)
+        if (inPolygon) {
+          results.push(layer.feature.properties)
+          console.log('[MapInfoLayer] 线/面要素中心在多边形内:', layer.feature.properties.name || layer.feature.properties.id, center)
         }
       }
+    })
+
+    console.log('[MapInfoLayer] getFeaturesInPolygon结果:', {
+      id: this.id,
+      totalLayers: layerCount,
+      matchedFeatures: results.length
     })
 
     return results
@@ -590,13 +610,14 @@ export class MapInfoLayer {
       // 要素交互处理
       onEachFeature: (feature, leafletLayer) => {
         leafletLayer.on('click', (e: L.LeafletMouseEvent) => {
-          // 阻止事件冒泡到地图
-          L.DomEvent.stopPropagation(e as any)
-
-          // 如果交互被禁用（如框选模式下），不处理点击
+          // 如果交互被禁用（如框选模式下），不处理点击，也不阻止事件冒泡
+          // 让事件继续传递，以便框选工具可以处理
           if (!mapInfoLayer.isInteractive) {
             return
           }
+
+          // 阻止事件冒泡到地图
+          L.DomEvent.stopPropagation(e as any)
 
           if (mapInfoLayer.onFeatureClickCallback) {
             if (IS_DEV) console.log('[MapInfoLayer] Feature clicked:', feature.properties)
@@ -657,10 +678,10 @@ export class MapInfoLayer {
       // 更新样式
       if (layer instanceof L.Path) {
         if (isSelected) {
-          // 高亮样式
+          // 高亮样式：红色边框
           layer.setStyle({
-            color: '#00ffff',
-            weight: 6,
+            color: '#ef4444',
+            weight: 3,
             opacity: 1
           })
           if (layer.bringToFront) layer.bringToFront()
@@ -671,8 +692,8 @@ export class MapInfoLayer {
       } else if (layer instanceof L.CircleMarker) {
         if (isSelected) {
           layer.setStyle({
-            color: '#00ffff',
-            weight: 6,
+            color: '#ef4444',
+            weight: 3,
             opacity: 1
           })
           if (layer.bringToFront) layer.bringToFront()
