@@ -606,12 +606,50 @@ class NeighborPlanner:
 
         # 候选邻区按评分排序并限制数量
         candidate_neighbors.sort(key=lambda x: x.score, reverse=True)
-        # 候选邻区数量 = 最大邻区数 - 强制邻区数
-        remaining_slots = max(0, self.max_neighbors - len(forced_neighbors))
+        # 候选邻区数量 = 最大邻区数 - 强制邻区数 - 兜底邻区数
+        remaining_slots = max(0, self.max_neighbors - len(forced_neighbors) - len(step4_fallback_neighbors))
         selected_candidates = candidate_neighbors[:remaining_slots]
 
-        # 最终结果 = 强制邻区 + 选中的候选邻区
-        final_neighbors = forced_neighbors + selected_candidates
+        # 构建兜底邻区列表
+        fallback_neighbors = []
+        fallback_keys = set()  # 记录兜底邻区的key，避免重复
+        for target_row, distance in step4_fallback_neighbors:
+            target_key = self.get_cell_key(target_row)
+            target_azimuth = target_row.get('azimuth')
+
+            source_to_target_azimuth = self.calculate_azimuth_angle(source_lat, source_lon, target_row['lat'], target_row['lon'])
+
+            # 计算角度差
+            angle_diff = None
+            if pd.notna(source_azimuth) and pd.notna(target_azimuth):
+                facing_diff = self.calculate_angle_difference(source_azimuth, (target_azimuth + 180) % 360)
+                pointing_diff = self.calculate_angle_difference(target_azimuth, source_to_target_azimuth)
+                angle_diff = min(facing_diff, pointing_diff)
+
+            # 兜底邻区评分稍低（标记为兜底）
+            score = self.calculate_neighbor_score(distance, angle_diff) * 0.8
+
+            neighbor = NeighborRelation(
+                source_key=source_key,
+                target_key=target_key,
+                distance=round(distance, 3),
+                angle_diff=round(angle_diff, 1) if angle_diff else None,
+                source_cell_name=str(source_row.get('cell_name', '')),
+                target_cell_name=str(target_row.get('cell_name', '')),
+                source_enodeb_id=str(source_row.get('enodeb_id', '')),
+                target_enodeb_id=str(target_row.get('enodeb_id', '')),
+                score=score,
+                source_pci=source_row.get('pci'),
+                target_pci=target_row.get('pci'),
+                source_earfcn=source_row.get('earfcn'),
+                target_earfcn=target_row.get('earfcn'),
+                relation_type=f"{self.config.source_type}-{self.config.target_type}"
+            )
+            fallback_neighbors.append(neighbor)
+            fallback_keys.add(target_key)
+
+        # 最终结果 = 强制邻区 + 兜底邻区 + 选中的候选邻区
+        final_neighbors = forced_neighbors + fallback_neighbors + selected_candidates
 
         logger.debug(f"最终结果: 强制邻区={len(forced_neighbors)}, 候选邻区={len(selected_candidates)}, 总计={len(final_neighbors)}")
 

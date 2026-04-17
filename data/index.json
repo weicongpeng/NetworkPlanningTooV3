@@ -106,5 +106,15 @@
         }
       ]
     }
+  },
+  "f195acd9-5733-47fb-a147-78f5e8c41233": {
+    "id": "f195acd9-5733-47fb-a147-78f5e8c41233",
+    "name": "f195acd9-5733-47fb-a147-78f5e8c41233.xlsx",
+    "type": "excel",
+    "fileType": "full_params",
+    "size": 4343242,
+    "uploadDate": "2026-04-17T10:03:50.049754",
+    "status": "ready",
+    "metadata": {}
   }
 }
