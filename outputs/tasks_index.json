@@ -2295,5 +2295,24 @@
     "created_at": "2026-04-17T11:03:30.944096",
     "started_at": "2026-04-17T11:03:30.947638",
     "completed_at": null
+  },
+  "d9d65793-0111-424c-a767-a1fd40aabd81": {
+    "task_id": "d9d65793-0111-424c-a767-a1fd40aabd81",
+    "task_type": "neighbor",
+    "config": {
+      "planningType": "NR-NR",
+      "maxDistance": 3.0,
+      "maxNeighbors": 64,
+      "coverageDistanceFactor": 1.0,
+      "coverageRadiusFactor": 1.0,
+      "customRules": null
+    },
+    "status": "completed",
+    "progress": 100.0,
+    "result": null,
+    "error": null,
+    "created_at": "2026-04-17T11:08:15.091422",
+    "started_at": "2026-04-17T11:08:15.096171",
+    "completed_at": null
   }
 }

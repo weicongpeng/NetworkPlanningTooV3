@@ -224,22 +224,45 @@ class NeighborPlanner:
         center_distance = self.calculate_distance(center1_lat, center1_lon, center2_lat, center2_lon)
         return center_distance <= (radius1 + radius2)
     
-    def calculate_neighbor_score(self, distance: float, angle_diff: Optional[float]) -> float:
+    def calculate_neighbor_score(self, distance: float, angle_diff: Optional[float],
+                                  facing_diff: Optional[float] = None,
+                                  pointing_diff: Optional[float] = None,
+                                  is_forward_cell: bool = False) -> float:
         """
         计算邻区评分 - 评分越高优先级越高
         主要考虑：
-        1. 距离越近评分越高
-        2. 方向角匹配度越好评分越高
+        1. 对打邻区（主小区朝向的邻区）优先级更高
+        2. 距离越近评分越高
+        3. 方向角匹配度越好评分越高
+
+        Args:
+            distance: 距离（公里）
+            angle_diff: 角度差（已废弃，仅保留兼容性）
+            facing_diff: 主小区方位角与目标小区背向角度差（对打关系）
+            pointing_diff: 目标小区方位角与主小区方向的角度差（内向关系）
+            is_forward_cell: 是否为对打邻区（主小区朝向的邻区）
         """
         # 距离评分（距离越近分数越高）
         distance_score = max(0, 10 - distance)
-        
-        # 方向角评分（角度差越小分数越高）
-        if angle_diff is not None:
+
+        # 方向角评分
+        if facing_diff is not None and pointing_diff is not None:
+            # 对打邻区（主小区朝向的目标小区）评分更高
+            # facing_diff: 目标小区背向与主小区方位角差（对打关系）
+            # pointing_diff: 目标小区朝向与主小区位置差（内向关系）
+            if is_forward_cell:
+                # 对打邻区：优先考虑 facing_diff
+                angle_score = max(0, (180 - facing_diff) / 18)  # 0-10分
+                # 对打邻区额外加分
+                angle_score += 3
+            else:
+                # 内向邻区：考虑 pointing_diff，但评分打折
+                angle_score = max(0, (180 - pointing_diff) / 18) * 0.6  # 0-6分
+        elif angle_diff is not None:
             angle_score = max(0, (180 - angle_diff) / 18)  # 0-10分
         else:
             angle_score = 5  # 无方向角信息时给中等分
-        
+
         return distance_score + angle_score
     
     def get_cell_key(self, row: pd.Series) -> str:
