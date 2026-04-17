@@ -1350,7 +1350,7 @@ function TreeNodeComponent({
             {isExpandable ? (
               <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '16px' }}>
                 {isExpanded ? (
-                  <ChevronDown size={12} color="#999" />
+                  <ChevronDown size={12} color="#000" />
                 ) : (
                   <ChevronRight size={12} color="#999" />
                 )}
