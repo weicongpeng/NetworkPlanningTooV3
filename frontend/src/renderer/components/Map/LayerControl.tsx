@@ -1269,27 +1269,27 @@ function TreeNodeComponent({
       case 'root':
         return null
       case 'map-type':
-        if (node.mapType?.id === 'roadmap') return <Map size={14} color="#666" />
-        if (node.mapType?.id === 'satellite') return <Satellite size={14} color="#666" />
+        if (node.mapType?.id === 'roadmap') return <Map size={14} color="#000" />
+        if (node.mapType?.id === 'satellite') return <Satellite size={14} color="#000" />
         return null
       case 'sector-layer':
-        return <Radio size={12} color="#666" />
+        return <Radio size={12} color="#000" />
       case 'sector-group':
-        return <Map size={14} color="#666" />
+        return <Map size={14} color="#000" />
       case 'layer-files':
-        return <Folder size={14} color="#666" />
+        return <Folder size={14} color="#000" />
       case 'sector-label':
         return <span style={{ fontSize: '14px' }}>📝</span>
       case 'layer-file-label':
         return <span style={{ fontSize: '14px' }}>🏷️</span>
       case 'layer-file':
-        return <File size={12} color="#666" />
+        return <File size={12} color="#000" />
       case 'custom-group':
-        return <Folder size={14} color="#666" />
+        return <Folder size={14} color="#000" />
       case 'custom-layer':
-        return <File size={12} color="#666" />
+        return <File size={12} color="#000" />
       case 'decoration-layer':
-        return <Folder size={14} color="#666" />
+        return <Folder size={14} color="#000" />
       default:
         return null
     }
