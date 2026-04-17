@@ -15,22 +15,6 @@
       "NRSectorCount": 15438
     }
   },
-  "37855283-1fa8-475d-958c-014e1c66334e": {
-    "id": "37855283-1fa8-475d-958c-014e1c66334e",
-    "name": "cell-tree-export.xlsx",
-    "type": "excel",
-    "fileType": "target_cells",
-    "size": 10387,
-    "originalPath": "D:\\mycode\\NetworkPlanningTooV3\\待规划小区\\cell-tree-export.xlsx",
-    "uploadDate": "2026-04-17T00:32:47.100585",
-    "status": "ready",
-    "metadata": {
-      "LTESiteCount": 2,
-      "LTESectorCount": 6,
-      "NRSiteCount": 2,
-      "NRSectorCount": 3
-    }
-  },
   "14e4c450-78f5-49d7-95fc-e25a19365f7c": {
     "id": "14e4c450-78f5-49d7-95fc-e25a19365f7c",
     "name": "4G_TAC.zip",
@@ -107,14 +91,20 @@
       ]
     }
   },
-  "f195acd9-5733-47fb-a147-78f5e8c41233": {
-    "id": "f195acd9-5733-47fb-a147-78f5e8c41233",
-    "name": "f195acd9-5733-47fb-a147-78f5e8c41233.xlsx",
+  "29a2d260-4d18-4fb3-ba27-26272a561ab0": {
+    "id": "29a2d260-4d18-4fb3-ba27-26272a561ab0",
+    "name": "cell-tree-export.xlsx",
     "type": "excel",
-    "fileType": "full_params",
-    "size": 4343242,
-    "uploadDate": "2026-04-17T10:47:56.775585",
+    "fileType": "target_cells",
+    "size": 11257,
+    "originalPath": "D:\\mycode\\cell-tree-export.xlsx",
+    "uploadDate": "2026-04-17T10:54:47.307501",
     "status": "ready",
-    "metadata": {}
+    "metadata": {
+      "LTESiteCount": 8,
+      "LTESectorCount": 27,
+      "NRSiteCount": 8,
+      "NRSectorCount": 21
+    }
   }
 }
