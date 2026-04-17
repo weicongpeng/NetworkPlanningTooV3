@@ -990,7 +990,7 @@ export function LayerControl({
             height: '100%',
             maxHeight: '100%',
             overflow: 'hidden',
-            fontSize: '14px',
+            fontSize: '12px',
             border: 'none',
             boxSizing: 'border-box',
             transition: 'transform 0.35s cubic-bezier(0.25, 0.1, 0.25, 1), opacity 0.35s ease',
