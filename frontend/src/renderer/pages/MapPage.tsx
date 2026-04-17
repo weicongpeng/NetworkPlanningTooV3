@@ -1517,7 +1517,7 @@ export function MapPage() {
         </div>
 
         {/* 右侧地图控件 */}
-        <div className="flex items-center gap-3 ml-auto">
+        <div className="flex items-center gap-4 ml-auto">
           {/* 地图类型切换按钮：平面图 → 卫星图 → 关闭底图 三态循环 */}
           <button
             onClick={() => {
