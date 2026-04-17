@@ -485,14 +485,15 @@ class NeighborPlanner:
         # ========== 第四步：兜底逻辑 - 站点稀疏时的邻区补充 ==========
         # 当站点稀疏（周边站点数量少）时，按"距离 <= 平均站间距"添加兜底邻区
         # 规则：
-        # 1. 如果第三步候选邻区数量少于4个（或少于周边站点数），说明站点稀疏
-        # 2. 从第二步候选中，对于满足距离 <= 平均站间距的候选小区，补充添加为邻区
+        # 1. 如果候选邻区数量少于4个（或少于周边站点数），说明站点稀疏
+        # 2. 从第一步剩余候选中（排除强制邻区后），对于满足距离 <= 平均站间距的候选小区，补充添加为邻区
+        # 注意：这里直接从第一步剩余候选中筛选，因为第二步的覆盖圆判断可能过滤掉所有候选
         step4_fallback_neighbors = []
 
-        if step2_candidates:
-            # 计算周边站点数量（第二步候选中不同站点的数量）
+        if step1_remaining_candidates:
+            # 计算第一步剩余候选中的站点数量
             unique_target_sites = set()
-            for target_row, _ in step2_candidates:
+            for target_row, _ in step1_remaining_candidates:
                 target_enodeb_id = str(target_row.get('enodeb_id', ''))
                 unique_target_sites.add(target_enodeb_id)
 
@@ -506,9 +507,9 @@ class NeighborPlanner:
             if needs_fallback:
                 site_spacing = self.calculate_site_spacing(source_row)
 
-                logger.debug(f"第四步兜底逻辑: 源小区={source_key}, 站点数={site_count}, 候选数={candidate_count}, 站间距={site_spacing:.3f}km")
+                logger.debug(f"第四步兜底逻辑: 源小区={source_key}, 剩余候选站点数={site_count}, 第三步候选数={candidate_count}, 站间距={site_spacing:.3f}km")
 
-                for target_row, distance in step2_candidates:
+                for target_row, distance in step1_remaining_candidates:
                     target_key = self.get_cell_key(target_row)
                     target_cover_type = target_row.get('cell_cover_type', 1)
                     is_target_indoor = (target_cover_type == 4)
@@ -517,7 +518,7 @@ class NeighborPlanner:
                     if target_key in forced_neighbor_keys:
                         continue
 
-                    # 跳过室分到室分（已在第二步限制160米内）
+                    # 跳过室分到室分
                     if is_source_indoor and is_target_indoor:
                         continue
 
