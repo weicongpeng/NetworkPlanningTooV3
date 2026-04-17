@@ -591,6 +591,10 @@ class DataService:
                                 )
                                 updates[key]["_processed"] = True
 
+                                # 设置"是否现网"列：能匹配到现网工参，填"是"
+                                if "是否现网" in col_map:
+                                    row[col_map["是否现网"] - 1].value = "是"
+
                                 # 检查基站名称是否被更新
                                 new_bs_name = None
                                 if "基站名称" in col_map:
@@ -604,6 +608,10 @@ class DataService:
                                 safe_print(f"[DataService] 更新行失败 (Key={key}): {e}")
                                 traceback.print_exc()
                         else:
+                            # 设置"是否现网"列：未匹配到现网工参，填"否"
+                            if "是否现网" in col_map:
+                                row[col_map["是否现网"] - 1].value = "否"
+
                             # Key未找到的调试日志（采样打印，避免日志过多）
                             safe_print(f"[DEBUG] Key未在现网工参中找到: {key}")
             except Exception as e:
