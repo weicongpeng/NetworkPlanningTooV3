@@ -1246,9 +1246,6 @@ export function MapPage() {
 
           {/* 搜索输入框 */}
           <div className="relative w-72">
-            {searchMode === 'map' && (
-              <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            )}
             <input
               ref={searchInputRef}
               type="text"
@@ -1263,7 +1260,7 @@ export function MapPage() {
                 setTimeout(() => setShowSearchResults(false), 200)
               }}
               placeholder={searchMode === 'map' ? (t('map.inputPlaceHint') || '输入地名、道路名称等') : (t('map.inputLocationHint') || '输入小区名、基站ID或经纬度(经度,纬度)')}
-              className={`w-full pr-16 py-1.5 text-xs border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary placeholder:text-xs ${searchMode === 'map' ? 'pl-8' : 'pl-3'}`}
+              className="w-full pl-3 pr-16 py-1.5 text-xs border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary placeholder:text-xs"
             />
 
             {/* 右侧按钮组：搜索/清除 */}
