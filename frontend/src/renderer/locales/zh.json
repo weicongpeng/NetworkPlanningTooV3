@@ -525,6 +525,7 @@
     "captureCoord": "打点",
     "exitCaptureMode": "退出打点",
     "captureModeHint": "点击地图任意位置抓取WGS84坐标",
+    "captureRequiresDecorationLayer": "请先勾选装饰图层后再进行打点操作",
     "wgs84Coordinate": "WGS84坐标",
     "coordCopied": "坐标已复制",
     "longitude": "经度",
