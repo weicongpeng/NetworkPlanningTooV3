@@ -1032,60 +1032,28 @@ export function LayerControl({
         {/* 固定/解开控件 - 位于面板内部右上角 */}
         <button
           onClick={handleTogglePin}
-          onMouseEnter={() => setIsPinHovered(true)}
-          onMouseLeave={() => setIsPinHovered(false)}
           style={{
             position: 'absolute',
             top: '10px',
             right: '10px',
             zIndex: 1003,
             pointerEvents: 'auto',
-            backgroundColor: isPinned ? '#3b82f6' : (isPinHovered ? '#f3f4f6' : 'transparent'),
+            backgroundColor: 'transparent',
             cursor: 'pointer',
-            padding: '6px',
-            borderRadius: '6px',
+            padding: '4px 8px',
+            borderRadius: '4px',
             border: 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            transition: 'background-color 0.2s ease',
+            color: isPinned ? '#3b82f6' : '#9ca3af',
+            fontSize: '16px',
+            fontWeight: 500,
+            transition: 'color 0.2s ease',
           }}
           title={isPinned ? '解开固定' : '固定侧边栏'}
         >
-          {/* 固定图标 SVG - 图钉样式 */}
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 18 18"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            {/* 图钉头部 */}
-            <circle
-              cx="9"
-              cy="4.5"
-              r="3"
-              fill={isPinned ? '#ffffff' : '#6b7280'}
-              stroke={isPinned ? '#2563eb' : '#9ca3af'}
-              strokeWidth="1.2"
-            />
-            {/* 图钉针脚 */}
-            <path
-              d="M9 7.5 L9 14"
-              stroke={isPinned ? '#ffffff' : '#6b7280'}
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-            {/* 图钉底部 */}
-            <path
-              d="M6 14 L9 12.5 L12 14"
-              stroke={isPinned ? '#ffffff' : '#6b7280'}
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              fill="none"
-            />
-          </svg>
+          ⇌
         </button>
 
         {/* 内容容器 - 处理滚动 */}
