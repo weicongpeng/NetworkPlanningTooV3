@@ -1352,7 +1352,7 @@ function TreeNodeComponent({
                 {isExpanded ? (
                   <ChevronDown size={12} color="#000" />
                 ) : (
-                  <ChevronRight size={12} color="#999" />
+                  <ChevronRight size={12} color="#000" />
                 )}
               </span>
             ) : (
