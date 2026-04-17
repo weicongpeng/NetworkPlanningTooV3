@@ -1371,7 +1371,7 @@ function TreeNodeComponent({
           title={node.label}
           style={{
             flex: 1,
-            color: node.type === 'root' ? '#333' : '#666',
+            color: node.type === 'root' ? '#000' : '#000',
             fontWeight: (() => {
               // 根节点保持加粗
               if (node.type === 'root') return 500
