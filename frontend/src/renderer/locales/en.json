@@ -528,6 +528,7 @@
     "captureCoord": "Extract Coord",
     "exitCaptureMode": "Exit Extract",
     "captureModeHint": "Click map to capture WGS84 coordinates",
+    "captureRequiresDecorationLayer": "Please enable the decoration layer before capturing coordinates",
     "wgs84Coordinate": "WGS84 Coordinate",
     "coordCopied": "Coordinate copied",
     "longitude": "Longitude",
