@@ -485,11 +485,11 @@ class NeighborPlanner:
         # ========== 第四步：兜底逻辑 - 站点稀疏时的邻区补充 ==========
         # 当站点稀疏（周边站点数量少）时，按"距离 <= 平均站间距"添加兜底邻区
         # 规则：
-        # 1. 如果当前候选邻区数量少于周边站点数，说明站点稀疏
-        # 2. 对于满足距离 <= 平均站间距的候选小区，补充添加为邻区
+        # 1. 如果第三步候选邻区数量少于4个（或少于周边站点数），说明站点稀疏
+        # 2. 从第二步候选中，对于满足距离 <= 平均站间距的候选小区，补充添加为邻区
         step4_fallback_neighbors = []
 
-        if step2_candidates and step3_candidates:
+        if step2_candidates:
             # 计算周边站点数量（第二步候选中不同站点的数量）
             unique_target_sites = set()
             for target_row, _ in step2_candidates:
@@ -499,9 +499,11 @@ class NeighborPlanner:
             site_count = len(unique_target_sites)
             candidate_count = len(step3_candidates)
 
-            # 如果候选邻区数量少于周边站点数的1/2，认为站点稀疏，需要兜底
-            # 同时确保候选数量本身也不够多
-            if candidate_count < max(3, site_count // 2):
+            # 触发条件：候选邻区数量少于4个，或少于周边站点数
+            # 这两种情况都说明站点稀疏，需要兜底
+            needs_fallback = candidate_count < min(4, site_count) if site_count > 0 else candidate_count < 4
+
+            if needs_fallback:
                 site_spacing = self.calculate_site_spacing(source_row)
 
                 logger.debug(f"第四步兜底逻辑: 源小区={source_key}, 站点数={site_count}, 候选数={candidate_count}, 站间距={site_spacing:.3f}km")
