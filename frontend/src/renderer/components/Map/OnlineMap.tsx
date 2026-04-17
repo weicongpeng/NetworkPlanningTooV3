@@ -136,6 +136,8 @@ interface OnlineMapProps {
   onCaptureCoord?: (lng: number, lat: number) => void
   /** 装饰图层可见性 */
   decorationLayerVisible?: boolean
+  /** 打点功能被阻止时的回调（装饰图层未勾选） */
+  onCaptureBlocked?: () => void
 }
 
 /**

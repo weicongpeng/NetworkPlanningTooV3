@@ -91,15 +91,28 @@
       "NRSectorCount": 21
     }
   },
-  "9549b714-adb8-4f0b-80e3-d1114987417b": {
-    "id": "9549b714-adb8-4f0b-80e3-d1114987417b",
-    "name": "ProjectParameter_mongoose河源电联20260416224335.xlsx",
+  "8784965d-6e88-4fdf-bbff-0468fa007278": {
+    "id": "8784965d-6e88-4fdf-bbff-0468fa007278",
+    "name": "BaselineLab_172.16.34.163_1776239483_1478608.zip",
+    "type": "map",
+    "subType": "offline",
+    "size": 3931113,
+    "originalPath": "D:\\Users\\weico\\Downloads\\BaselineLab_172.16.34.163_1776239483_1478608.zip",
+    "uploadDate": "2026-04-17T12:25:29.768401",
+    "status": "ready",
+    "metadata": {
+      "fileCount": 9
+    }
+  },
+  "984c7eae-9e99-4050-b09d-b1a17c8c5ab2": {
+    "id": "984c7eae-9e99-4050-b09d-b1a17c8c5ab2",
+    "name": "ProjectParameter_mongoose河源电联20260417122608.xlsx",
     "type": "excel",
     "fileType": "full_params",
-    "size": 4399073,
-    "originalPath": "D:\\mycode\\ProjectParameter_mongoose河源电联20260416224335.xlsx",
-    "uploadDate": "2026-04-17T12:14:15.410851",
+    "size": 3826088,
+    "uploadDate": "2026-04-17T12:26:45.678771",
     "status": "ready",
+    "originalPath": "D:\\mycode\\ProjectParameter_mongoose河源电联20260416224335.xlsx",
     "metadata": {
       "LTESiteCount": 4112,
       "LTESectorCount": 18778,

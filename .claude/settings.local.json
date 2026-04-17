@@ -77,7 +77,8 @@
       "mcp__serena__onboarding",
       "mcp__serena__list_dir",
       "Bash(npm run lint:*)",
-      "Skill(gsd-do)"
+      "Skill(gsd-do)",
+      "Skill(gsd-quick)"
     ]
   }
 }
