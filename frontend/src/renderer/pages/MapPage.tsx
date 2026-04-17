@@ -1416,7 +1416,7 @@ export function MapPage() {
                   onClick={() => handleSelectionModeChange('circle')}
                   className="w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors flex items-center gap-2"
                 >
-                  <CircleIcon size={12} className="text-blue-500" />
+                  <CircleIcon size={12} />
                   {t('map.circleSelect') || '圆形'}
                 </button>
                 <button
