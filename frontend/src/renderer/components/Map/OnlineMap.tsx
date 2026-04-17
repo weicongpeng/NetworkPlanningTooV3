@@ -1523,6 +1523,11 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
 
     // 抓取模式：获取点击坐标并转换为WGS84，在地图上添加持久化标记
     if (captureMode && onCaptureCoord && mapInstanceRef.current && window.L) {
+      // 检查装饰图层是否启用，未启用则阻止打点
+      if (!decorationLayerVisibility) {
+        onCaptureBlocked?.()
+        return
+      }
       const L = window.L
       const map = mapInstanceRef.current
       const gcjLat = event.latlng.lat
