@@ -1234,7 +1234,7 @@ export function MapPage() {
             className={`text-xs px-2 py-1 rounded transition-colors ${searchMode === 'parameter' ? 'bg-blue-400 text-white hover:bg-blue-500' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
             title={t('map.searchModeSwitchHint') || '点击可切换工参搜索、经纬度定位和地图搜索'}
           >
-            {searchMode === 'parameter' ? (t('map.searchLocation') || '搜索定位') : (t('map.searchPlace') || '地图搜索')}
+            {searchMode === 'parameter' ? '⇌ ' + (t('map.searchLocation') || '搜索定位') : (t('map.searchPlace') || '地图搜索')}
           </button>
           {searchMode === 'parameter' && missingCoordCount > 0 && (
             <div className="flex items-center gap-1 ml-2 text-xs text-amber-600" title="部分扇区缺少坐标信息">
