@@ -1083,6 +1083,10 @@ class DataService:
                 # NR: 先设置默认值，后续会根据CGI出现次数更新
                 new_row[col_map["是否共享"] - 1] = "否"
 
+        # 设置"是否现网"列：追加的新行来自现网工参，填"是"
+        if "是否现网" in col_map:
+            new_row[col_map["是否现网"] - 1] = "是"
+
         # 将新行添加到工作表
         ws.append(new_row)
 
