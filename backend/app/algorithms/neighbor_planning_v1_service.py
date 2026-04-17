@@ -314,11 +314,11 @@ class NeighborPlanner:
         # 获取所有站点距离并排序
         unique_distances = sorted(site_min_distances.values())
 
-        # 取最近3个站点的平均距离作为站间距
-        nearest_3 = unique_distances[:3]
-        avg_spacing = sum(nearest_3) / len(nearest_3) if nearest_3 else 0.5
+        # 取最近5个站点的平均距离作为站间距
+        nearest_5 = unique_distances[:5]
+        avg_spacing = sum(nearest_5) / len(nearest_5) if nearest_5 else 0.5
 
-        logger.debug(f"站间距计算: 源站点={source_enodeb_id}, 最近{len(nearest_3)}个站点, 平均距离={avg_spacing:.3f}km")
+        logger.debug(f"站间距计算: 源站点={source_enodeb_id}, 最近{len(nearest_5)}个站点, 平均距离={avg_spacing:.3f}km")
 
         return avg_spacing
 
