@@ -1594,6 +1594,7 @@ export function MapPage() {
               mapDragTool={mapDragTool}
               captureMode={captureMode}
               onCaptureCoord={(lng, lat) => setCaptureCoord({ lng, lat })}
+              onCaptureBlocked={handleCaptureBlocked}
               decorationLayerVisible={decorationLayer.visible}
             />
 
