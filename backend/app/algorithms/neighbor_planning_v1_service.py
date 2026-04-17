@@ -564,12 +564,18 @@ class NeighborPlanner:
             source_to_target_azimuth = self.calculate_azimuth_angle(source_lat, source_lon, target_row['lat'], target_row['lon'])
 
             # 计算角度差
-            angle_diff = None
+            facing_diff = None
+            pointing_diff = None
             if pd.notna(source_azimuth) and pd.notna(target_azimuth):
                 facing_diff = self.calculate_angle_difference(source_azimuth, (target_azimuth + 180) % 360)
                 pointing_diff = self.calculate_angle_difference(target_azimuth, source_to_target_azimuth)
-                angle_diff = min(facing_diff, pointing_diff)
+                # 对打邻区判断：目标小区背向与主小区方位角差小于目标小区朝向与主小区位置差
+                is_forward = facing_diff < pointing_diff
+            else:
+                is_forward = False
 
+            # 强制邻区直接添加，保留原有评分逻辑（不受对打/内向影响）
+            angle_diff = min(facing_diff, pointing_diff) if facing_diff is not None else None
             score = self.calculate_neighbor_score(distance, angle_diff)
 
             neighbor = NeighborRelation(
@@ -604,13 +610,19 @@ class NeighborPlanner:
             source_to_target_azimuth = self.calculate_azimuth_angle(source_lat, source_lon, target_row['lat'], target_row['lon'])
 
             # 计算角度差
-            angle_diff = None
+            facing_diff = None
+            pointing_diff = None
             if pd.notna(source_azimuth) and pd.notna(target_azimuth):
                 facing_diff = self.calculate_angle_difference(source_azimuth, (target_azimuth + 180) % 360)
                 pointing_diff = self.calculate_angle_difference(target_azimuth, source_to_target_azimuth)
-                angle_diff = min(facing_diff, pointing_diff)
+                # 对打邻区判断：facing_diff < pointing_diff 表示目标小区在主小区朝向方向
+                is_forward = facing_diff < pointing_diff
+            else:
+                is_forward = False
 
-            score = self.calculate_neighbor_score(distance, angle_diff)
+            # 使用新的评分函数，对打邻区优先级更高
+            angle_diff = min(facing_diff, pointing_diff) if facing_diff is not None else None
+            score = self.calculate_neighbor_score(distance, angle_diff, facing_diff, pointing_diff, is_forward)
 
             neighbor = NeighborRelation(
                 source_key=source_key,
