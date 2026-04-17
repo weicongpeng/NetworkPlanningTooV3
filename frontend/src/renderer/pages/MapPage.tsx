@@ -1235,7 +1235,7 @@ export function MapPage() {
             title={t('map.searchModeSwitchHint') || '点击可切换工参搜索、经纬度定位和地图搜索'}
           >
             <Search size={14} />
-            <span>{searchMode === 'parameter' ? '⇌ ' + (t('map.searchLocation') || '搜索定位') : (t('map.searchPlace') || '地图搜索')}</span>
+            <span>{searchMode === 'parameter' ? (t('map.searchLocation') || '搜索定位') : (t('map.searchPlace') || '地图搜索')}</span>
           </button>
           {searchMode === 'parameter' && missingCoordCount > 0 && (
             <div className="flex items-center gap-1 ml-2 text-xs text-amber-600" title="部分扇区缺少坐标信息">
