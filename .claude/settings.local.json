@@ -80,7 +80,8 @@
       "Skill(gsd-do)",
       "Skill(gsd-quick)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(npx create-expo-app@latest . --template blank-typescript --yes)"
     ]
   }
 }
