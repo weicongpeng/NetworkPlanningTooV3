@@ -100,9 +100,15 @@ def create_app() -> FastAPI:
     )
 
     # 配置CORS
+    # 保留原有配置，同时添加局域网IP支持
+    cors_origins = settings.BACKEND_CORS_ORIGINS + [
+        f"http://{local_ip}:5173",
+        f"http://{local_ip}:8000",
+    ]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.BACKEND_CORS_ORIGINS,
+        allow_origins=cors_origins,
+        allow_origin_regex=f"http://.*:({5173|8000})",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
