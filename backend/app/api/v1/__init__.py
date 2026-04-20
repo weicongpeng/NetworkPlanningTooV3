@@ -3,7 +3,7 @@ API v1 路由
 """
 
 from fastapi import APIRouter
-from app.api.v1.endpoints import license, data, pci, neighbor, tac, map, geo_data
+from app.api.v1.endpoints import license, data, pci, neighbor, tac, map, geo_data, system
 
 api_router = APIRouter()
 
