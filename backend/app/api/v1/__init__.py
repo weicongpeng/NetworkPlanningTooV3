@@ -15,3 +15,4 @@ api_router.include_router(neighbor.router, prefix="/neighbor", tags=["邻区规�
 api_router.include_router(tac.router, prefix="/tac", tags=["TAC规划"])
 api_router.include_router(map.router, prefix="/map", tags=["地图服务"])
 api_router.include_router(geo_data.router, prefix="/data", tags=["地理化数据"])
+api_router.include_router(system.router, prefix="/system", tags=["系统服务"])
