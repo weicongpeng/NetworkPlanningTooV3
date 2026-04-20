@@ -81,7 +81,13 @@
       "Skill(gsd-quick)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:github.com)",
-      "Bash(npx create-expo-app@latest . --template blank-typescript --yes)"
+      "Bash(npx create-expo-app@latest . --template blank-typescript --yes)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git -C D:/mycode/NetworkPlanningTooV3 add mobile-app/src/)",
+      "Bash(git -C D:/mycode/NetworkPlanningTooV3 status)",
+      "Bash(git -C D:/mycode/NetworkPlanningTooV3 ls-files --stage mobile-app/)",
+      "Bash(git *)"
     ]
   }
 }
