@@ -5,7 +5,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 import socket
 
-router = APIRouter(prefix="/system", tags=["系统服务"])
+router = APIRouter(tags=["系统服务"])
 
 class SystemInfo(BaseModel):
     """系统信息响应模型"""
