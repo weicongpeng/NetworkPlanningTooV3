@@ -59,9 +59,16 @@ interface MapState {
   nrSectors: SectorData[];
   selectedSector: SectorData | null;
   markers: MarkerPoint[];
+  measurePoints: MeasurePoint[];
+  measureMode: boolean;
+  totalDistance: number | null;
   addMarker: (lat: number, lng: number, name?: string) => void;
   removeMarker: (id: string) => void;
   clearMarkers: () => void;
+  addMeasurePoint: (lat: number, lng: number) => void;
+  removeLastMeasurePoint: () => void;
+  clearMeasure: () => void;
+  toggleMeasureMode: () => void;
   setBackendInfo: (ip: string, port: number) => void;
   setConnected: (connected: boolean) => void;
   setMapType: (type: 'roadmap' | 'satellite') => void;
