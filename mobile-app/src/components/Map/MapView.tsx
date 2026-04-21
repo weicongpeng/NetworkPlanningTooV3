@@ -1,18 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, Platform, Text, TouchableOpacity } from 'react-native';
-import { AMapScene, MapView, UserLocation, Marker, AMapRef } from 'react-native-amap3d';
+import { View, StyleSheet, Text } from 'react-native';
+import { AMapScene, MapView, Marker, AMapRef } from 'react-native-amap3d';
 import { AMAP_CONFIG } from '../../utils/config';
-import { useMapStore, SectorData, MarkerPoint } from '../../store/mapStore';
+import { useMapStore } from '../../store/mapStore';
 import { apiService } from '../../services/api';
-import MarkerList from '../Marker/MarkerList';
-import MeasureControl from '../Measure/MeasureControl';
 
 interface MapViewProps {
   initialCenter?: [number, number];
   initialZoom?: number;
   showSatellite?: boolean;
   onMapPress?: (lat: number, lng: number) => void;
-  captureMode?: boolean;
+  onLongPress?: (lat: number, lng: number) => void;
 }
 
 export default function MapViewComponent({
