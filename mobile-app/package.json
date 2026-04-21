@@ -5,7 +5,8 @@
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
-    "build:android": "expo run:android --variant release"
+    "build:android": "expo run:android --variant release",
+    "ios": "expo run:ios"
   },
   "dependencies": {
     "@react-navigation/native": "^7.2.2",
