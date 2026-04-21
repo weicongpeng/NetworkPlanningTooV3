@@ -18,7 +18,7 @@ export default function MapViewComponent({
   initialZoom = 12,
   showSatellite = false,
   onMapPress,
-  captureMode = false,
+  onLongPress,
 }: MapViewProps) {
   const mapRef = useRef<AMapRef>(null);
   const [isReady, setIsReady] = useState(false);
