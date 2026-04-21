@@ -93,6 +93,10 @@ export default function MapViewComponent({
     if (captureMode) {
       useMapStore.getState().addMarker(latitude, longitude, `标记${Date.now()}`);
     }
+    // 如果开启了测距模式，自动添加测距点
+    if (measureMode) {
+      addMeasurePoint(latitude, longitude);
+    }
   };
 
   const renderLTEProviders = () => {
