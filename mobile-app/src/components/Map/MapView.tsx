@@ -149,6 +149,17 @@ export default function MapViewComponent({
     ));
   };
 
+  const renderMeasurePoints = () => {
+    if (!measureMode) return null;
+    return measurePoints.map((point, index) => (
+      <Marker
+        key={`measure-${index}`}
+        coordinate={{ latitude: point.lat, longitude: point.lng }}
+        pinColor="orange"
+      />
+    ));
+  };
+
   return (
     <View style={styles.container}>
       <AMapScene
