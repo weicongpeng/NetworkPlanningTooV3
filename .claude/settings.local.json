@@ -90,7 +90,8 @@
       "Bash(git *)",
       "Bash(npx expo *)",
       "Bash(ls node_modules/react-i18next)",
-      "Bash(ls node_modules/i18next)"
+      "Bash(ls node_modules/i18next)",
+      "Bash(npx vite *)"
     ]
   }
 }
