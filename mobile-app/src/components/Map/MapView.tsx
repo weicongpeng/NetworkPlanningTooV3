@@ -82,18 +82,15 @@ export default function MapViewComponent({
 
   const handleMapPress = (event: { nativeEvent: { coordinate: { latitude: number; longitude: number } } }) => {
     const { latitude, longitude } = event.nativeEvent.coordinate;
-
     if (onMapPress) {
       onMapPress(latitude, longitude);
     }
+  };
 
-    // 如果开启了打点模式，自动添加标记
-    if (captureMode) {
-      useMapStore.getState().addMarker(latitude, longitude, `标记${Date.now()}`);
-    }
-    // 如果开启了测距模式，自动添加测距点
-    if (measureMode) {
-      addMeasurePoint(latitude, longitude);
+  const handleMapLongPress = (event: { nativeEvent: { coordinate: { latitude: number; longitude: number } } }) => {
+    const { latitude, longitude } = event.nativeEvent.coordinate;
+    if (onLongPress) {
+      onLongPress(latitude, longitude);
     }
   };
 
