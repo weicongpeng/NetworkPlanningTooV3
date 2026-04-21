@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, Platform, Text } from 'react-native';
-import { AMapScene, MapView, UserLocation, AMapRef } from 'react-native-amap3d';
+import { AMapScene, MapView, UserLocation, Marker, AMapRef } from 'react-native-amap3d';
 import { AMAP_CONFIG } from '../../utils/config';
+import { useMapStore, SectorData } from '../../store/mapStore';
+import { apiService } from '../../services/api';
 
 interface MapViewProps {
   initialCenter?: [number, number];
@@ -18,12 +20,99 @@ export default function MapViewComponent({
 }: MapViewProps) {
   const mapRef = useRef<AMapRef>(null);
   const [isReady, setIsReady] = useState(false);
+  const {
+    layers,
+    lteSectors,
+    nrSectors,
+    setSectors,
+    setConnected
+  } = useMapStore();
+
+  useEffect(() => {
+    loadMapData();
+  }, []);
+
+  const loadMapData = async () => {
+    try {
+      const response = await apiService.getMapData();
+      if (response.success && response.data) {
+        const sites = response.data.sites || [];
+        const lte = sites
+          .filter((s: any) => s.networkType === 'LTE' || !s.networkType)
+          .map((s: any) => ({
+            id: s.id || s.sectorId || Math.random().toString(36),
+            name: s.name || '未命名',
+            siteId: s.siteId,
+            sectorId: s.sectorId,
+            latitude: s.latitude,
+            longitude: s.longitude,
+            networkType: 'LTE' as const,
+            frequency: s.frequency,
+            pci: s.pci,
+            tac: s.tac,
+          }));
+        const nr = sites
+          .filter((s: any) => s.networkType === 'NR')
+          .map((s: any) => ({
+            id: s.id || s.sectorId || Math.random().toString(36),
+            name: s.name || '未命名',
+            siteId: s.siteId,
+            sectorId: s.sectorId,
+            latitude: s.latitude,
+            longitude: s.longitude,
+            networkType: 'NR' as const,
+            frequency: s.frequency,
+            pci: s.pci,
+            tac: s.tac,
+          }));
+        setSectors(lte, nr);
+        setConnected(true);
+      }
+    } catch (error) {
+      console.error('Failed to load map data:', error);
+      setConnected(false);
+    }
+  };
 
   const handleMapPress = (event: { nativeEvent: { coordinate: { latitude: number; longitude: number } } }) => {
     if (onMapPress) {
       const { latitude, longitude } = event.nativeEvent.coordinate;
       onMapPress(latitude, longitude);
     }
+  };
+
+  const renderLTEProviders = () => {
+    if (!layers.lte.visible) return null;
+    return lteSectors.map((sector) => (
+      <Marker
+        key={sector.id}
+        coordinate={{
+          latitude: sector.latitude,
+          longitude: sector.longitude,
+        }}
+        title={sector.name}
+        description={`${sector.siteId || ''} ${sector.frequency ? 'F' + sector.frequency : ''}`}
+        pinColor="blue"
+        onPress={() => useMapStore.getState().setSelectedSector(sector)}
+      />
+    ));
+  };
+
+  const renderNRProviders = () => {
+    if (!layers.nr.visible) return null;
+    return nrSectors.map((sector) => (
+      <Marker
+        key={sector.id}
+        coordinate={{
+          latitude: sector.latitude,
+          longitude: sector.longitude,
+        }}
+        title={sector.name}
+        description={`${sector.siteId || ''} ${sector.frequency ? 'N' + sector.frequency : ''}`}
+        pinColor="green"
+        onPress={() => useMapStore.getState().setSelectedSector(sector)}
+      />
+    ));
   };
 
   return (
