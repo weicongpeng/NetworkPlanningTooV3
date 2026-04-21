@@ -57,6 +57,14 @@ export const useMapStore = create<MapState>((set) => ({
   lteSectors: [],
   nrSectors: [],
   selectedSector: null,
+  markers: [],
+  addMarker: (lat, lng, name = '') => set((state) => ({
+    markers: [...state.markers, { id: `marker-${Date.now()}`, lat, lng, name, createdAt: Date.now() }]
+  })),
+  removeMarker: (id) => set((state) => ({
+    markers: state.markers.filter(m => m.id !== id)
+  })),
+  clearMarkers: () => set({ markers: [] }),
   setBackendInfo: (ip, port) => set({ backendIp: ip, backendPort: port }),
   setConnected: (connected) => set({ isConnected: connected }),
   setMapType: (type) => set({ mapType: type }),
