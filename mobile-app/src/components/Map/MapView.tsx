@@ -29,6 +29,9 @@ export default function MapViewComponent({
     lteSectors,
     nrSectors,
     markers,
+    measureMode,
+    measurePoints,
+    addMeasurePoint,
     setSectors,
     setConnected
   } = useMapStore();
