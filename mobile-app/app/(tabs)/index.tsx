@@ -114,4 +114,41 @@ const styles = StyleSheet.create({
   mapContainer: {
     flex: 1,
   },
+  mapTypeBtn: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  mapTypeBtnText: {
+    fontSize: 13,
+    color: '#333',
+  },
+  measureBtn: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  measureBtnActive: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  measureBtnText: {
+    fontSize: 13,
+    color: '#333',
+  },
+  measureBtnTextActive: {
+    color: '#fff',
+  },
 });
