@@ -184,8 +184,10 @@ export default function MapViewComponent({
           {renderLTEProviders()}
           {renderNRProviders()}
           {renderMarkers()}
+          {renderMeasurePoints()}
         </MapView>
         <MarkerList />
+        <MeasureControl />
       </AMapScene>
       {!isReady && (
         <View style={styles.loading}>
