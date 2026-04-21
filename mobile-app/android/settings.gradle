@@ -15,6 +15,14 @@ pluginManagement {
     "../android/expo-gradle-plugin"
   ).absolutePath
   includeBuild(expoPluginsPath)
+
+  // Disable auto-provisioning of toolchains
+  def useLocalJdk = System.getenv('JAVA_HOME') ?: System.getProperty('java.home')
+  repositories {
+    gradlePluginPortal()
+    google()
+    mavenCentral()
+  }
 }
 
 plugins {
@@ -37,12 +45,3 @@ expoAutolinking.useExpoVersionCatalog()
 
 include ':app'
 includeBuild(expoAutolinking.reactNativeGradlePlugin)
-
-// Java toolchain configuration to use local JDK
-plugins.withType(JavaPlugin) {
-  java {
-    toolchain {
-      languageVersion = JavaLanguageVersion.of(19)
-    }
-  }
-}
