@@ -1,14 +1,17 @@
 // mobile-app/app/(tabs)/index.tsx
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, SafeAreaView, Alert } from 'react-native';
+import { View, StyleSheet, SafeAreaView, Alert, TouchableOpacity, Text } from 'react-native';
 import MapViewComponent from '../../src/components/Map/MapView';
+import LayerControl from '../../src/components/Map/LayerControl';
 import SearchBar, { SearchResult } from '../../src/components/Search/SearchBar';
 import NavControl from '../../src/components/Navigation/NavControl';
+import MarkerList from '../../src/components/Marker/MarkerList';
+import MeasureControl from '../../src/components/Measure/MeasureControl';
 import { useMapStore } from '../../src/store/mapStore';
 import { apiService } from '../../src/services/api';
 
 export default function MapScreen() {
-  const { mapType, setMapType, setBackendInfo, setConnected } = useMapStore();
+  const { mapType, setMapType, setBackendInfo, setConnected, measureMode, addMarker, addMeasurePoint, toggleMeasureMode } = useMapStore();
   const [selectedLocation, setSelectedLocation] = useState<{
     lat: number;
     lng: number;
@@ -31,7 +34,18 @@ export default function MapScreen() {
   };
 
   const handleMapPress = (lat: number, lng: number) => {
-    setSelectedLocation({ lat, lng, name: '' });
+    if (measureMode) {
+      addMeasurePoint(lat, lng);
+    } else {
+      setSelectedLocation({ lat, lng, name: '' });
+    }
+  };
+
+  const handleLongPress = (lat: number, lng: number) => {
+    addMarker(lat, lng, `标记 ${Date.now()}`);
+    if (!measureMode) {
+      setSelectedLocation({ lat, lng, name: '已添加标记' });
+    }
   };
 
   const handleResultSelect = (result: SearchResult) => {
@@ -61,9 +75,24 @@ export default function MapScreen() {
           initialCenter={selectedLocation ? [selectedLocation.lat, selectedLocation.lng] : undefined}
           showSatellite={mapType === 'satellite'}
           onMapPress={handleMapPress}
+          onLongPress={handleLongPress}
         />
+        <LayerControl />
+        <MeasureControl />
+        <MarkerList />
+        <TouchableOpacity style={styles.mapTypeBtn} onPress={handleToggleMapType}>
+          <Text style={styles.mapTypeBtnText}>{mapType === 'roadmap' ? '卫星' : '地图'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.measureBtn, measureMode && styles.measureBtnActive]}
+          onPress={toggleMeasureMode}
+        >
+          <Text style={[styles.measureBtnText, measureMode && styles.measureBtnTextActive]}>
+            {measureMode ? '退出测距' : '测距'}
+          </Text>
+        </TouchableOpacity>
       </View>
-      {selectedLocation && (
+      {selectedLocation && !measureMode && (
         <NavControl
           latitude={selectedLocation.lat}
           longitude={selectedLocation.lng}
