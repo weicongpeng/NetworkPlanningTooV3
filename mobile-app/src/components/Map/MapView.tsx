@@ -135,7 +135,10 @@ export default function MapViewComponent({
             latitude: initialCenter[0],
             longitude: initialCenter[1],
           }}
-        />
+        >
+          {renderLTEProviders()}
+          {renderNRProviders()}
+        </MapView>
       </AMapScene>
       {!isReady && (
         <View style={styles.loading}>
