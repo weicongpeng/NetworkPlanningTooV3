@@ -42,6 +42,9 @@ export const useMapStore = create<MapState>((set) => ({
     lte: { visible: true },
     nr: { visible: true },
   },
+  lteSectors: [],
+  nrSectors: [],
+  selectedSector: null,
   setBackendInfo: (ip, port) => set({ backendIp: ip, backendPort: port }),
   setConnected: (connected) => set({ isConnected: connected }),
   setMapType: (type) => set({ mapType: type }),
@@ -52,4 +55,6 @@ export const useMapStore = create<MapState>((set) => ({
         [type]: { visible: !state.layers[type].visible },
       },
     })),
+  setSectors: (lte, nr) => set({ lteSectors: lte, nrSectors: nr }),
+  setSelectedSector: (sector) => set({ selectedSector: sector }),
 }));
