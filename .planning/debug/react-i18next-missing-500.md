@@ -3,16 +3,11 @@ name: react-i18next-missing-500
 description: |
   [plugin:vite:import-analysis] Failed to resolve import "react-i18next" from
   "src/renderer/pages/TACPlanningPage.tsx"
-status: investigating
+status: resolved
 trigger: |
   [plugin:vite:import-analysis] Failed to resolve import "react-i18next" from
   "src/renderer/pages/TACPlanningPage.tsx". Does the file exist?
   D:/mycode/NetworkPlanningTooV3/frontend/src/renderer/pages/TACPlanningPage.tsx:5:31
-  20 |  import { tacPlanningApi, dataApi } from "../services/api";
-  21 |  import { useTACPlanningStore } from "../store/tacPlanningStore";
-  22 |  import { useTranslation } from "react-i18next";
-  23 |  const ITEM_HEIGHT = 48;
-  24 |  const VISIBLE_COUNT = 20;
   同时报500错误
 created: 2026-04-21
 updated: 2026-04-21
@@ -31,11 +26,15 @@ updated: 2026-04-21
 
 ## Current Focus
 
-**next_action:** gather_initial_evidence
+**next_action:** resolved
 
-**hypothesis:** (not yet set)
+**hypothesis:** (not needed - resolved)
 
 ## Evidence
+
+- `frontend/package.json` missing `react-i18next` and `i18next` in dependencies
+- 16+ files import from `react-i18next` but package not installed
+- `node_modules/` directory did not contain these packages
 
 ## Eliminated
 
@@ -43,7 +42,7 @@ updated: 2026-04-21
 
 | Field | Value |
 |-------|-------|
-| root_cause | (not yet determined) |
-| fix | (not yet determined) |
-| verification | (not yet determined) |
-| files_changed | (not yet determined) |
+| root_cause | react-i18next and i18next packages were missing from node_modules and not listed in package.json dependencies |
+| fix | npm install react-i18next i18next |
+| verification | react-i18next and i18next packages now present in node_modules |
+| files_changed | frontend/package.json (added dependencies), frontend/node_modules/ (added packages) |
