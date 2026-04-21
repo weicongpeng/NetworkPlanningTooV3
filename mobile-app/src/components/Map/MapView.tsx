@@ -143,7 +143,7 @@ export default function MapViewComponent({
   };
 
   const renderMeasurePoints = () => {
-    if (!measureMode) return null;
+    if (measurePoints.length === 0) return null;
     return measurePoints.map((point, index) => (
       <Marker
         key={`measure-${index}`}
@@ -165,6 +165,7 @@ export default function MapViewComponent({
           style={styles.map}
           mapType={showSatellite ? 'Satellite' : 'Standard'}
           onPress={handleMapPress}
+          onLongPress={handleMapLongPress}
           showsUserLocation={true}
           showsCompass={true}
           showsScale={true}
@@ -179,8 +180,6 @@ export default function MapViewComponent({
           {renderMarkers()}
           {renderMeasurePoints()}
         </MapView>
-        <MarkerList />
-        <MeasureControl />
       </AMapScene>
       {!isReady && (
         <View style={styles.loading}>
