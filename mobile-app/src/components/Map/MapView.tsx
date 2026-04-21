@@ -125,6 +125,22 @@ export default function MapViewComponent({
     ));
   };
 
+  const renderMarkers = () => {
+    return markers.map((marker) => (
+      <Marker
+        key={marker.id}
+        coordinate={{
+          latitude: marker.lat,
+          longitude: marker.lng,
+        }}
+        title={marker.name || '未命名'}
+        description={`${marker.lat.toFixed(6)}, ${marker.lng.toFixed(6)}`}
+        pinColor="red"
+        onPress={() => useMapStore.getState().removeMarker(marker.id)}
+      />
+    ));
+  };
+
   return (
     <View style={styles.container}>
       <AMapScene
