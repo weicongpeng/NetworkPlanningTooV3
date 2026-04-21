@@ -1,5 +1,18 @@
 import { create } from 'zustand';
 
+export interface SectorData {
+  id: string;
+  name: string;
+  siteId?: string;
+  sectorId?: string;
+  latitude: number;
+  longitude: number;
+  networkType: 'LTE' | 'NR';
+  frequency?: number;
+  pci?: number;
+  tac?: number;
+}
+
 interface MapState {
   backendIp: string;
   backendPort: number;
@@ -9,10 +22,15 @@ interface MapState {
     lte: { visible: boolean };
     nr: { visible: boolean };
   };
+  lteSectors: SectorData[];
+  nrSectors: SectorData[];
+  selectedSector: SectorData | null;
   setBackendInfo: (ip: string, port: number) => void;
   setConnected: (connected: boolean) => void;
   setMapType: (type: 'roadmap' | 'satellite') => void;
   toggleLayer: (type: 'lte' | 'nr') => void;
+  setSectors: (lte: SectorData[], nr: SectorData[]) => void;
+  setSelectedSector: (sector: SectorData | null) => void;
 }
 
 export const useMapStore = create<MapState>((set) => ({
