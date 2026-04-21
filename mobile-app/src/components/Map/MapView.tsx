@@ -19,6 +19,7 @@ export default function MapViewComponent({
   initialZoom = 12,
   showSatellite = false,
   onMapPress,
+  captureMode = false,
 }: MapViewProps) {
   const mapRef = useRef<AMapRef>(null);
   const [isReady, setIsReady] = useState(false);
@@ -26,6 +27,7 @@ export default function MapViewComponent({
     layers,
     lteSectors,
     nrSectors,
+    markers,
     setSectors,
     setConnected
   } = useMapStore();
