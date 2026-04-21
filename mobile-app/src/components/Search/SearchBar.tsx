@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { View, TextInput, TouchableOpacity, Text, StyleSheet, FlatList } from 'react-native';
+import { apiService } from '../../services/api';
 
 export interface SearchResult {
   name: string;
   address: string;
   location: string;
 }
+
+type SearchMode = 'place' | 'parameter' | 'coordinate';
 
 interface SearchBarProps {
   onSearch: (keyword: string) => void;
@@ -22,15 +25,36 @@ export default function SearchBar({
   const [results, setResults] = useState<SearchResult[]>([]);
   const [showResults, setShowResults] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [searchMode, setSearchMode] = useState<SearchMode>('place');
 
   const handleSearch = async () => {
     if (!keyword.trim()) return;
     setIsSearching(true);
-    onSearch(keyword);
 
-    // 调用高德搜索API
-    const searchResults = await searchPlace(keyword);
-    setResults(searchResults);
+    if (searchMode === 'place') {
+      const searchResults = await searchPlace(keyword);
+      setResults(searchResults);
+    } else if (searchMode === 'parameter') {
+      const paramResults = await apiService.searchParameter(keyword);
+      setResults(paramResults.map((s: any) => ({
+        name: s.name,
+        address: `基站ID: ${s.siteId || 'N/A'}`,
+        location: `${s.longitude},${s.latitude}`,
+      })));
+    } else if (searchMode === 'coordinate') {
+      const coordMatch = keyword.match(/^\s*(-?\d+\.?\d*)\s*[，,]\s*(-?\d+\.?\d*)\s*$/);
+      if (coordMatch) {
+        setResults([{
+          name: `坐标点 (${coordMatch[1]}, ${coordMatch[2]})`,
+          address: 'WGS84坐标',
+          location: `${coordMatch[1]},${coordMatch[2]}`,
+        }]);
+      } else {
+        setResults([]);
+      }
+    }
+
+    onSearch(keyword);
     setShowResults(true);
     setIsSearching(false);
   };
@@ -60,14 +84,47 @@ export default function SearchBar({
     setShowResults(false);
   };
 
+  const renderModeToggle = () => (
+    <View style={styles.modeToggle}>
+      <TouchableOpacity
+        style={[styles.modeBtn, searchMode === 'place' && styles.modeBtnActive]}
+        onPress={() => setSearchMode('place')}
+      >
+        <Text style={[styles.modeBtnText, searchMode === 'place' && styles.modeBtnTextActive]}>地点</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.modeBtn, searchMode === 'parameter' && styles.modeBtnActive]}
+        onPress={() => setSearchMode('parameter')}
+      >
+        <Text style={[styles.modeBtnText, searchMode === 'parameter' && styles.modeBtnTextActive]}>小区</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.modeBtn, searchMode === 'coordinate' && styles.modeBtnActive]}
+        onPress={() => setSearchMode('coordinate')}
+      >
+        <Text style={[styles.modeBtnText, searchMode === 'coordinate' && styles.modeBtnTextActive]}>坐标</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const getPlaceholder = () => {
+    switch (searchMode) {
+      case 'place': return '搜索地点...';
+      case 'parameter': return '搜索小区名/基站ID...';
+      case 'coordinate': return '输入经纬度，如: 113.123,23.456';
+      default: return placeholder;
+    }
+  };
+
   return (
     <View style={styles.container}>
+      {renderModeToggle()}
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}
           value={keyword}
           onChangeText={setKeyword}
-          placeholder={placeholder}
+          placeholder={getPlaceholder()}
           onSubmitEditing={handleSearch}
           returnKeyType="search"
         />
@@ -113,7 +170,7 @@ export default function SearchBar({
             />
           ) : (
             <View style={styles.noResults}>
-              <Text style={styles.noResultsText}>未找到相关地点</Text>
+              <Text style={styles.noResultsText}>未找到相关结果</Text>
             </View>
           )}
         </View>
@@ -127,6 +184,11 @@ const styles = StyleSheet.create({
     padding: 10,
     backgroundColor: '#fff',
   },
+  modeToggle: { flexDirection: 'row', marginBottom: 8 },
+  modeBtn: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 4, marginRight: 8, backgroundColor: '#f0f0f0' },
+  modeBtnActive: { backgroundColor: '#007AFF' },
+  modeBtnText: { fontSize: 12, color: '#333' },
+  modeBtnTextActive: { color: '#fff' },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
