@@ -164,7 +164,9 @@ export default function MapViewComponent({
         >
           {renderLTEProviders()}
           {renderNRProviders()}
+          {renderMarkers()}
         </MapView>
+        <MarkerList />
       </AMapScene>
       {!isReady && (
         <View style={styles.loading}>
