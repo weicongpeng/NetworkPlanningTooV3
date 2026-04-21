@@ -5,6 +5,7 @@ import { AMAP_CONFIG } from '../../utils/config';
 import { useMapStore, SectorData, MarkerPoint } from '../../store/mapStore';
 import { apiService } from '../../services/api';
 import MarkerList from '../Marker/MarkerList';
+import MeasureControl from '../Measure/MeasureControl';
 
 interface MapViewProps {
   initialCenter?: [number, number];
