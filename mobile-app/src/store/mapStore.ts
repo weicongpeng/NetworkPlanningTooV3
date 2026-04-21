@@ -90,6 +90,9 @@ export const useMapStore = create<MapState>((set) => ({
   nrSectors: [],
   selectedSector: null,
   markers: [],
+  measurePoints: [],
+  measureMode: false,
+  totalDistance: null,
   addMarker: (lat, lng, name = '') => set((state) => ({
     markers: [...state.markers, { id: `marker-${Date.now()}`, lat, lng, name, createdAt: Date.now() }]
   })),
@@ -97,6 +100,17 @@ export const useMapStore = create<MapState>((set) => ({
     markers: state.markers.filter(m => m.id !== id)
   })),
   clearMarkers: () => set({ markers: [] }),
+  addMeasurePoint: (lat, lng) => set((state) => {
+    const newPoints = [...state.measurePoints, { lat, lng }];
+    const distance = calculateTotalDistance(newPoints);
+    return { measurePoints: newPoints, totalDistance: distance };
+  }),
+  removeLastMeasurePoint: () => set((state) => {
+    const newPoints = state.measurePoints.slice(0, -1);
+    return { measurePoints: newPoints, totalDistance: newPoints.length > 1 ? calculateTotalDistance(newPoints) : null };
+  }),
+  clearMeasure: () => set({ measurePoints: [], totalDistance: null }),
+  toggleMeasureMode: () => set((state) => ({ measureMode: !state.measureMode })),
   setBackendInfo: (ip, port) => set({ backendIp: ip, backendPort: port }),
   setConnected: (connected) => set({ isConnected: connected }),
   setMapType: (type) => set({ mapType: type }),
