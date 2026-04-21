@@ -13,6 +13,14 @@ export interface SectorData {
   tac?: number;
 }
 
+export interface MarkerPoint {
+  id: string;
+  lat: number;
+  lng: number;
+  name: string;
+  createdAt: number;
+}
+
 interface MapState {
   backendIp: string;
   backendPort: number;
@@ -25,6 +33,10 @@ interface MapState {
   lteSectors: SectorData[];
   nrSectors: SectorData[];
   selectedSector: SectorData | null;
+  markers: MarkerPoint[];
+  addMarker: (lat: number, lng: number, name?: string) => void;
+  removeMarker: (id: string) => void;
+  clearMarkers: () => void;
   setBackendInfo: (ip: string, port: number) => void;
   setConnected: (connected: boolean) => void;
   setMapType: (type: 'roadmap' | 'satellite') => void;
