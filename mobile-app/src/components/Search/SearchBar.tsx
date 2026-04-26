@@ -191,6 +191,8 @@ export default function SearchBar({
                   onPress={() => {
                     onResultSelect(item);
                     setShowResults(false);
+                    setKeyword('');
+                    setResults([]);
                   }}
                 >
                   <Text style={styles.resultName}>{item.name}</Text>

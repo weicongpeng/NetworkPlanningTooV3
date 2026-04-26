@@ -23,9 +23,11 @@ export async function startNavi(params: NaviParams): Promise<void> {
   }
 }
 
-export async function startNaviToCoord(lat: number, lng: number, name?: string): Promise<void> {
+export async function startNaviToCoord(lat: number, lng: number, name?: string, isWgs84?: boolean): Promise<void> {
   if (Platform.OS === 'android') {
-    const scheme = `amapuri://route/drive?sourceApplication=工参地图&dlat=${lat}&dlng=${lng}&dname=${encodeURIComponent(name || '目的地')}&dev=0&m=0`;
+    // dev=0: GCJ-02 坐标；dev=1: WGS84 原始坐标（高德自动纠偏）
+    const dev = isWgs84 ? 1 : 0;
+    const scheme = `amapuri://route/drive?sourceApplication=工参地图&dlat=${lat}&dlng=${lng}&dname=${encodeURIComponent(name || '目的地')}&dev=${dev}&m=0`;
     try {
       await Linking.openURL(scheme);
     } catch (error) {

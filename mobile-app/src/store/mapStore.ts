@@ -98,6 +98,7 @@ interface MapState {
   toggleMeasureMode: () => void;
   finishMeasure: () => void;
   toggleMarkerMode: () => void;
+  setMarkerMode: (mode: boolean) => void;
   setCoordinateMode: (mode: boolean) => void;
   setBackendInfo: (ip: string, port: number) => void;
   setConnected: (connected: boolean) => void;
@@ -178,6 +179,7 @@ export const useMapStore = create<MapState>((set) => ({
     }
     return { markerMode: newMarkerMode };
   }),
+  setMarkerMode: (mode) => set({ markerMode: mode }),
   setCoordinateMode: (mode) => set({ coordinateMode: mode }),
   setBackendInfo: (ip, port) => set({ backendIp: ip, backendPort: port }),
   setConnected: (connected) => set({ isConnected: connected }),

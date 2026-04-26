@@ -701,8 +701,12 @@ const HTML_TEMPLATE = `
         markerOverlayGroup.clearOverlays();
         for (var i = 0; i < markers.length; i++) {
           var m = markers[i];
+          // markers 存储为 WGS84，显示前转换为 GCJ-02
+          var gcj = wgs84ToGcj02(m.lat, m.lng);
+          var gcjLat = gcj[0];
+          var gcjLng = gcj[1];
           var dot = new AMap.CircleMarker({
-            center: [m.lng, m.lat],
+            center: [gcjLng, gcjLat],
             radius: 8,
             fillColor: '#E53935',
             fillOpacity: 1,
@@ -722,7 +726,7 @@ const HTML_TEMPLATE = `
           markerOverlayGroup.addOverlay(dot);
 
           var label = new AMap.Marker({
-            position: [m.lng, m.lat],
+            position: [gcjLng, gcjLat],
             offset: new AMap.Pixel(0, -22),
             content: '<div class="marker-label">' + ((m.name && m.name.length > 0) ? m.name : '标记 ' + (i + 1)) + '</div>',
             clickable: false,

@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Clipboard } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Clipboard, Modal, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useMapStore, MarkerPoint } from '../../src/store/mapStore';
@@ -8,7 +8,12 @@ import { startNaviToCoord } from '../../src/services/navi';
 export default function FavoritesScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
-  const { favorites, removeFavorite, clearFavorites, setFocusLocation, setSearchMarker } = useMapStore();
+  const { favorites, removeFavorite, clearFavorites, setFocusLocation, setSearchMarker, updateMarkerName } = useMapStore();
+
+  // 编辑名称弹框状态
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingItem, setEditingItem] = useState<MarkerPoint | null>(null);
+  const [editNameInput, setEditNameInput] = useState('');
 
   const handleDelete = (id: string) => {
     Alert.alert(
@@ -34,7 +39,8 @@ export default function FavoritesScreen() {
   };
 
   const handleNavigate = (item: MarkerPoint) => {
-    startNaviToCoord(item.lat, item.lng, item.name);
+    // favorites 存储为 WGS84，导航时传入 isWgs84=true
+    startNaviToCoord(item.lat, item.lng, item.name, true);
   };
 
   const handleCopy = (item: MarkerPoint) => {
@@ -47,6 +53,28 @@ export default function FavoritesScreen() {
     setFocusLocation({ lat: item.lat, lng: item.lng });
     setSearchMarker({ lat: item.lat, lng: item.lng, name: item.name || '收藏点' });
     navigation.navigate('map');
+  };
+
+  const handleEditPress = (item: MarkerPoint) => {
+    setEditingItem(item);
+    setEditNameInput(item.name || '');
+    setShowEditModal(true);
+  };
+
+  const handleConfirmEdit = () => {
+    if (editingItem) {
+      const name = editNameInput.trim();
+      updateMarkerName(editingItem.id, name);
+    }
+    setShowEditModal(false);
+    setEditingItem(null);
+    setEditNameInput('');
+  };
+
+  const handleCancelEdit = () => {
+    setShowEditModal(false);
+    setEditingItem(null);
+    setEditNameInput('');
   };
 
   const renderItem = ({ item, index }: { item: MarkerPoint; index: number }) => (
@@ -68,6 +96,9 @@ export default function FavoritesScreen() {
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionBtn} onPress={() => handleNavigate(item)}>
             <Text style={styles.actionBtnText}>导航</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionBtn, styles.editAction]} onPress={() => handleEditPress(item)}>
+            <Text style={[styles.actionBtnText, styles.editActionText]}>编辑</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionBtn} onPress={() => handleCopy(item)}>
             <Text style={styles.actionBtnText}>复制</Text>
@@ -104,6 +135,36 @@ export default function FavoritesScreen() {
           contentContainerStyle={styles.list}
         />
       )}
+
+      {/* 编辑名称弹框 */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showEditModal}
+        onRequestClose={handleCancelEdit}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.editModalContent}>
+            <Text style={styles.editModalTitle}>编辑名称</Text>
+            <TextInput
+              style={styles.editModalInput}
+              value={editNameInput}
+              onChangeText={setEditNameInput}
+              placeholder="输入标记名称"
+              autoFocus={true}
+              selectTextOnFocus={true}
+            />
+            <View style={styles.editModalActions}>
+              <TouchableOpacity style={styles.editModalBtn} onPress={handleCancelEdit}>
+                <Text style={styles.editModalBtnText}>取消</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.editModalBtn, styles.editModalBtnPrimary]} onPress={handleConfirmEdit}>
+                <Text style={[styles.editModalBtnText, styles.editModalBtnPrimaryText]}>确定</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -166,11 +227,73 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
   },
   actionBtnText: { color: '#555', fontSize: 11, fontWeight: '600' },
+  editAction: {
+    backgroundColor: '#E8F5E9',
+    borderColor: '#A5D6A7',
+  },
+  editActionText: { color: '#388E3C' },
   deleteAction: {
     backgroundColor: '#FFEBEE',
     borderColor: '#EF9A9A',
   },
   deleteActionText: { color: '#E53935' },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  editModalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    width: '80%',
+    maxWidth: 320,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  editModalTitle: {
+    fontSize: 17,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  editModalInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: '#333',
+    marginBottom: 16,
+  },
+  editModalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+  },
+  editModalBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    backgroundColor: '#f5f5f5',
+  },
+  editModalBtnPrimary: {
+    backgroundColor: '#007AFF',
+  },
+  editModalBtnText: {
+    fontSize: 15,
+    color: '#666',
+    fontWeight: '600',
+  },
+  editModalBtnPrimaryText: {
+    color: '#fff',
+  },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',

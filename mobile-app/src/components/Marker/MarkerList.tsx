@@ -8,7 +8,7 @@ interface MarkerListProps {
 }
 
 export default function MarkerList({ onMarkerSelect }: MarkerListProps) {
-  const { markers, favorites, removeMarker, addFavorite, measureMode, setEditingMarker } = useMapStore();
+  const { markers, favorites, removeMarker, addFavorite, measureMode, markerMode, setEditingMarker } = useMapStore();
 
   if (markers.length === 0 || measureMode) return null;
 
@@ -22,7 +22,8 @@ export default function MarkerList({ onMarkerSelect }: MarkerListProps) {
   };
 
   const handleNavigate = (marker: MarkerPoint) => {
-    startNaviToCoord(marker.lat, marker.lng, marker.name);
+    // markers 存储为 WGS84，导航时传入 isWgs84=true
+    startNaviToCoord(marker.lat, marker.lng, marker.name, true);
   };
 
   const handleEdit = (marker: MarkerPoint) => {

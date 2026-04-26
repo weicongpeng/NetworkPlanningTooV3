@@ -1308,8 +1308,6 @@ export function MapPage() {
             {t('map.clear') || '清除'}
           </button>
 
-
-
           {/* 提取坐标按钮 */}
           <button
             className={`px-2 py-1.5 text-xs rounded transition-colors flex items-center gap-1 ${captureMode ? 'bg-blue-400 text-white hover:bg-blue-500' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
