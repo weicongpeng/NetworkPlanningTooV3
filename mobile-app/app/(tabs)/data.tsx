@@ -11,6 +11,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { apiService } from '../../src/services/api';
+import { BACKEND_CONFIG } from '../../src/utils/config';
 
 interface DataItem {
   id: string;
@@ -40,17 +41,31 @@ export default function DataScreen() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<any>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [downloadLoading, setDownloadLoading] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const fetchList = useCallback(async (isRefresh = false) => {
+    setErrorMsg(null);
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     try {
+      console.log('[DataScreen] 后端地址:', BACKEND_CONFIG.baseUrl + BACKEND_CONFIG.apiPrefix);
       const response = await apiService.getDataList();
+      console.log('[DataScreen] 数据列表响应:', JSON.stringify(response, null, 2)?.substring(0, 500));
       if (response.success && response.data) {
-        setItems(response.data.items || []);
+        // 后端 data 直接是数组，不是 {items: [...]} 对象
+        const list = Array.isArray(response.data) ? response.data : response.data.items || [];
+        setItems(list);
+      } else {
+        setItems([]);
       }
-    } catch (error) {
-      console.error('获取数据列表失败:', error);
+    } catch (error: any) {
+      console.error('[DataScreen] 获取数据列表失败:', error);
+      const msg = error?.message || '无法连接到服务器，请检查网络';
+      setErrorMsg(msg);
+      if (!isRefresh) {
+        Alert.alert('连接失败', `地址: ${BACKEND_CONFIG.baseUrl}\n${msg}`);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -110,6 +125,23 @@ export default function DataScreen() {
     }
   };
 
+  const handleDownload = async (item: DataItem) => {
+    setDownloadLoading(item.id);
+    try {
+      const result = await apiService.downloadData(item.id, item.name);
+      if (result.success) {
+        Alert.alert('成功', result.message || '文件已下载');
+      } else {
+        Alert.alert('失败', result.message || '下载失败');
+      }
+    } catch (error: any) {
+      console.error('下载失败:', error);
+      Alert.alert('失败', error?.message || '下载失败');
+    } finally {
+      setDownloadLoading(null);
+    }
+  };
+
   const getTypeLabel = (item: DataItem) => {
     if (item.fileType === 'geo_data') return item.geometryType === 'sector' ? '扇区数据' : '地理化';
     if (item.fileType === 'full_params') return '全量工参';
@@ -144,6 +176,7 @@ export default function DataScreen() {
 
   const renderItem = ({ item }: { item: DataItem }) => {
     const isSelected = selectedId === item.id;
+    const isDownloading = downloadLoading === item.id;
     return (
       <TouchableOpacity
         style={[styles.itemCard, isSelected && styles.itemCardSelected]}
@@ -155,12 +188,25 @@ export default function DataScreen() {
               {getTypeLabel(item)}
             </Text>
           </View>
-          <TouchableOpacity
-            style={styles.deleteBtn}
-            onPress={() => handleDelete(item)}
-          >
-            <Text style={styles.deleteBtnText}>删除</Text>
-          </TouchableOpacity>
+          <View style={styles.actionButtons}>
+            <TouchableOpacity
+              style={[styles.downloadBtn, isDownloading && styles.downloadBtnActive]}
+              onPress={() => handleDownload(item)}
+              disabled={isDownloading}
+            >
+              {isDownloading ? (
+                <ActivityIndicator size="small" color="#007AFF" />
+              ) : (
+                <Text style={styles.downloadBtnText}>下载</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.deleteBtn}
+              onPress={() => handleDelete(item)}
+            >
+              <Text style={styles.deleteBtnText}>删除</Text>
+            </TouchableOpacity>
+          </View>
         </View>
         <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
         {getMetaText(item) ? (
@@ -254,7 +300,15 @@ export default function DataScreen() {
           <ActivityIndicator size="large" color="#007AFF" style={styles.loader} />
         ) : items.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>暂无数据，请在桌面端导入</Text>
+            {errorMsg ? (
+              <>
+                <Text style={styles.errorTitle}>连接失败</Text>
+                <Text style={styles.errorText}>{errorMsg}</Text>
+                <Text style={styles.errorHint}>请确认：\n1. 桌面端服务已启动\n2. 手机与电脑在同一网络</Text>
+              </>
+            ) : (
+              <Text style={styles.emptyText}>暂无数据，请在桌面端导入</Text>
+            )}
           </View>
         ) : (
           <FlatList
@@ -319,6 +373,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999',
   },
+  errorTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#DC2626',
+    marginBottom: 8,
+  },
+  errorText: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  errorHint: {
+    fontSize: 12,
+    color: '#999',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
   itemCard: {
     backgroundColor: '#fff',
     borderRadius: 10,
@@ -355,6 +427,28 @@ const styles = StyleSheet.create({
   deleteBtnText: {
     fontSize: 12,
     color: '#DC2626',
+    fontWeight: '500',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  downloadBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    backgroundColor: '#E0F2FE',
+    borderRadius: 4,
+    minWidth: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  downloadBtnActive: {
+    backgroundColor: '#BAE6FD',
+  },
+  downloadBtnText: {
+    fontSize: 12,
+    color: '#0369A1',
     fontWeight: '500',
   },
   itemName: {

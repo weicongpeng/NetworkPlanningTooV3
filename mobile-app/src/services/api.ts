@@ -1,5 +1,7 @@
 import axios, { AxiosInstance } from 'axios';
 import { BACKEND_CONFIG } from '../utils/config';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 
 class ApiService {
   private client: AxiosInstance;
@@ -75,13 +77,28 @@ class ApiService {
     return response.json();
   }
 
-  async downloadData(dataId: string, filename: string) {
-    const url = `${BACKEND_CONFIG.baseUrl}${BACKEND_CONFIG.apiPrefix}/data/${dataId}/download`;
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const blob = await response.blob();
-    // React Native 中无法直接下载文件到本地，返回 blob 和文件名供上层处理
-    return { blob, filename };
+  async downloadData(dataId: string, filename: string): Promise<{ success: boolean; message: string }> {
+    try {
+      // 使用 axios 的 baseURL 保持一致
+      const url = `${BACKEND_CONFIG.baseUrl}${BACKEND_CONFIG.apiPrefix}/data/${dataId}/download`;
+      
+      // 构建本地文件路径
+      const localUri = `${FileSystem.cacheDirectory}${filename}`;
+      
+      // 下载文件到本地缓存目录
+      const downloadResult = await FileSystem.downloadAsync(url, localUri);
+      
+      if (downloadResult.status === 200) {
+        // 使用 Sharing 分享/保存文件
+        await Sharing.shareAsync(localUri);
+        return { success: true, message: '文件已下载' };
+      } else {
+        throw new Error(`下载失败: ${downloadResult.status}`);
+      }
+    } catch (error: any) {
+      console.error('[downloadData] 下载失败:', error);
+      throw error;
+    }
   }
 
   async deleteData(dataId: string, force = false) {
