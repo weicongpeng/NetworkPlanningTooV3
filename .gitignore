@@ -19,6 +19,11 @@
 /backend/licenses/
 /backend/*.log
 
+# 移动端
+/mobile-app/node_modules/
+/mobile-app/.expo/
+/mobile-app/dist/
+
 # 共享
 /shared/node_modules/
 
@@ -40,3 +45,11 @@ coverage/
 # 构建产物
 *.egg-info/
 dist/
+
+# 项目级上传/输出/数据目录
+/uploads/
+/outputs/
+/data/
+/全量工参/
+/待规划小区/
+/输出文件/
