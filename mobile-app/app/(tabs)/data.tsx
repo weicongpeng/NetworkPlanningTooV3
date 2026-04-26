@@ -76,36 +76,7 @@ export default function DataScreen() {
     fetchList();
   }, [fetchList]);
 
-  const handleDelete = (item: DataItem) => {
-    Alert.alert(
-      '确认删除',
-      `确定要删除 "${item.name}" 吗？\n\n删除后将无法恢复，且会影响使用该数据的规划结果。`,
-      [
-        { text: '取消', style: 'cancel' },
-        {
-          text: '删除',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const result = await apiService.deleteData(item.id);
-              if (result?.success) {
-                Alert.alert('成功', '删除成功');
-                fetchList(true);
-                if (selectedId === item.id) {
-                  setSelectedId(null);
-                  setPreviewData(null);
-                }
-              } else {
-                Alert.alert('失败', result?.message || '删除失败');
-              }
-            } catch (error: any) {
-              Alert.alert('失败', error?.message || '删除失败');
-            }
-          },
-        },
-      ]
-    );
-  };
+
 
   const handlePreview = async (item: DataItem) => {
     setSelectedId(item.id);
@@ -199,12 +170,6 @@ export default function DataScreen() {
               ) : (
                 <Text style={styles.downloadBtnText}>下载</Text>
               )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.deleteBtn}
-              onPress={() => handleDelete(item)}
-            >
-              <Text style={styles.deleteBtnText}>删除</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -417,17 +382,6 @@ const styles = StyleSheet.create({
   typeBadgeText: {
     fontSize: 11,
     fontWeight: '600',
-  },
-  deleteBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    backgroundColor: '#FEE2E2',
-    borderRadius: 4,
-  },
-  deleteBtnText: {
-    fontSize: 12,
-    color: '#DC2626',
-    fontWeight: '500',
   },
   actionButtons: {
     flexDirection: 'row',

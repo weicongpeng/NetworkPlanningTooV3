@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useMapStore, MarkerPoint } from '../../src/store/mapStore';
 import { startNaviToCoord } from '../../src/services/navi';
+import { wgs84ToGcj02 } from '../../src/utils/coordinate';
 
 export default function FavoritesScreen() {
   const insets = useSafeAreaInsets();
@@ -50,8 +51,10 @@ export default function FavoritesScreen() {
   };
 
   const handleLocation = (item: MarkerPoint) => {
-    setFocusLocation({ lat: item.lat, lng: item.lng });
-    setSearchMarker({ lat: item.lat, lng: item.lng, name: item.name || '收藏点' });
+    // 收藏点存储为 WGS84，跳转高德地图前转换为 GCJ-02
+    const [gcjLat, gcjLng] = wgs84ToGcj02(item.lat, item.lng);
+    setFocusLocation({ lat: gcjLat, lng: gcjLng });
+    setSearchMarker({ lat: gcjLat, lng: gcjLng, name: item.name || '收藏点' });
     navigation.navigate('map');
   };
 
