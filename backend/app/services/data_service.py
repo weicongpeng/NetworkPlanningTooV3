@@ -2859,6 +2859,11 @@ class DataService:
         # 处理 ZIP 文件（离线地图或 MapInfo 包）
         if is_zip:
             import zipfile
+            import shutil
+
+            # 保留原始 ZIP 文件以便下载
+            original_zip = data_dir / "original.zip"
+            shutil.copy(file_path, original_zip)
 
             with zipfile.ZipFile(file_path, "r") as zip_ref:
                 zip_ref.extractall(data_dir)

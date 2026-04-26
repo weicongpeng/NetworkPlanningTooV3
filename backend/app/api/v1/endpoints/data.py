@@ -43,17 +43,32 @@ async def download_file(data_id: str):
         data_dir = settings.DATA_DIR / data_id
         file_path = data_dir / "original.xlsx"
 
-        if not file_path.exists():
-            # 尝试从 uploads 目录找
-            file_path = settings.UPLOAD_DIR / f"{data_id}.xlsx"
+        # 按优先级查找原始文件：xlsx -> zip
+        candidates = [
+            data_dir / "original.xlsx",
+            data_dir / "original.zip",
+            settings.UPLOAD_DIR / f"{data_id}.xlsx",
+            settings.UPLOAD_DIR / f"{data_id}.zip",
+        ]
+        file_path = None
+        for candidate in candidates:
+            if candidate.exists():
+                file_path = candidate
+                break
 
-        if not file_path.exists():
+        if not file_path:
             raise HTTPException(status_code=404, detail="文件不存在")
 
         # 获取原始文件名
-        filename = "download.xlsx"
+        default_name = "download.xlsx" if file_path.suffix == ".xlsx" else "download.zip"
         if data_id in data_service.index:
-            filename = data_service.index[data_id].get("name", filename)
+            stored_name = data_service.index[data_id].get("name", default_name)
+            # 确保扩展名一致
+            if not stored_name.lower().endswith(file_path.suffix.lower()):
+                stored_name = stored_name + file_path.suffix
+            filename = stored_name
+        else:
+            filename = default_name
 
         # 处理中文文件名编码 (RFC 5987)
         import urllib.parse
@@ -63,11 +78,17 @@ async def download_file(data_id: str):
             "Content-Disposition": f"attachment; filename*=utf-8''{encoded_filename}"
         }
 
+        # 根据文件类型设置正确的媒体类型
+        if file_path.suffix.lower() == ".zip":
+            media_type = "application/zip"
+        else:
+            media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
         return FileResponse(
             path=file_path,
             filename=filename,
             headers=headers,
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            media_type=media_type,
         )
     except HTTPException:
         raise
