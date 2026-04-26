@@ -2578,5 +2578,116 @@
     "created_at": "2026-04-20T16:21:36.305172",
     "started_at": "2026-04-20T16:21:36.305699",
     "completed_at": null
+  },
+  "67d5069d-6635-40a2-8160-4ed8f8f8e3cc": {
+    "task_id": "67d5069d-6635-40a2-8160-4ed8f8f8e3cc",
+    "task_type": "pci",
+    "config": {
+      "networkType": "NR",
+      "distanceThreshold": 15.0,
+      "pciModulus": 30,
+      "inheritModulus": false,
+      "pciRange": {
+        "min": 0,
+        "max": 1007
+      },
+      "enableTACPlanning": true,
+      "customRules": null
+    },
+    "status": "completed",
+    "progress": 100.0,
+    "result": null,
+    "error": null,
+    "created_at": "2026-04-24T11:41:37.276306",
+    "started_at": "2026-04-24T11:41:37.282245",
+    "completed_at": null
+  },
+  "0f05fdcc-59fe-4ce3-b568-e4054a1ee722": {
+    "task_id": "0f05fdcc-59fe-4ce3-b568-e4054a1ee722",
+    "task_type": "pci",
+    "config": {
+      "networkType": "NR",
+      "distanceThreshold": 20.0,
+      "pciModulus": 30,
+      "inheritModulus": false,
+      "pciRange": {
+        "min": 0,
+        "max": 1007
+      },
+      "enableTACPlanning": true,
+      "customRules": null
+    },
+    "status": "completed",
+    "progress": 100.0,
+    "result": null,
+    "error": null,
+    "created_at": "2026-04-24T14:33:46.051212",
+    "started_at": "2026-04-24T14:33:46.068276",
+    "completed_at": null
+  },
+  "33612f3e-dd66-4d60-bd13-14df1b331844": {
+    "task_id": "33612f3e-dd66-4d60-bd13-14df1b331844",
+    "task_type": "pci",
+    "config": {
+      "networkType": "NR",
+      "distanceThreshold": 10.0,
+      "pciModulus": 30,
+      "inheritModulus": false,
+      "pciRange": {
+        "min": 0,
+        "max": 1007
+      },
+      "enableTACPlanning": true,
+      "customRules": null
+    },
+    "status": "completed",
+    "progress": 100.0,
+    "result": null,
+    "error": null,
+    "created_at": "2026-04-24T14:34:55.845207",
+    "started_at": "2026-04-24T14:34:55.850083",
+    "completed_at": null
+  },
+  "ad515878-bbbd-494f-9b6b-d4ff95a69d63": {
+    "task_id": "ad515878-bbbd-494f-9b6b-d4ff95a69d63",
+    "task_type": "pci",
+    "config": {
+      "networkType": "NR",
+      "distanceThreshold": 8.0,
+      "pciModulus": 30,
+      "inheritModulus": false,
+      "pciRange": {
+        "min": 0,
+        "max": 1007
+      },
+      "enableTACPlanning": true,
+      "customRules": null
+    },
+    "status": "completed",
+    "progress": 100.0,
+    "result": null,
+    "error": null,
+    "created_at": "2026-04-24T14:35:27.581423",
+    "started_at": "2026-04-24T14:35:27.586016",
+    "completed_at": null
+  },
+  "41e82c88-80b9-458c-865b-89115d091c7a": {
+    "task_id": "41e82c88-80b9-458c-865b-89115d091c7a",
+    "task_type": "tac",
+    "config": {
+      "networkType": "LTE",
+      "enableSingularityCheck": true,
+      "singularityConfig": {
+        "searchRadius": 1500,
+        "singularityThreshold": 0.5
+      }
+    },
+    "status": "completed",
+    "progress": 95,
+    "result": null,
+    "error": null,
+    "created_at": "2026-04-26T08:51:19.466585",
+    "started_at": "2026-04-26T08:51:19.481558",
+    "completed_at": null
   }
 }

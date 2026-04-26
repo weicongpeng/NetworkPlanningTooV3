@@ -1,11 +1,17 @@
+import { registerRootComponent } from 'expo';
 import React from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import MapScreen from './app/(tabs)/index';
+import { NavigationContainer } from '@react-navigation/native';
+import TabsLayout from './app/(tabs)/_layout';
 
-export default function App() {
+function App() {
   return (
     <SafeAreaProvider>
-      <MapScreen />
+      <NavigationContainer>
+        <TabsLayout />
+      </NavigationContainer>
     </SafeAreaProvider>
   );
 }
+
+registerRootComponent(App);

@@ -97,7 +97,8 @@
       "Read(//c/Program Files/Java/**)",
       "Read(//c/Program Files \\(x86\\)/**)",
       "Bash(mv \"C:/Users/weico/.gradle/wrapper/dists/gradle-8.14.3-bin/gradle-8.14.3-bin.zip\" \"C:/Users/weico/.gradle/wrapper/dists/gradle-8.14.3-bin/cv11ve7ro1n3o1j4so8xd9n66/\")",
-      "Bash(rm -f \"C:/Users/weico/.gradle/wrapper/dists/gradle-8.14.3-bin/cv11ve7ro1n3o1j4so8xd9n66/\"*.part \"C:/Users/weico/.gradle/wrapper/dists/gradle-8.14.3-bin/cv11ve7ro1n3o1j4so8xd9n66/\"*.lck)"
+      "Bash(rm -f \"C:/Users/weico/.gradle/wrapper/dists/gradle-8.14.3-bin/cv11ve7ro1n3o1j4so8xd9n66/\"*.part \"C:/Users/weico/.gradle/wrapper/dists/gradle-8.14.3-bin/cv11ve7ro1n3o1j4so8xd9n66/\"*.lck)",
+      "Bash(ren android *)"
     ]
   }
 }

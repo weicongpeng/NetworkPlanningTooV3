@@ -1,13 +1,13 @@
 {
   "expo": {
-    "name": "网络规划工具",
+    "name": "工参地图",
     "slug": "network-planning-mobile",
     "version": "1.0.0",
     "platforms": [
       "android"
     ],
     "android": {
-      "package": "com.networkplanning.mobile",
+      "package": "com.gongcan.map",
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION"
@@ -15,6 +15,9 @@
     },
     "plugins": [
       "expo-asset"
-    ]
+    ],
+    "web": {
+      "bundler": "metro"
+    }
   }
 }

@@ -75,49 +75,49 @@
       ]
     }
   },
-  "29a2d260-4d18-4fb3-ba27-26272a561ab0": {
-    "id": "29a2d260-4d18-4fb3-ba27-26272a561ab0",
+  "e17fc5fc-e581-445a-a20d-caa7d1877ca9": {
+    "id": "e17fc5fc-e581-445a-a20d-caa7d1877ca9",
     "name": "cell-tree-export.xlsx",
     "type": "excel",
     "fileType": "target_cells",
-    "size": 11257,
-    "originalPath": "D:\\mycode\\cell-tree-export.xlsx",
-    "uploadDate": "2026-04-17T10:54:47.307501",
+    "size": 10173,
+    "originalPath": null,
+    "uploadDate": "2026-04-24T11:37:15.064346",
     "status": "ready",
     "metadata": {
-      "LTESiteCount": 8,
-      "LTESectorCount": 27,
-      "NRSiteCount": 8,
-      "NRSectorCount": 21
+      "LTESiteCount": 0,
+      "LTESectorCount": 0,
+      "NRSiteCount": 1,
+      "NRSectorCount": 3
     }
   },
-  "517cb6cc-5440-4af5-ace6-5d6770374588": {
-    "id": "517cb6cc-5440-4af5-ace6-5d6770374588",
-    "name": "BaselineLab_172.16.34.163_1776763089_7587927.zip",
+  "399f1760-7007-452f-b891-3c0ad2ef14af": {
+    "id": "399f1760-7007-452f-b891-3c0ad2ef14af",
+    "name": "BaselineLab_172.16.34.163_1776931099_6110754.zip",
     "type": "map",
     "subType": "offline",
-    "size": 3921713,
-    "originalPath": "D:\\mycode\\NetworkPlanningTooV3\\全量工参\\BaselineLab_172.16.34.163_1776763089_7587927.zip",
-    "uploadDate": "2026-04-21T18:06:08.545774",
+    "size": 3921133,
+    "originalPath": null,
+    "uploadDate": "2026-04-24T11:37:39.603772",
     "status": "ready",
     "metadata": {
       "fileCount": 9
     }
   },
-  "a6e68fca-530e-4515-8f70-22a3c2115d77": {
-    "id": "a6e68fca-530e-4515-8f70-22a3c2115d77",
-    "name": "ProjectParameter_mongoose河源电联20260421180617.xlsx",
+  "9f8a3f60-1c1c-407c-9184-3d87554d7b08": {
+    "id": "9f8a3f60-1c1c-407c-9184-3d87554d7b08",
+    "name": "ProjectParameter_mongoose河源电联20260424114008.xlsx",
     "type": "excel",
     "fileType": "full_params",
-    "size": 5100493,
-    "uploadDate": "2026-04-21T18:07:01.971745",
+    "size": 5100818,
+    "uploadDate": "2026-04-24T11:40:49.261273",
     "status": "ready",
-    "originalPath": "D:\\mycode\\ProjectParameter_mongoose河源电联20260417122608.xlsx",
+    "originalPath": null,
     "metadata": {
-      "LTESiteCount": 4112,
-      "LTESectorCount": 18894,
+      "LTESiteCount": 4103,
+      "LTESectorCount": 18845,
       "NRSiteCount": 1405,
-      "NRSectorCount": 15438
+      "NRSectorCount": 15406
     }
   }
 }
