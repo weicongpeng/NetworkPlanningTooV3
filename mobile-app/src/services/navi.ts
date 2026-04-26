@@ -13,7 +13,7 @@ export async function startNavi(params: NaviParams): Promise<void> {
   const { startLat, startLng, endLat, endLng, mode = 'drive' } = params;
 
   if (Platform.OS === 'android') {
-    const scheme = `amapuri://route/${mode}?sourceApplication=NetworkPlanning&slat=${startLat}&slng=${startLng}&sname=起点&dlat=${endLat}&dlng=${endLng}&dname=终点&dev=0&m=0`;
+    const scheme = `amapuri://route/${mode}?sourceApplication=工参地图&slat=${startLat}&slng=${startLng}&sname=起点&dlat=${endLat}&dlng=${endLng}&dname=终点&dev=0&m=0`;
     try {
       await Linking.openURL(scheme);
     } catch (error) {
@@ -25,7 +25,7 @@ export async function startNavi(params: NaviParams): Promise<void> {
 
 export async function startNaviToCoord(lat: number, lng: number, name?: string): Promise<void> {
   if (Platform.OS === 'android') {
-    const scheme = `amapuri://route/drive?sourceApplication=NetworkPlanning&dlat=${lat}&dlng=${lng}&dname=${name || '目的地'}&dev=0&m=0`;
+    const scheme = `amapuri://route/drive?sourceApplication=工参地图&dlat=${lat}&dlng=${lng}&dname=${encodeURIComponent(name || '目的地')}&dev=0&m=0`;
     try {
       await Linking.openURL(scheme);
     } catch (error) {
