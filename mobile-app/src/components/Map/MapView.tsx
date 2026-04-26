@@ -910,6 +910,8 @@ export default forwardRef<MapViewRef, Props>(function MapView(props, ref) {
     layers,
     setSelectedSector,
     selectedSector,
+    focusLocation,
+    setFocusLocation,
   } = useMapStore();
   const { onMapPress, onLongPress, onMarkerClick, onMeasureFinish, onMeasureClear, onSectorOverlap } = props;
   const showSatellite = props.showSatellite;
@@ -979,6 +981,14 @@ export default forwardRef<MapViewRef, Props>(function MapView(props, ref) {
       injectJS('window.updateSearchMarker(null);');
     }
   }, [searchMarker, mapReady]);
+
+  // Move camera when focusLocation changes (e.g. from favorites list)
+  useEffect(() => {
+    if (!mapReady || !focusLocation) return;
+    injectJS(`window.moveCamera(${focusLocation.lat}, ${focusLocation.lng}, 16);`);
+    // Clear focusLocation after moving to prevent re-triggering
+    setFocusLocation(null);
+  }, [focusLocation, mapReady, setFocusLocation]);
 
   // Update map type
   useEffect(() => {
