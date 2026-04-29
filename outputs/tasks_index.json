@@ -2689,5 +2689,28 @@
     "created_at": "2026-04-26T08:51:19.466585",
     "started_at": "2026-04-26T08:51:19.481558",
     "completed_at": null
+  },
+  "0153989d-4a1b-4f7e-85cf-aacb55ee5603": {
+    "task_id": "0153989d-4a1b-4f7e-85cf-aacb55ee5603",
+    "task_type": "pci",
+    "config": {
+      "networkType": "NR",
+      "distanceThreshold": 15.0,
+      "pciModulus": 30,
+      "inheritModulus": false,
+      "pciRange": {
+        "min": 0,
+        "max": 1007
+      },
+      "enableTACPlanning": true,
+      "customRules": null
+    },
+    "status": "completed",
+    "progress": 100.0,
+    "result": null,
+    "error": null,
+    "created_at": "2026-04-29T15:36:11.680429",
+    "started_at": "2026-04-29T15:36:11.690159",
+    "completed_at": null
   }
 }

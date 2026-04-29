@@ -1,69 +1,38 @@
 {
-  "e17fc5fc-e581-445a-a20d-caa7d1877ca9": {
-    "id": "e17fc5fc-e581-445a-a20d-caa7d1877ca9",
-    "name": "cell-tree-export.xlsx",
+  "4ee2eedb-8141-47c5-83a1-0a00b20f2910": {
+    "id": "4ee2eedb-8141-47c5-83a1-0a00b20f2910",
+    "name": "中兴工参-2026-4-21.xlsx",
     "type": "excel",
-    "fileType": "target_cells",
-    "size": 10173,
-    "originalPath": null,
-    "uploadDate": "2026-04-24T11:37:15.064346",
+    "fileType": "geo_data",
+    "geometryType": "sector",
+    "sourceType": "excel",
+    "size": 9594374,
+    "uploadDate": "2026-04-28T23:18:25.453917",
     "status": "ready",
     "metadata": {
-      "LTESiteCount": 0,
-      "LTESectorCount": 0,
-      "NRSiteCount": 1,
-      "NRSectorCount": 3
+      "pointCount": 8008
     }
   },
-  "9f8a3f60-1c1c-407c-9184-3d87554d7b08": {
-    "id": "9f8a3f60-1c1c-407c-9184-3d87554d7b08",
-    "name": "ProjectParameter_mongoose河源电联20260424114008.xlsx",
-    "type": "excel",
-    "fileType": "full_params",
-    "size": 5100818,
-    "uploadDate": "2026-04-24T11:40:49.261273",
-    "status": "ready",
-    "originalPath": null,
-    "metadata": {
-      "LTESiteCount": 4103,
-      "LTESectorCount": 18845,
-      "NRSiteCount": 1405,
-      "NRSectorCount": 15406
-    }
-  },
-  "e833ae03-75f2-44bc-8ad4-26d6badc6f4b": {
-    "id": "e833ae03-75f2-44bc-8ad4-26d6badc6f4b",
-    "name": "BaselineLab_172.16.34.163_1776931099_6110754.zip",
-    "type": "map",
-    "subType": "offline",
-    "size": 3921133,
-    "originalPath": "D:\\mycode\\NetworkPlanningTooV3\\全量工参\\BaselineLab_172.16.34.163_1776931099_6110754.zip",
-    "uploadDate": "2026-04-26T19:33:12.455415",
-    "status": "ready",
-    "metadata": {
-      "fileCount": 10
-    }
-  },
-  "884420eb-c87d-45a9-bd83-afce2cd7e3a0": {
-    "id": "884420eb-c87d-45a9-bd83-afce2cd7e3a0",
+  "26719a3b-5b65-4f84-8b28-727d015ea6c0": {
+    "id": "26719a3b-5b65-4f84-8b28-727d015ea6c0",
     "name": "4G_TAC.zip",
     "type": "map",
     "subType": "mapinfo",
     "size": 30113,
-    "originalPath": "D:\\mycode\\NetworkPlanningTooV3\\全量工参\\4G_TAC.zip",
-    "uploadDate": "2026-04-26T19:35:01.593617",
+    "originalPath": null,
+    "uploadDate": "2026-04-29T12:03:20.036740",
     "status": "ready",
     "metadata": {
       "fileCount": 6,
       "layerCount": 1,
       "layers": [
         {
-          "id": "024dd7f1-660c-4f37-bf3d-bcebbfdc70e0",
+          "id": "b023590e-6fcc-4b53-8ec5-7f681b071c31",
           "name": "4G_TAC",
           "type": "polygon",
           "feature_count": 23,
           "metadata": {
-            "source_file": "D:\\mycode\\NetworkPlanningTooV3\\data\\884420eb-c87d-45a9-bd83-afce2cd7e3a0\\4G_TAC.TAB",
+            "source_file": "D:\\mycode\\NetworkPlanningTooV3\\data\\26719a3b-5b65-4f84-8b28-727d015ea6c0\\4G_TAC.TAB",
             "feature_count": 23,
             "name": "4G_TAC",
             "coord_sys": "unknown",
@@ -83,26 +52,26 @@
       ]
     }
   },
-  "95d7e5e5-da20-4900-934c-55efd48c1931": {
-    "id": "95d7e5e5-da20-4900-934c-55efd48c1931",
+  "16e23a4e-7b2a-45cb-a141-9b66a68db23d": {
+    "id": "16e23a4e-7b2a-45cb-a141-9b66a68db23d",
     "name": "5G TAC.zip",
     "type": "map",
     "subType": "mapinfo",
     "size": 9188,
-    "originalPath": "D:\\mycode\\NetworkPlanningTooV3\\全量工参\\5G TAC.zip",
-    "uploadDate": "2026-04-26T19:35:01.652623",
+    "originalPath": null,
+    "uploadDate": "2026-04-29T12:03:20.645809",
     "status": "ready",
     "metadata": {
       "fileCount": 5,
       "layerCount": 1,
       "layers": [
         {
-          "id": "f23d4642-8b54-49d5-a817-1abf6810d908",
+          "id": "8817a52f-d83f-4856-ae5e-6f3e62a17333",
           "name": "河源5G-TAC",
           "type": "polygon",
           "feature_count": 51,
           "metadata": {
-            "source_file": "D:\\mycode\\NetworkPlanningTooV3\\data\\95d7e5e5-da20-4900-934c-55efd48c1931\\河源5G-TAC.TAB",
+            "source_file": "D:\\mycode\\NetworkPlanningTooV3\\data\\16e23a4e-7b2a-45cb-a141-9b66a68db23d\\河源5G-TAC.TAB",
             "feature_count": 51,
             "name": "河源5G-TAC",
             "coord_sys": "unknown",
@@ -118,6 +87,51 @@
           }
         }
       ]
+    }
+  },
+  "b87f770b-1362-4631-aad1-b66f78b840ca": {
+    "id": "b87f770b-1362-4631-aad1-b66f78b840ca",
+    "name": "BaselineLab_172.16.34.163_1777447277_2760546.zip",
+    "type": "map",
+    "subType": "offline",
+    "size": 3919619,
+    "originalPath": null,
+    "uploadDate": "2026-04-29T15:24:20.452223",
+    "status": "ready",
+    "metadata": {
+      "fileCount": 10
+    }
+  },
+  "b368b925-ca91-41e8-8c8a-1788db8e4096": {
+    "id": "b368b925-ca91-41e8-8c8a-1788db8e4096",
+    "name": "cell-tree-export.xlsx",
+    "type": "excel",
+    "fileType": "target_cells",
+    "size": 10289,
+    "originalPath": null,
+    "uploadDate": "2026-04-29T15:35:46.788786",
+    "status": "ready",
+    "metadata": {
+      "LTESiteCount": 0,
+      "LTESectorCount": 0,
+      "NRSiteCount": 4,
+      "NRSectorCount": 6
+    }
+  },
+  "01b662bf-e956-46fb-88a3-d0af5273e5dd": {
+    "id": "01b662bf-e956-46fb-88a3-d0af5273e5dd",
+    "name": "ProjectParameter_mongoose河源电联_20260429153730_已更新PCI.xlsx",
+    "type": "excel",
+    "fileType": "full_params",
+    "size": 3858023,
+    "uploadDate": "2026-04-29T15:37:30.758048",
+    "status": "ready",
+    "originalPath": null,
+    "metadata": {
+      "LTESiteCount": 4103,
+      "LTESectorCount": 18845,
+      "NRSiteCount": 1411,
+      "NRSectorCount": 15466
     }
   }
 }

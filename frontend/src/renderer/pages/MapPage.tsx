@@ -1245,7 +1245,7 @@ export function MapPage() {
           )}
 
           {/* 搜索输入框 */}
-          <div className="relative w-72">
+          <div className="relative w-[360px]">
             <input
               ref={searchInputRef}
               type="text"
@@ -1282,6 +1282,89 @@ export function MapPage() {
                 >
                   <X size={12} />
                 </button>
+              )}
+            </div>
+
+            {/* 搜索结果容器 - 在输入框容器内部定位 */}
+            <div className="absolute top-full left-0 mt-1 z-[2000] w-full">
+              {/* 搜索结果下拉框 */}
+              {showSearchResults && searchResults.length > 0 && (
+                <div className="bg-card border border-border rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                  {searchResults.map((result, index) => {
+                    if (result.type === 'place') {
+                      return (
+                        <button
+                          key={index}
+                          onMouseDown={(e) => {
+                            e.preventDefault()
+                            selectSearchResult(result)
+                          }}
+                          className="w-full px-3 py-2 text-left text-xs hover:bg-muted transition-colors border-b border-border last:border-0"
+                          title={result.name}
+                        >
+                          <div className="flex items-start gap-2">
+                            <MapPin size={14} className="mt-0.5 text-red-500 shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium truncate">{result.name}</div>
+                              <div className="text-xs text-muted-foreground truncate" title={`${result.address} ${result.district}`}>
+                                {result.address} {result.district}
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+                      )
+                    } else {
+                      return (
+                        <button
+                          key={index}
+                          onMouseDown={(e) => {
+                            e.preventDefault()
+                            selectSearchResult(result)
+                          }}
+                          className="w-full px-3 py-2 text-left text-xs hover:bg-muted transition-colors border-b border-border last:border-0"
+                          title={result.name}
+                        >
+                          <div className="flex items-start gap-2">
+                            <Database size={14} className={`mt-0.5 shrink-0 ${result.networkType === 'LTE' ? 'text-blue-500' : 'text-green-500'}`} />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium truncate">{result.name}</span>
+                                <span className={`text-xs px-1.5 py-0.5 rounded ${result.networkType === 'LTE' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
+                                  {result.networkType}
+                                </span>
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {result.siteId && <span>基站ID: {result.siteId}</span>}
+                                {result.sectorId && <span> • 小区ID: {result.sectorId}</span>}
+                              </div>
+                              {!result.hasLocation && (
+                                <div className="text-xs text-amber-600 flex items-center gap-1 mt-1">
+                                  <AlertTriangle size={10} />
+                                  {t('map.noCoordinate') || '缺少坐标信息'}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      )
+                    }
+                  })}
+                </div>
+              )}
+
+              {/* 搜索中提示 */}
+              {searching && (
+                <div className="bg-card border border-border rounded-lg shadow-lg p-3 text-xs text-muted-foreground flex items-center justify-center gap-2">
+                  <Loader2 className="animate-spin" size={14} />
+                  {t('map.searching') || '搜索中...'}
+                </div>
+              )}
+
+              {/* 无结果提示 */}
+              {showSearchResults && searchResults.length === 0 && !searching && (
+                <div className="bg-card border border-border rounded-lg shadow-lg p-3 text-xs text-muted-foreground">
+                  {searchMode === 'map' ? (t('map.noRelatedPlace') || '未找到相关地点') : (t('map.noRelatedCell') || '未找到相关小区')}
+                </div>
               )}
             </div>
           </div>
@@ -1472,90 +1555,7 @@ export function MapPage() {
             )}
           </button>
 
-          {/* 搜索结果容器 */}
-          <div className="absolute top-full left-0 mt-1 z-[2000] w-64">
-            {/* 搜索结果下拉框 */}
-            {showSearchResults && searchResults.length > 0 && (
-              <div className="bg-card border border-border rounded-lg shadow-lg max-h-64 overflow-y-auto">
-                {searchResults.map((result, index) => {
-                  if (result.type === 'place') {
-                    return (
-                      <button
-                        key={index}
-                        onMouseDown={(e) => {
-                          e.preventDefault()
-                          selectSearchResult(result)
-                        }}
-                        className="w-full px-3 py-2 text-left text-sm hover:bg-muted transition-colors border-b border-border last:border-0"
-                      >
-                        <div className="flex items-start gap-2">
-                          <MapPin size={14} className="mt-0.5 text-red-500 shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium truncate">{result.name}</div>
-                            <div className="text-xs text-muted-foreground truncate">
-                              {result.address} {result.district}
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    )
-                  } else {
-                    return (
-                      <button
-                        key={index}
-                        onMouseDown={(e) => {
-                          e.preventDefault()
-                          selectSearchResult(result)
-                        }}
-                        className="w-full px-3 py-2 text-left text-sm hover:bg-muted transition-colors border-b border-border last:border-0"
-                      >
-                        <div className="flex items-start gap-2">
-                          <Database size={14} className={`mt-0.5 shrink-0 ${result.networkType === 'LTE' ? 'text-blue-500' : 'text-green-500'
-                            }`} />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium truncate">{result.name}</span>
-                              <span className={`text-xs px-1.5 py-0.5 rounded ${result.networkType === 'LTE'
-                                ? 'bg-blue-100 text-blue-700'
-                                : 'bg-green-100 text-green-700'
-                                }`}>
-                                {result.networkType}
-                              </span>
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {result.siteId && <span>基站ID: {result.siteId}</span>}
-                              {result.sectorId && <span> • 小区ID: {result.sectorId}</span>}
-                            </div>
-                            {!result.hasLocation && (
-                              <div className="text-xs text-amber-600 flex items-center gap-1 mt-1">
-                                <AlertTriangle size={10} />
-                                {t('map.noCoordinate') || '缺少坐标信息'}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </button>
-                    )
-                  }
-                })}
-              </div>
-            )}
 
-            {/* 搜索中提示 */}
-            {searching && (
-              <div className="bg-card border border-border rounded-lg shadow-lg p-3 text-sm text-muted-foreground flex items-center justify-center gap-2">
-                <Loader2 className="animate-spin" size={14} />
-                {t('map.searching') || '搜索中...'}
-              </div>
-            )}
-
-            {/* 无结果提示 */}
-            {showSearchResults && searchResults.length === 0 && !searching && (
-              <div className="bg-card border border-border rounded-lg shadow-lg p-3 text-sm text-muted-foreground">
-                {searchMode === 'map' ? (t('map.noRelatedPlace') || '未找到相关地点') : (t('map.noRelatedCell') || '未找到相关小区')}
-              </div>
-            )}
-          </div>
         </div>
 
         {/* 右侧地图控件占位 */}
