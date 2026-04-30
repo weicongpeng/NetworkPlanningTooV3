@@ -18,24 +18,24 @@ export function MapToolbar({
       <div className="bg-card border border-border rounded-lg shadow-lg p-1">
         <button
           onClick={() => onViewModeChange('online')}
-          className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
+          className={`flex items-center gap-1 px-2 py-1.5 text-xs rounded transition-colors ${
             viewMode === 'online'
               ? 'bg-primary text-primary-foreground'
-              : 'text-muted-foreground hover:bg-muted'
+              : 'text-foreground hover:bg-muted hover:text-primary'
           }`}
         >
-          <MapPin size={16} />
+          <MapPin size={14} />
           在线地图
         </button>
         <button
           onClick={() => onViewModeChange('offline')}
-          className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors mt-1 ${
+          className={`flex items-center gap-1 px-2 py-1.5 text-xs rounded transition-colors mt-1 ${
             viewMode === 'offline'
               ? 'bg-primary text-primary-foreground'
-              : 'text-muted-foreground hover:bg-muted'
+              : 'text-foreground hover:bg-muted hover:text-primary'
           }`}
         >
-          <Layers size={16} />
+          <Layers size={14} />
           离线地图
         </button>
       </div>

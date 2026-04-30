@@ -32,15 +32,15 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen bg-background overflow-hidden">
       {/* 侧边栏容器 - 包含侧边栏和控件 */}
       <div className="relative">
-        {/* 侧边栏 - 统一使用浅灰色背景，匹配窗口高度 */}
+        {/* 侧边栏 - 使用主题变量，跟随系统主题设置 */}
         <aside
           style={{
             width: sidebarOpen ? '180px' : '42px',
             height: '100vh',
             transition: 'width 0.35s cubic-bezier(0.25, 0.1, 0.25, 1)',
-            backgroundColor: '#f3f4f6', // 浅灰色，与导航项背景一致
+            backgroundColor: 'hsl(var(--card))',
           }}
-          className="border-r border-gray-200 flex flex-col relative z-20"
+          className="border-r border-border flex flex-col relative z-20"
         >
           {/* 导航菜单 - 固定高度和间距，避免上下移动，图标位置固定，内容边距统一 */}
           <nav className="flex-1 overflow-y-auto py-3">
@@ -57,19 +57,19 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                     paddingLeft: '6px',
                     paddingRight: '6px',
                     gap: '8px',
-                    backgroundColor: isActive ? '#60a5fa' : 'transparent',
-                    color: isActive ? '#ffffff' : '#6b7280',
+                    backgroundColor: isActive ? 'hsl(var(--primary))' : 'transparent',
+                    color: isActive ? 'hsl(var(--primary-foreground))' : 'hsl(var(--foreground))',
                   }}
                   onMouseEnter={(e) => {
                     if (!isActive) {
-                      e.currentTarget.style.backgroundColor = '#e5e7eb'
-                      e.currentTarget.style.color = '#374151'
+                      e.currentTarget.style.backgroundColor = 'hsl(var(--muted))'
+                      e.currentTarget.style.color = 'hsl(var(--foreground))'
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (!isActive) {
                       e.currentTarget.style.backgroundColor = 'transparent'
-                      e.currentTarget.style.color = '#6b7280'
+                      e.currentTarget.style.color = 'hsl(var(--foreground))'
                     }
                   }}
                 >
@@ -100,7 +100,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
             style={{
               opacity: sidebarOpen ? 1 : 0,
               transition: 'opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-              color: '#9ca3af',
+              color: 'hsl(var(--muted-foreground))',
               flexShrink: 0,
             }}
           >
@@ -112,8 +112,8 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
           {/* 展开/隐藏控件 - 位于侧边栏内部右下角 */}
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#e5e7eb' }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f3f4f6' }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'hsl(var(--muted))' }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'hsl(var(--card))' }}
             style={{
               position: 'absolute',
               bottom: '8px',
@@ -122,7 +122,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
               minWidth: '34px',
               height: '28px',
               padding: '0 8px',
-              backgroundColor: '#f3f4f6',
+              backgroundColor: 'hsl(var(--card))',
               borderRadius: '6px',
               border: 'none',
               cursor: 'pointer',
@@ -139,7 +139,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
               style={{
                 fontSize: '12px',
                 fontWeight: 'bold',
-                color: '#6b7280',
+                color: 'hsl(var(--muted-foreground))',
                 letterSpacing: '-1px',
                 transition: 'transform 0.35s cubic-bezier(0.25, 0.1, 0.25, 1)',
                 transform: sidebarOpen ? 'rotate(0deg)' : 'rotate(180deg)',

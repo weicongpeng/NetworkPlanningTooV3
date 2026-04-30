@@ -329,7 +329,15 @@ class TaskManager:
                             cell_key = sector_id
                         target_cell_keys.add(cell_key)
             else:
-                raise ValueError(f"待规划小区文件中没有{network_type_str}数据")
+                # 获取实际可用的网络类型，提供更准确的错误信息
+                available_types = list(target_cells_data.keys()) if isinstance(target_cells_data, dict) else []
+                if available_types:
+                    raise ValueError(
+                        f"待规划小区文件中没有{network_type_str}数据。"
+                        f"可用的网络类型: {', '.join(available_types)}"
+                    )
+                else:
+                    raise ValueError(f"待规划小区文件中没有{network_type_str}数据，且文件格式异常（无可用网络类型）")
         elif isinstance(target_cells_data, list):
             for site in target_cells_data:
                 if site.get("networkType") == network_type_str:

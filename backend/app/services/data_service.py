@@ -116,7 +116,7 @@ class DataService:
                             and "NR Project Parameters" in sheet_names
                         ):
                             file_type = "full_params"
-                        elif "LTE" in sheet_names and "NR" in sheet_names:
+                        elif "LTE" in sheet_names or "NR" in sheet_names:
                             file_type = "target_cells"
 
                         # 添加到index中
@@ -1540,6 +1540,14 @@ class DataService:
         # 待规划小区文件特征 - 以"cell-tree-export"开头
         if filename_lower.startswith("cell-tree-export"):
             return "target_cells"
+
+        # 待规划小区文件特征 - 检查sheet名称（支持单网络类型）
+        has_lte_sheet = any(s.strip().lower() == "lte" for s in sheet_names)
+        has_nr_sheet = any(s.strip().lower() == "nr" for s in sheet_names)
+        if has_lte_sheet or has_nr_sheet:
+            # 排除全量工参（有Project Parameters后缀的）
+            if not (has_lte_params or has_nr_params):
+                return "target_cells"
 
         # 全量工参文件特征 - 多种识别方式
         # 方式1: 检查sheet名称

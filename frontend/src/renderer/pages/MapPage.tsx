@@ -1207,15 +1207,15 @@ export function MapPage() {
           {currentDataSourceFile ? (
             <div className="px-3 py-1.5 bg-muted/50 rounded-md">
               <div className="flex items-center gap-2">
-                <Database size={14} className="text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">{t('map.engineerParam') || '工参'}: {currentDataSourceFile}</span>
+                <Database size={14} className="text-foreground" />
+                <span className="text-xs text-foreground">{t('map.engineerParam') || '工参'}: {currentDataSourceFile}</span>
               </div>
             </div>
           ) : (
             <div className="px-3 py-1.5 bg-muted/50 rounded-md">
               <div className="flex items-center gap-2">
-                <Database size={14} className="text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">{t('map.noImportFile') || '未导入工参文件'}</span>
+                <Database size={14} className="text-foreground" />
+                <span className="text-xs text-foreground">{t('map.noImportFile') || '未导入工参文件'}</span>
               </div>
             </div>
           )}
@@ -1231,7 +1231,7 @@ export function MapPage() {
               setSearchResults([])
               setShowSearchResults(false)
             }}
-            className="px-2 py-1.5 text-xs rounded transition-colors flex items-center gap-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="px-2 py-1.5 text-xs rounded transition-colors flex items-center gap-1 text-foreground hover:bg-muted hover:text-primary"
             title={t('map.searchModeSwitchHint') || '点击可切换工参搜索、经纬度定位和地图搜索'}
           >
             <Search size={14} />
@@ -1260,7 +1260,7 @@ export function MapPage() {
                 setTimeout(() => setShowSearchResults(false), 200)
               }}
               placeholder={searchMode === 'map' ? (t('map.inputPlaceHint') || '输入地名、道路名称等') : (t('map.inputLocationHint') || '输入小区名、基站ID或经纬度(经度,纬度)')}
-              className="w-full pl-3 pr-16 py-1.5 text-xs border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary placeholder:text-xs"
+              className="w-full pl-3 pr-16 py-1.5 text-xs border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary placeholder:text-muted-foreground"
             />
 
             {/* 右侧按钮组：搜索/清除 */}
@@ -1268,7 +1268,7 @@ export function MapPage() {
               {/* 搜索/定位按钮 */}
               <button
                 onClick={() => handleSearchAction()}
-                className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                className="p-1 rounded hover:bg-muted transition-colors text-foreground hover:text-primary"
                 title={t('map.searchOrLocate') || '搜索或定位'}
               >
                 <Search size={12} />
@@ -1277,7 +1277,7 @@ export function MapPage() {
               {searchKeyword && (
                 <button
                   onClick={clearSearchInput}
-                  className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                  className="p-1 rounded hover:bg-muted transition-colors text-foreground hover:text-primary"
                   title={t('map.clearInput') || '清除输入'}
                 >
                   <X size={12} />
@@ -1306,7 +1306,7 @@ export function MapPage() {
                             <MapPin size={14} className="mt-0.5 text-red-500 shrink-0" />
                             <div className="flex-1 min-w-0">
                               <div className="font-medium truncate">{result.name}</div>
-                              <div className="text-xs text-muted-foreground truncate" title={`${result.address} ${result.district}`}>
+                              <div className="text-xs text-foreground/80 truncate" title={`${result.address} ${result.district}`}>
                                 {result.address} {result.district}
                               </div>
                             </div>
@@ -1333,7 +1333,7 @@ export function MapPage() {
                                   {result.networkType}
                                 </span>
                               </div>
-                              <div className="text-xs text-muted-foreground">
+                              <div className="text-xs text-foreground/80">
                                 {result.siteId && <span>基站ID: {result.siteId}</span>}
                                 {result.sectorId && <span> • 小区ID: {result.sectorId}</span>}
                               </div>
@@ -1354,7 +1354,7 @@ export function MapPage() {
 
               {/* 搜索中提示 */}
               {searching && (
-                <div className="bg-card border border-border rounded-lg shadow-lg p-3 text-xs text-muted-foreground flex items-center justify-center gap-2">
+                <div className="bg-card border border-border rounded-lg shadow-lg p-3 text-xs text-foreground/80 flex items-center justify-center gap-2">
                   <Loader2 className="animate-spin" size={14} />
                   {t('map.searching') || '搜索中...'}
                 </div>
@@ -1362,7 +1362,7 @@ export function MapPage() {
 
               {/* 无结果提示 */}
               {showSearchResults && searchResults.length === 0 && !searching && (
-                <div className="bg-card border border-border rounded-lg shadow-lg p-3 text-xs text-muted-foreground">
+                <div className="bg-card border border-border rounded-lg shadow-lg p-3 text-xs text-foreground/80">
                   {searchMode === 'map' ? (t('map.noRelatedPlace') || '未找到相关地点') : (t('map.noRelatedCell') || '未找到相关小区')}
                 </div>
               )}
@@ -1384,7 +1384,7 @@ export function MapPage() {
                 onlineMapRef.current.clearCaptureMarkers()
               }
             }}
-            className="px-2 py-1.5 text-xs rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground flex items-center gap-1"
+            className="px-2 py-1.5 text-xs rounded hover:bg-muted transition-colors text-foreground hover:text-primary flex items-center gap-1"
             title={t('map.clearAllMarkers') || '清除所有搜索标记和圈选状态'}
           >
             <Trash2 size={14} />
@@ -1393,7 +1393,7 @@ export function MapPage() {
 
           {/* 提取坐标按钮 */}
           <button
-            className={`px-2 py-1.5 text-xs rounded transition-colors flex items-center gap-1 ${captureMode ? 'bg-blue-400 text-white hover:bg-blue-500' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+            className={`px-2 py-1.5 text-xs rounded transition-colors flex items-center gap-1 ${captureMode ? 'bg-blue-400 text-white hover:bg-blue-500' : 'text-foreground hover:bg-muted hover:text-primary'}`}
             onClick={() => {
               // 激活/关闭提取坐标：激活时关闭所有其他互斥模式
               const newMode = !captureMode
@@ -1416,7 +1416,7 @@ export function MapPage() {
 
           {/* 测距按钮 */}
           <button
-            className={`px-2 py-1.5 text-xs rounded transition-colors flex items-center gap-1 ${measureMode ? 'bg-blue-400 text-white hover:bg-blue-500' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+            className={`px-2 py-1.5 text-xs rounded transition-colors flex items-center gap-1 ${measureMode ? 'bg-blue-400 text-white hover:bg-blue-500' : 'text-foreground hover:bg-muted hover:text-primary'
               }`}
             onClick={() => {
               const newState = !measureMode
@@ -1439,7 +1439,7 @@ export function MapPage() {
 
           {/* 地图拖拽工具按钮 - 始终显示 */}
           <button
-            className={`px-2 py-1.5 text-xs rounded transition-colors flex items-center gap-1 ${mapDragTool ? 'bg-blue-400 text-white hover:bg-blue-500' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+            className={`px-2 py-1.5 text-xs rounded transition-colors flex items-center gap-1 ${mapDragTool ? 'bg-blue-400 text-white hover:bg-blue-500' : 'text-foreground hover:bg-muted hover:text-primary'
               }`}
             onClick={handleMapDragToolToggle}
             title={mapDragTool ? (t('map.disableDrag') || '禁用地图拖拽') : (t('map.enableDrag') || '启用地图拖拽')}
@@ -1451,7 +1451,7 @@ export function MapPage() {
           {/* 圈选按钮 */}
           <div className="relative" ref={selectionMenuRef}>
             <button
-              className={`px-2 py-1.5 text-xs rounded transition-colors flex items-center gap-1 ${selectionMode !== 'none' ? 'bg-blue-400 text-white hover:bg-blue-500' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+              className={`px-2 py-1.5 text-xs rounded transition-colors flex items-center gap-1 ${selectionMode !== 'none' ? 'bg-blue-400 text-white hover:bg-blue-500' : 'text-foreground hover:bg-muted hover:text-primary'
                 }`}
               onClick={() => {
                 if (selectionMode !== 'none') {
@@ -1488,21 +1488,21 @@ export function MapPage() {
               <div className="absolute top-full left-0 mt-1 z-[3000] bg-card border border-border rounded-lg shadow-lg w-32 overflow-hidden">
                 <button
                   onClick={() => handleSelectionModeChange('point')}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors flex items-center gap-2"
+                  className="w-full text-left px-2 py-1.5 text-xs text-foreground hover:bg-muted hover:text-primary transition-colors flex items-center gap-1"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
                   {t('map.pointSelect') || '框选'}
                 </button>
                 <button
                   onClick={() => handleSelectionModeChange('circle')}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors flex items-center gap-2"
+                  className="w-full text-left px-2 py-1.5 text-xs text-foreground hover:bg-muted hover:text-primary transition-colors flex items-center gap-1"
                 >
                   <CircleIcon size={12} />
                   {t('map.circleSelect') || '圆形'}
                 </button>
                 <button
                   onClick={() => handleSelectionModeChange('polygon')}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors flex items-center gap-2"
+                  className="w-full text-left px-2 py-1.5 text-xs text-foreground hover:bg-muted hover:text-primary transition-colors flex items-center gap-1"
                 >
                   <Pentagon size={12} />
                   {t('map.polygonSelect') || '多边形'}
@@ -1526,10 +1526,10 @@ export function MapPage() {
                 handleOnlineMapToggle(false)
               }
             }}
-            className={`flex items-center gap-1.5 px-2 py-1 text-xs rounded transition-colors ${
+            className={`flex items-center gap-1 px-2 py-1.5 text-xs rounded transition-colors ${
               onlineMapVisible
-                ? 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                : 'text-muted-foreground opacity-60 hover:bg-muted hover:text-foreground'
+                ? 'text-foreground hover:bg-muted hover:text-primary'
+                : 'text-foreground hover:bg-muted hover:text-primary'
             }`}
             title={!onlineMapVisible
               ? (t('map.switchToRoadmap') || '切换到平面图')
@@ -1539,8 +1539,8 @@ export function MapPage() {
           >
             {!onlineMapVisible ? (
               <>
-                <MapIcon size={14} className="opacity-50" />
-                <span className="opacity-60">{t('map.emptyMap') || '空地图'}</span>
+                <MapIcon size={14} />
+                <span>{t('map.emptyMap') || '空地图'}</span>
               </>
             ) : mapType === 'roadmap' ? (
               <>

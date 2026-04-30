@@ -768,8 +768,11 @@ export function DataPage() {
                               : `${item.metadata?.pointCount || 0} ${t('data.points') || '个点'}`}
                           </>
                         ) : item.type === 'excel' ? (
-                            item.metadata?.LTESiteCount
-                                ? `LTE ${item.metadata.LTESiteCount}站/${item.metadata.LTESectorCount}小区 · NR ${item.metadata.NRSiteCount}站/${item.metadata.NRSectorCount}小区`
+                            item.metadata?.LTESiteCount || item.metadata?.NRSiteCount
+                                ? [
+                                    item.metadata?.LTESiteCount ? `LTE ${item.metadata.LTESiteCount}站/${item.metadata.LTESectorCount}小区` : null,
+                                    item.metadata?.NRSiteCount ? `NR ${item.metadata.NRSiteCount}站/${item.metadata.NRSectorCount}小区` : null
+                                  ].filter(Boolean).join(' · ')
                                 : (item.fileType === 'full_params'
                                     ? (t('data.fullParamsData') || '全量工参数据')
                                     : (item.fileType === 'target_cells'
