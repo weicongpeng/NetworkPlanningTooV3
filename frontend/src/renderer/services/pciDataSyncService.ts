@@ -517,12 +517,70 @@ export class PCIDataSyncService {
    * 获取同步后的数据
    * 优先返回临时工参副本（如果存在），否则返回普通同步数据
    * 临时工参包含规划后的PCI，用于同频同PCI地理化显示
+   * 兜底：如果没有临时工参副本但有pciResultsMap，使用syncedData临时更新syncedPCI
    */
   getSyncedData(): {
     lte: SyncedSectorData[]
     nr: SyncedSectorData[]
   } | null {
-    return this.pciTempData || this.syncedData
+    // 优先返回临时工参副本
+    if (this.pciTempData) {
+      return this.pciTempData
+    }
+
+    // 兜底：如果没有临时工参，但有pciResultsMap，就使用syncedData并临时更新syncedPCI
+    if (this.syncedData && this.pciResultsMap.size > 0) {
+      console.log('[PCIDataSyncService] 未找到pciTempData，使用syncedData并临时更新syncedPCI', {
+        pciResultsCount: this.pciResultsMap.size,
+        lteCount: this.syncedData.lte.length,
+        nrCount: this.syncedData.nr.length
+      })
+
+      // 创建syncedData的副本，并根据pciResultsMap更新syncedPCI
+      const tempLTE = JSON.parse(JSON.stringify(this.syncedData.lte)).map((s: any) => ({ ...s }))
+      const tempNR = JSON.parse(JSON.stringify(this.syncedData.nr)).map((s: any) => ({ ...s }))
+
+      // 应用规划后的PCI
+      let appliedCount = 0
+      for (const [key, pciResult] of this.pciResultsMap) {
+        let found = false
+
+        // 在LTE数据中查找
+        for (const sector of tempLTE) {
+          const sKey = this.getSectorKey(sector.siteId || '', sector.sectorId || '')
+          if (sKey === key || sector.id === key) {
+            sector.syncedPCI = pciResult.newPCI
+            sector.isPlannedSector = true
+            found = true
+            appliedCount++
+            break
+          }
+        }
+
+        // 在NR数据中查找
+        if (!found) {
+          for (const sector of tempNR) {
+            const sKey = this.getSectorKey(sector.siteId || '', sector.sectorId || '')
+            if (sKey === key || sector.id === key) {
+              sector.syncedPCI = pciResult.newPCI
+              sector.isPlannedSector = true
+              found = true
+              appliedCount++
+              break
+            }
+          }
+        }
+      }
+
+      console.log('[PCIDataSyncService] 兜底更新完成', {
+        appliedCount,
+        totalResults: this.pciResultsMap.size
+      })
+
+      return { lte: tempLTE, nr: tempNR }
+    }
+
+    return this.syncedData
   }
 
   /**
