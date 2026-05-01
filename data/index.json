@@ -102,36 +102,48 @@
       "fileCount": 10
     }
   },
-  "ddbd4de2-ba51-466e-bf62-22520beea327": {
-    "id": "ddbd4de2-ba51-466e-bf62-22520beea327",
+  "fb8076bd-37d8-40c8-a646-87f3507e97b6": {
+    "id": "fb8076bd-37d8-40c8-a646-87f3507e97b6",
+    "name": "东源追龙&和平村超保障站点清单-20260428.xlsx",
+    "type": "excel",
+    "fileType": "geo_data",
+    "geometryType": "point",
+    "sourceType": "excel",
+    "size": 22915,
+    "uploadDate": "2026-05-01T13:28:58.273147",
+    "status": "ready",
+    "metadata": {
+      "pointCount": 71
+    }
+  },
+  "db636f0e-2a19-4bd7-b86e-6eddbd56319c": {
+    "id": "db636f0e-2a19-4bd7-b86e-6eddbd56319c",
     "name": "ProjectParameter_mongoose河源电联20260430111956.xlsx",
     "type": "excel",
     "fileType": "full_params",
-    "size": 4639680,
+    "size": 4644631,
     "originalPath": null,
-    "uploadDate": "2026-04-30T11:36:53.886601",
+    "uploadDate": "2026-05-01T14:53:03.043249",
     "status": "ready",
     "metadata": {
       "LTESiteCount": 4103,
-      "LTESectorCount": 18847,
+      "LTESectorCount": 18856,
       "NRSiteCount": 1409,
       "NRSectorCount": 15471
     }
   },
-  "53d40b8a-9779-49f5-be03-da62bb32f61f": {
-    "id": "53d40b8a-9779-49f5-be03-da62bb32f61f",
-    "name": "cell-tree-export.xlsx",
+  "95610d5c-c68d-4559-9f73-9ee514f57356": {
+    "id": "95610d5c-c68d-4559-9f73-9ee514f57356",
+    "name": "cell-tree-export-20260501144124.xlsx",
     "type": "excel",
     "fileType": "target_cells",
-    "size": 10162,
+    "size": 9707,
     "originalPath": null,
-    "uploadDate": "2026-04-30T14:40:38.524974",
+    "uploadDate": "2026-05-01T16:17:16.840568",
     "status": "ready",
     "metadata": {
-      "LTESiteCount": 0,
-      "LTESectorCount": 0,
-      "NRSiteCount": 1,
-      "NRSectorCount": 2
+      "NRSiteCount": 4,
+      "NRSectorCount": 21
     }
   }
 }

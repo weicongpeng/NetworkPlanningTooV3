@@ -1446,10 +1446,17 @@ class DataService:
                     elif file_type == "target_cells":
                         # 待规划小区文件 - 读取LTE和NR子表
                         for network in ["LTE", "NR"]:
-                            if network in sheet_names:
-                                safe_print(f"[DataService] 解析 {network}...")
-                                # 传入xls对象而不是路径
-                                sites = self._parse_sheet_data(xls, network, network)
+                            # 使用大小写不敏感的方式查找实际的sheet名称
+                            actual_sheet = None
+                            for sn in sheet_names:
+                                if sn.strip().lower() == network.lower():
+                                    actual_sheet = sn
+                                    break
+
+                            if actual_sheet:
+                                safe_print(f"[DataService] 解析 {network} (sheet: {actual_sheet})...")
+                                # 传入xls对象和实际的sheet名称
+                                sites = self._parse_sheet_data(xls, actual_sheet, network)
                                 parsed_data[network] = sites
                                 metadata[f"{network}SiteCount"] = len(sites)
                                 metadata[f"{network}SectorCount"] = sum(
@@ -1501,6 +1508,10 @@ class DataService:
         except Exception as e:
             safe_print(f"[DataService] 保存原始文件失败: {e}")
             # 继续保存JSON
+
+        # 检查解析结果是否为空
+        if not parsed_data:
+            raise ValueError("解析后数据为空，请检查Excel文件是否包含有效的LTE或NR数据")
 
         # 保存解析后的数据
         with open(data_dir / "data.json", "w", encoding="utf-8") as f:
@@ -3373,7 +3384,9 @@ class DataService:
 
                     # 如果是分表格式（LTE.json 或 NR.json），包装成标准格式
                     if filename in ["LTE.json", "NR.json"]:
-                        result = {filename.replace(".json", "").lower(): data}
+                        # 确保键是大写的，与_network_type.value保持一致
+                        key = filename.replace(".json", "").upper()
+                        result = {key: data}
                         self._set_cached_data(data_id, filename, data_file, result)
                         return result
 

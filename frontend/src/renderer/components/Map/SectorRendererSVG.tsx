@@ -2579,8 +2579,8 @@ export class SectorSVGLayer extends L.Layer {
     // 获取标签内容
     let content = ''
     if (this.pciHighlightConfig && this.renderMode === 'pci-planning') {
-      // PCI模式：显示 小区名称 + PCI
-      content = `${sector.name || ''} (PCI: ${sector.pci || '-'})`
+      // PCI模式：显示 小区名称 + PCI（优先使用规划后的PCI）
+      content = `${sector.name || ''} (PCI: ${this._getLabelContent(sector, 'pci') || '-'})`
     } else {
       // 默认模式：根据配置获取
       // 如果是聚合标签(isAggregated=true)，优先显示站点名称
