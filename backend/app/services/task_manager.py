@@ -822,54 +822,65 @@ class TaskManager:
             
             source_sites = []
             target_sites = []
+            target_cell_keys = set()
 
             try:
                 data_items = data_service.list_data()
                 cell_tree_item = None
                 full_params_item = None
-                
-                # 1. 查找文件
+
+                # 1. 查找全量工参文件（两种方式都需要）
                 for item in data_items:
                     if item.type.value == "excel":
                         fname = item.name.lower()
-                        if fname.startswith("cell-tree-export"):
-                            cell_tree_item = item
-                        elif fname.startswith("projectparameter_mongoose"):
+                        if fname.startswith("projectparameter_mongoose"):
                             full_params_item = item
-                
-                if not cell_tree_item:
-                    raise ValueError("未找到待规划小区文件 (文件名需以 cell-tree-export 开头)")
+
                 if not full_params_item:
                     raise ValueError("未找到全量工参文件 (文件名需以 ProjectParameter_mongoose 开头)")
-                
-                # 2. 加载待规划小区清单 (获取Source Keys)
-                logger.info(f"邻区规划: 加载待规划清单 {cell_tree_item.name}")
-                cell_tree_data = data_service.get_data(cell_tree_item.id)
-                target_cell_keys = set()
-                
-                # 解析清单
-                if isinstance(cell_tree_data, dict):
-                    if source_network_str in cell_tree_data:
-                        items = cell_tree_data[source_network_str]
-                        for site in items:
-                            site_id = site.get("id", "")
-                            for sector in site.get("sectors", []):
-                                sector_id = sector.get("id", "")
-                                # 逻辑同PCI: 尝试site_id_sector_id或直接sector_id
-                                if f"{site_id}_{site_id}" in sector_id:
-                                    real_sector_id = sector_id.split("_")[-1]
-                                    target_cell_keys.add(f"{site_id}_{real_sector_id}")
-                                else:
-                                    target_cell_keys.add(sector_id)
-                    else:
-                        raise ValueError(f"待规划清单中不包含 {source_network_str} 数据")
-                elif isinstance(cell_tree_data, list):
-                    for site in cell_tree_data:
-                        if site.get("networkType") == source_network_str:
-                            site_id = site.get("id", "")
-                            for sector in site.get("sectors", []):
-                                target_cell_keys.add(f"{site_id}_{sector.get('id', '')}")
-                
+
+                # 2. 确定待规划小区来源
+                if config.selectedCellIds and len(config.selectedCellIds) > 0:
+                    # 方式A：使用前端选中的小区
+                    logger.info(f"邻区规划: 使用前端选中的小区, 数量={len(config.selectedCellIds)}")
+                    target_cell_keys = set(config.selectedCellIds)
+                else:
+                    # 方式B：使用待规划小区文件（原有逻辑）
+                    for item in data_items:
+                        if item.type.value == "excel":
+                            fname = item.name.lower()
+                            if fname.startswith("cell-tree-export"):
+                                cell_tree_item = item
+
+                    if not cell_tree_item:
+                        raise ValueError("未找到待规划小区文件 (文件名需以 cell-tree-export 开头)")
+
+                    # 加载待规划小区清单 (获取Source Keys)
+                    logger.info(f"邻区规划: 加载待规划清单 {cell_tree_item.name}")
+                    cell_tree_data = data_service.get_data(cell_tree_item.id)
+
+                    # 解析清单
+                    if isinstance(cell_tree_data, dict):
+                        if source_network_str in cell_tree_data:
+                            items = cell_tree_data[source_network_str]
+                            for site in items:
+                                site_id = site.get("id", "")
+                                for sector in site.get("sectors", []):
+                                    sector_id = sector.get("id", "")
+                                    if f"{site_id}_{site_id}" in sector_id:
+                                        real_sector_id = sector_id.split("_")[-1]
+                                        target_cell_keys.add(f"{site_id}_{real_sector_id}")
+                                    else:
+                                        target_cell_keys.add(sector_id)
+                        else:
+                            raise ValueError(f"待规划清单中不包含 {source_network_str} 数据")
+                    elif isinstance(cell_tree_data, list):
+                        for site in cell_tree_data:
+                            if site.get("networkType") == source_network_str:
+                                site_id = site.get("id", "")
+                                for sector in site.get("sectors", []):
+                                    target_cell_keys.add(f"{site_id}_{sector.get('id', '')}")
+
                 logger.info(f"邻区规划: 待规划源小区数量: {len(target_cell_keys)}")
                 if not target_cell_keys:
                     raise ValueError(f"没有找到 {source_network_str} 类型的待规划小区")

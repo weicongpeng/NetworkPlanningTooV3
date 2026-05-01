@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { Play, Download, Settings, Loader2, AlertCircle, HelpCircle, Search, X, Ruler, GripVertical } from 'lucide-react'
+import { Play, Download, Settings, Loader2, AlertCircle, HelpCircle, Search, X, Ruler, GripVertical, Check } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 // 虚拟滚动配置
@@ -101,6 +101,16 @@ export function NeighborPage() {
     cannotConnect: t('neighbor.cannotConnect') || '无法连接到服务器，请检查网络连接或后端服务状态',
     retrying: t('neighbor.retrying') || '获取进度失败 ({{count}}/{{max}})，正在重试...',
     taskFailed2: t('neighbor.taskFailed2') || '规划任务失败',
+    // 小区选择相关
+    cellSelection: t('neighbor.cellSelection') || '小区选择',
+    selectAll: t('neighbor.selectAll') || '全选',
+    deselectAll: t('neighbor.deselectAll') || '取消全选',
+    clearSelections: t('neighbor.clearSelections') || '清空选择',
+    selectedCount: t('neighbor.selectedCount') || '已选中 {{count}} 个小区',
+    cellSearchPlaceholder: t('neighbor.cellSearchPlaceholder') || '搜索基站ID、小区ID或名称...',
+    noCells: t('neighbor.noCells') || '暂无小区数据',
+    loadingCells: t('neighbor.loadingCells') || '加载中...',
+    cellListSource: t('neighbor.cellListSource') || '数据源：{{type}} 小区',
     // 工具提示
     distanceFactorTooltip: t('neighbor.distanceFactorTooltip') || '覆盖圆距离系数：站点到覆盖圆心的距离系数，默认5/9(≈0.556)',
     radiusFactorTooltip: t('neighbor.radiusFactorTooltip') || '覆盖圆半径系数：覆盖半径系数，默认5/9(≈0.556)',
@@ -186,6 +196,16 @@ export function NeighborPage() {
   const [error, setError] = useState<string | null>(null)
   const [isLegendVisible, setIsLegendVisible] = useState(true)
   const [syncServiceInitialized, setSyncServiceInitialized] = useState(false)
+
+  // 左列页签状态：'cell-selection' | 'planning-result'
+  const [activeLeftTab, setActiveLeftTab] = useState<'cell-selection' | 'planning-result'>('planning-result')
+  // 选中的小区ID集合（格式：${siteId}_${sectorId}）
+  const [selectedCellIds, setSelectedCellIds] = useState<Set<string>>(new Set())
+  // 小区选择页搜索值
+  const [cellSearchValue, setCellSearchValue] = useState('')
+  // 小区列表数据（从地图服务获取）
+  const [cellListData, setCellListData] = useState<{ lte: RenderSectorData[]; nr: RenderSectorData[] }>({ lte: [], nr: [] })
+  const [cellListLoading, setCellListLoading] = useState(false)
 
   // 搜索状态
   const [searchValue, setSearchValue] = useState('')
@@ -284,12 +304,45 @@ export function NeighborPage() {
     }
   }, [latestNeighborTask])
 
+  // 将 SiteNeighborResult[] 转换为扁平的邻区关系列表
+  const buildFlatResults = useCallback((siteResults: any[]): any[] => {
+    const flat: any[] = []
+    siteResults.forEach((site: any) => {
+      const siteId = site.siteId || ''
+      ;(site.sectors || []).forEach((sector: any) => {
+        const sectorId = sector.sectorId || ''
+        const sectorName = sector.sectorName || ''
+        ;(sector.neighbors || []).forEach((neighbor: any) => {
+          // 解析 targetSector (格式: siteId_sectorId)
+          const targetParts = (neighbor.targetSector || '').split('_')
+          const targetCellId = targetParts[1] || ''
+          flat.push({
+            sourceSiteId: siteId,
+            sourceCellId: sectorId,
+            sourceCellName: sectorName,
+            sourceFrequency: '',
+            sourcePci: '',
+            targetSiteId: neighbor.targetSite || targetParts[0] || '',
+            targetCellId: targetCellId,
+            targetCellName: neighbor.targetSectorName || '',
+            targetFrequency: '',
+            targetPci: '',
+            distance: neighbor.distance ?? 0,
+            relationType: neighbor.relationType || 'LTE-LTE',
+          })
+        })
+      })
+    })
+    return flat
+  }, [])
+
   // 初始化filteredResults，确保taskResult加载时filteredResults有数据
   useEffect(() => {
     if (taskResult?.status === 'completed' && taskResult.results) {
-      setFilteredResults(taskResult.results)
+      const flatResults = buildFlatResults(taskResult.results)
+      setFilteredResults(flatResults)
     }
-  }, [taskResult?.status, taskResult?.results])
+  }, [taskResult?.status, taskResult?.results, buildFlatResults])
 
   // 初始化邻区数据同步服务（异步执行，不阻塞页面渲染）
   useEffect(() => {
@@ -466,12 +519,12 @@ export function NeighborPage() {
   // 处理规划结果搜索过滤
   useEffect(() => {
     if (taskResult?.status === 'completed' && taskResult.results) {
-      // 确保filteredResults始终有数据
+      // 将 SiteNeighborResult[] 转换为扁平的邻区关系列表
       const allResults = taskResult.results || []
-      
+
       if (resultSearchEnabled) {
         const hasActiveFilters = Object.values(resultSearchFilters).some(v => v.trim() !== '')
-        
+
         if (hasActiveFilters) {
           const filtered = allResults.filter((row: any) => {
             return (
@@ -501,7 +554,7 @@ export function NeighborPage() {
       // 任务未完成或没有结果时，清空filteredResults
       setFilteredResults([])
     }
-  }, [taskResult, resultSearchEnabled, resultSearchFilters])
+  }, [taskResult, resultSearchEnabled, resultSearchFilters, buildFlatResults])
 
   // 处理搜索输入变化
   const handleResultSearchChange = (field: string, value: string) => {
@@ -599,6 +652,70 @@ export function NeighborPage() {
     return clearPolling
   }, [taskId, localTaskResult, updateTaskProgress, completeTask, failTask])
 
+  // 加载小区列表数据（根据规划类型加载对应网络类型的扇区）
+  const loadCellList = useCallback(async () => {
+    const sourceType = config.planningType.split('-')[0] as 'LTE' | 'NR'
+    setCellListLoading(true)
+    try {
+      const { mapDataService } = await import('../services/mapDataService')
+      const mapData = await mapDataService.getMapData(12, false)
+      setCellListData({
+        lte: mapData.lteSectors || [],
+        nr: mapData.nrSectors || []
+      })
+    } catch (err) {
+      console.error('[NeighborPage] 加载小区列表失败:', err)
+    } finally {
+      setCellListLoading(false)
+    }
+  }, [config.planningType])
+
+  // 初始加载小区列表
+  useEffect(() => {
+    loadCellList()
+  }, [loadCellList])
+
+  // 切换单个小区选中状态
+  const toggleCellSelection = (cellId: string) => {
+    setSelectedCellIds(prev => {
+      const next = new Set(prev)
+      if (next.has(cellId)) {
+        next.delete(cellId)
+      } else {
+        next.add(cellId)
+      }
+      return next
+    })
+  }
+
+  // 全选/取消全选当前网络类型的小区
+  const toggleSelectAll = () => {
+    const sourceType = config.planningType.split('-')[0] as 'LTE' | 'NR'
+    const sectors = sourceType === 'LTE' ? cellListData.lte : cellListData.nr
+    const allIds = sectors.map(s => s.id)
+    const allSelected = allIds.every(id => selectedCellIds.has(id))
+    if (allSelected) {
+      // 取消全选：从选中集合中移除当前网络类型的所有小区
+      setSelectedCellIds(prev => {
+        const next = new Set(prev)
+        allIds.forEach(id => next.delete(id))
+        return next
+      })
+    } else {
+      // 全选：添加所有当前网络类型的小区
+      setSelectedCellIds(prev => {
+        const next = new Set(prev)
+        allIds.forEach(id => next.add(id))
+        return next
+      })
+    }
+  }
+
+  // 清空所有选中
+  const clearSelections = () => {
+    setSelectedCellIds(new Set())
+  }
+
   const handleRunNeighbor = async () => {
     // 前端验证配置参数
     const validationError = validateNeighborConfig(config)
@@ -620,7 +737,8 @@ export function NeighborPage() {
         planningType: config.planningType as 'LTE-LTE' | 'NR-NR' | 'NR-LTE',
         maxNeighbors: config.maxNeighbors,
         coverageDistanceFactor: config.coverageDistanceFactor,
-        coverageRadiusFactor: config.coverageRadiusFactor
+        coverageRadiusFactor: config.coverageRadiusFactor,
+        selectedCellIds: selectedCellIds.size > 0 ? Array.from(selectedCellIds) : undefined
       })
 
       if (response.success && response.data) {
@@ -1056,83 +1174,224 @@ export function NeighborPage() {
             )}
           </div>
 
-          {/* 规划结果面板 */}
+          {/* 小区选择与结果面板（页签切换） */}
           <div className="bg-card p-3 rounded-lg border border-border flex flex-col flex-1 min-h-0 overflow-hidden">
-            {/* 标题行 + 统计卡片 */}
-            <div className="flex items-center gap-3 mb-3 flex-wrap">
-              <h2 className="text-base font-semibold">{i18n.result}</h2>
-
-              {/* 统计卡片 - 与标题同行 */}
-              {taskResult?.status === 'completed' && (
-                <>
-                  <div className="flex gap-2">
-                    <CompactStatCard title={i18n.siteCount} value={taskResult.totalSites || 0} />
-                    <CompactStatCard title={i18n.cellCount} value={taskResult.totalSectors || 0} />
-                    <CompactStatCard title={i18n.neighborCount} value={taskResult.totalNeighbors || 0} />
-                    <CompactStatCard title={i18n.avgNeighbors} value={taskResult.avgNeighbors || 0} />
-                  </div>
-                  <div className="flex items-center gap-3 ml-auto">
-                    <button
-                      onClick={() => setResultSearchEnabled(!resultSearchEnabled)}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-xs font-medium ${
-                        resultSearchEnabled
-                          ? 'bg-blue-400 text-white hover:bg-blue-500'
-                          : 'bg-card border border-border hover:bg-muted/80'
-                      }`}
-                    >
-                      <Search size={14} />
-                      {i18n.search}
-                    </button>
-                    <button
-                      onClick={handleExport}
-                      className="flex items-center justify-center gap-2 px-3 py-1.5 bg-card border border-border rounded-lg hover:bg-muted/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium whitespace-nowrap"
-                    >
-                      <Download size={14} />
-                      {i18n.export}
-                    </button>
-                  </div>
-                </>
-              )}
+            {/* 页签切换栏 */}
+            <div className="flex items-center gap-1 mb-3 border-b border-border">
+              <button
+                onClick={() => setActiveLeftTab('cell-selection')}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+                  activeLeftTab === 'cell-selection'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {i18n.cellSelection}
+                {selectedCellIds.size > 0 && (
+                  <span className="ml-2 px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">
+                    {selectedCellIds.size}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setActiveLeftTab('planning-result')}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+                  activeLeftTab === 'planning-result'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {i18n.result}
+                {taskResult?.status === 'completed' && (
+                  <span className="ml-2 px-1.5 py-0.5 text-xs bg-green-100 text-green-700 rounded-full">
+                    ✓
+                  </span>
+                )}
+              </button>
             </div>
 
-            {!taskResult ? (
-              <div className="text-center py-16 text-muted-foreground">
-                <Settings size={48} className="mx-auto mb-4 opacity-50" />
-                <p>{i18n.configTip}</p>
-                <p className="text-xs mt-2">{i18n.needUpload}</p>
-              </div>
-            ) : taskResult.status === 'failed' ? (
-              <div className="text-center py-16 text-red-500">
-                <AlertCircle size={48} className="mx-auto mb-4" />
-                <p className="font-semibold">{i18n.taskFailed}</p>
-              </div>
-            ) : taskResult.status === 'completed' ? (
-              <>
-                {/* 结果表格 */}
-                {taskResult.results && taskResult.results.length > 0 ? (
-                  <NeighborTable
-                    results={filteredResults}
-                    onSourceSectorClick={handleSourceSectorClick}
-                    selectedSectorKey={selectedSourceSector?.sourceKey || null}
-                    searchEnabled={resultSearchEnabled}
-                    searchFilters={resultSearchFilters}
-                    onSearchChange={handleResultSearchChange}
-                    columnWidths={neighborColumnWidths}
-                    resizingColumn={neighborResizingColumn}
-                    onResizeStart={handleNeighborResizeStart}
-                  />
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <p>{i18n.noResult}</p>
+            {/* 页签内容 */}
+            <div className="flex-1 min-h-0 overflow-hidden">
+              {activeLeftTab === 'cell-selection' ? (
+                /* 小区选择面板 */
+                <div className="flex flex-col h-full overflow-hidden">
+                  {/* 工具栏：搜索、全选、清空 */}
+                  <div className="flex items-center gap-2 mb-2 shrink-0">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" size={14} />
+                      <input
+                        type="text"
+                        value={cellSearchValue}
+                        onChange={(e) => setCellSearchValue(e.target.value)}
+                        placeholder={i18n.cellSearchPlaceholder}
+                        className="w-full pl-8 pr-3 py-1.5 text-xs bg-background border border-border rounded-lg focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
+                    <button
+                      onClick={toggleSelectAll}
+                      className="px-2 py-1.5 text-xs bg-card border border-border rounded-lg hover:bg-muted/80 transition-colors shrink-0"
+                    >
+                      {(() => {
+                        const sourceType = config.planningType.split('-')[0] as 'LTE' | 'NR'
+                        const sectors = sourceType === 'LTE' ? cellListData.lte : cellListData.nr
+                        const allSelected = sectors.length > 0 && sectors.every(s => selectedCellIds.has(s.id))
+                        return allSelected ? i18n.deselectAll : i18n.selectAll
+                      })()}
+                    </button>
+                    <button
+                      onClick={clearSelections}
+                      className="px-2 py-1.5 text-xs bg-card border border-border rounded-lg hover:bg-muted/80 transition-colors shrink-0"
+                    >
+                      {i18n.clearSelections}
+                    </button>
+                    <span className="text-xs text-muted-foreground ml-auto shrink-0">
+                      {i18n.selectedCount.replace('{{count}}', String(selectedCellIds.size))}
+                    </span>
                   </div>
-                )}
-              </>
-            ) : (
-              <div className="text-center py-16 text-muted-foreground">
-                <Loader2 className="animate-spin mx-auto mb-4" size={48} />
-                <p>{i18n.planningInProgress}</p>
-              </div>
-            )}
+
+                  {/* 数据源提示 */}
+                  <div className="text-xs text-muted-foreground mb-2 shrink-0">
+                    {i18n.cellListSource.replace('{{type}}', config.planningType.split('-')[0])}
+                  </div>
+
+                  {/* 小区列表 */}
+                  {cellListLoading ? (
+                    <div className="flex-1 flex items-center justify-center text-muted-foreground">
+                      <Loader2 className="animate-spin" size={24} />
+                      <span className="ml-2 text-sm">{i18n.loadingCells}</span>
+                    </div>
+                  ) : (
+                    (() => {
+                      const sourceType = config.planningType.split('-')[0] as 'LTE' | 'NR'
+                      const sectors = sourceType === 'LTE' ? cellListData.lte : cellListData.nr
+                      const filtered = cellSearchValue
+                        ? sectors.filter(s =>
+                            s.siteId?.includes(cellSearchValue) ||
+                            s.id.includes(cellSearchValue) ||
+                            s.name.includes(cellSearchValue)
+                          )
+                        : sectors
+
+                      if (filtered.length === 0) {
+                        return (
+                          <div className="flex-1 flex items-center justify-center text-muted-foreground">
+                            <p>{i18n.noCells}</p>
+                          </div>
+                        )
+                      }
+
+                      return (
+                        <div className="flex-1 overflow-y-auto space-y-0.5">
+                          {filtered.map(sector => (
+                            <div
+                              key={sector.id}
+                              onClick={() => toggleCellSelection(sector.id)}
+                              className={`flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-colors text-xs ${
+                                selectedCellIds.has(sector.id)
+                                  ? 'bg-blue-50 border border-blue-200'
+                                  : 'hover:bg-muted/50 border border-transparent'
+                              }`}
+                            >
+                              <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
+                                selectedCellIds.has(sector.id)
+                                  ? 'bg-blue-500 border-blue-500'
+                                  : 'border-border'
+                              }`}>
+                                {selectedCellIds.has(sector.id) && (
+                                  <Check size={12} className="text-white" />
+                                )}
+                              </div>
+                              <span className="font-mono w-20 truncate" title={sector.siteId || 'N/A'}>{sector.siteId || 'N/A'}</span>
+                              <span className="font-mono w-20 truncate" title={sector.id.split('_').pop() || sector.id}>
+                                {sector.id.split('_').pop() || sector.id}
+                              </span>
+                              <span className="flex-1 truncate" title={sector.name}>{sector.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    })()
+                  )}
+                </div>
+              ) : (
+                /* 规划结果面板（原内容） */
+                <div className="flex flex-col h-full overflow-hidden">
+                  {/* 标题行 + 统计卡片 */}
+                  <div className="flex items-center gap-3 mb-3 flex-wrap shrink-0">
+                    {taskResult?.status === 'completed' && (
+                      <>
+                        <div className="flex gap-2">
+                          <CompactStatCard title={i18n.siteCount} value={taskResult.totalSites || 0} />
+                          <CompactStatCard title={i18n.cellCount} value={taskResult.totalSectors || 0} />
+                          <CompactStatCard title={i18n.neighborCount} value={taskResult.totalNeighbors || 0} />
+                          <CompactStatCard title={i18n.avgNeighbors} value={taskResult.avgNeighbors || 0} />
+                        </div>
+                        <div className="flex items-center gap-3 ml-auto">
+                          <button
+                            onClick={() => setResultSearchEnabled(!resultSearchEnabled)}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-xs font-medium ${
+                              resultSearchEnabled
+                                ? 'bg-blue-400 text-white hover:bg-blue-500'
+                                : 'bg-card border border-border hover:bg-muted/80'
+                            }`}
+                          >
+                            <Search size={14} />
+                            {i18n.search}
+                          </button>
+                          <button
+                            onClick={handleExport}
+                            className="flex items-center justify-center gap-2 px-3 py-1.5 bg-card border border-border rounded-lg hover:bg-muted/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium whitespace-nowrap"
+                          >
+                            <Download size={14} />
+                            {i18n.export}
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {!taskResult ? (
+                    <div className="flex-1 flex items-center justify-center text-muted-foreground">
+                      <Settings size={48} className="mx-auto mb-4 opacity-50" />
+                      <div className="text-center">
+                        <p>{i18n.configTip}</p>
+                        <p className="text-xs mt-2">{i18n.needUpload}</p>
+                      </div>
+                    </div>
+                  ) : taskResult.status === 'failed' ? (
+                    <div className="flex-1 flex items-center justify-center text-red-500">
+                      <AlertCircle size={48} className="mx-auto mb-4" />
+                      <p className="font-semibold">{i18n.taskFailed}</p>
+                    </div>
+                  ) : taskResult.status === 'completed' ? (
+                    <div className="flex-1 overflow-hidden">
+                      {taskResult.results && taskResult.results.length > 0 ? (
+                        <NeighborTable
+                          results={filteredResults}
+                          onSourceSectorClick={handleSourceSectorClick}
+                          selectedSectorKey={selectedSourceSector?.sourceKey || null}
+                          searchEnabled={resultSearchEnabled}
+                          searchFilters={resultSearchFilters}
+                          onSearchChange={handleResultSearchChange}
+                          columnWidths={neighborColumnWidths}
+                          resizingColumn={neighborResizingColumn}
+                          onResizeStart={handleNeighborResizeStart}
+                        />
+                      ) : (
+                        <div className="flex items-center justify-center h-full text-muted-foreground">
+                          <p>{i18n.noResult}</p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center text-muted-foreground">
+                      <Loader2 className="animate-spin mx-auto mb-4" size={48} />
+                      <p>{i18n.planningInProgress}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

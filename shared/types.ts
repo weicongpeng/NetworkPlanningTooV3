@@ -149,6 +149,7 @@ export interface NeighborConfig {
   coverageDistanceFactor: number  // 覆盖圆距离系数
   coverageRadiusFactor: number    // 覆盖圆半径系数
   customRules?: NeighborRule[]
+  selectedCellIds?: string[]  // 选中的小区ID列表（格式：siteId_sectorId）
 }
 
 export interface NeighborRule {

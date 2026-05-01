@@ -321,6 +321,10 @@ class NeighborConfig(BaseModel):
         description="覆盖圆半径系数(m)，范围0.1-2.0，默认5/9≈0.556"
     )
     customRules: Optional[List[Dict[str, Any]]] = None
+    selectedCellIds: Optional[List[str]] = Field(
+        default=None,
+        description="前端选中的小区ID列表（格式：siteId_sectorId）。如有值则不使用待规划小区文件，直接使用选中的小区进行规划"
+    )
 
     @field_validator('planningType')
     @classmethod

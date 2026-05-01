@@ -368,7 +368,17 @@
     "hideLegend": "隐藏图例",
     "sourceCellLegend": "源小区",
     "targetCellLegend": "目标小区",
-    "otherCellLegend": "其他小区"
+    "otherCellLegend": "其他小区",
+    "cellSelection": "小区选择",
+    "selectAll": "全选",
+    "deselectAll": "取消全选",
+    "clearSelections": "清空选择",
+    "selectedCount": "已选中 {{count}} 个小区",
+    "cellSearchPlaceholder": "搜索基站ID、小区ID或名称...",
+    "noCells": "暂无小区数据",
+    "loadingCells": "加载中...",
+    "cellListSource": "数据源：{{type}} 小区",
+    "startTaskMsg": "邻区规划开始"
   },
   "tac": {
     "title": "TAC核查",

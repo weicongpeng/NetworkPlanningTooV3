@@ -368,7 +368,17 @@
     "hideLegend": "Hide Legend",
     "sourceCellLegend": "Source Cell",
     "targetCellLegend": "Target Cell",
-    "otherCellLegend": "Other Cells"
+    "otherCellLegend": "Other Cells",
+    "cellSelection": "Cell Selection",
+    "selectAll": "Select All",
+    "deselectAll": "Deselect All",
+    "clearSelections": "Clear Selections",
+    "selectedCount": "{{count}} cells selected",
+    "cellSearchPlaceholder": "Search site ID, cell ID or name...",
+    "noCells": "No cell data available",
+    "loadingCells": "Loading...",
+    "cellListSource": "Data source: {{type}} cells",
+    "startTaskMsg": "Neighbor planning started"
   },
   "tac": {
     "title": "TAC Check",
