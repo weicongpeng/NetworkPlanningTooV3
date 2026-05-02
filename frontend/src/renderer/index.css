@@ -70,7 +70,17 @@
 
 /* Leaflet地图样式覆盖 */
 .leaflet-container {
-  background: #1e293b;
+  background: #f0f2f5;
+}
+
+/* 瓦片缩放渲染优化 - 防止 zoom 过程中出现黑色块状拖影 */
+.leaflet-tile {
+  image-rendering: auto;
+  will-change: auto;
+}
+.leaflet-layer {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 /* 打点标记标签样式 - 确保标签框正确包裹文字 */

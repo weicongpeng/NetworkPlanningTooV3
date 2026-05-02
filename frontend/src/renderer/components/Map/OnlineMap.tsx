@@ -26,6 +26,29 @@ import { GeoDataLayerManager, GeoDataItem } from './GeoDataLayer'
 import { layerApi, dataApi } from '../../services/api'
 
 console.log('🔥🔥🔥 OnlineMap.tsx 已加载 (2025-01-27-v3) 🔥🔥🔥')
+
+// ========== 共享地图实例缓存 ==========
+// 跨页面复用 Leaflet 地图实例，避免页面切换时地图销毁重建导致瓦片重载
+// 原理：在组件内创建独立容器 div（非React管理），unmount 时分离到隐藏存储，remount 时恢复
+interface SharedMapCache {
+  map: L.Map | null
+  tileLayer: L.TileLayer | null
+  leafletContainer: HTMLDivElement | null  // Leaflet 实际使用的容器元素
+  mapLayerType: MapLayerType
+}
+let __sharedMapCache: SharedMapCache = {
+  map: null, tileLayer: null, leafletContainer: null, mapLayerType: 'roadmap'
+}
+let __sharedHiddenContainer: HTMLDivElement | null = null
+// 模块级共享 ref —— 地图缓存后，事件监听器闭包仍引用旧组件的 useRef 对象
+// 使用模块级对象确保所有组件实例读写同一个 ref，解决跨实例闭包问题
+const __sharedCaptureModeRef: { current: boolean } = { current: false }
+const __sharedMeasureModeRef: { current: boolean } = { current: false }
+const __sharedMeasurePointsRef: { current: Array<{ lng: number; lat: number }> } = { current: [] }
+const __sharedFinishMeasurementRef: { current: (() => void) | null } = { current: null }
+const __sharedHandleMapClickRef: { current: ((event: any) => void) | null } = { current: null }
+// =====================================
+
 import { mapStateService } from '../../services/mapStateService'
 import { SectorSVGLayer, PCIHighlightConfig, TACHighlightConfig, NeighborHighlightConfig, SectorLabelConfig } from './SectorRendererSVG'
 import { pciDataSyncService } from '../../services/pciDataSyncService'
@@ -471,7 +494,9 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
     panelVisible,
     clickPosition,
     showSectorInfo,
-    hideSectorInfo
+    hideSectorInfo,
+    onPanelMouseEnter,
+    onPanelMouseLeave
   } = useSectorInfoPanel()
 
   // 要素信息面板 (MapInfo/地理化点文件)
@@ -748,15 +773,18 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
       if (!mapInstanceRef.current || !tileLayerRef.current) return
 
       if (visible) {
-        // 显示底图
+        // 显示底图：恢复瓦片图层，清除 Leaflet 容器背景色
         if (!mapInstanceRef.current.hasLayer(tileLayerRef.current)) {
           tileLayerRef.current.addTo(mapInstanceRef.current)
         }
+        mapInstanceRef.current.getContainer().style.backgroundColor = ''
       } else {
-        // 隐藏底图
+        // 空地图模式：隐藏瓦片图层，设置 Leaflet 容器背景为白色
         if (mapInstanceRef.current.hasLayer(tileLayerRef.current)) {
           mapInstanceRef.current.removeLayer(tileLayerRef.current)
         }
+        // 直接在 Leaflet 容器上设置白色背景，避免默认灰色透出
+        mapInstanceRef.current.getContainer().style.backgroundColor = '#ffffff'
       }
     },
 
@@ -1894,25 +1922,23 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
     // 清理中间状态的线条，只保留最后一条完整的线
     // 在测量过程中，每次点击都会添加一条包含所有点的折线
     // 现在需要清理之前的中间状态线，只保留最后一条
-    const lineStartIndex = measurementLineStartIndexRef.current
+    const savedLineStartIndex = measurementLineStartIndexRef.current
     const currentLineCount = measurementLinesRef.current.length
 
     // 移除除最后一条外的所有中间状态线
-    for (let i = lineStartIndex; i < currentLineCount - 1; i++) {
+    for (let i = savedLineStartIndex; i < currentLineCount - 1; i++) {
       const line = measurementLinesRef.current[i]
       if (line) map.removeLayer(line)
     }
     // 只保留最后一条线
-    if (currentLineCount > lineStartIndex) {
+    if (currentLineCount > savedLineStartIndex) {
       const lastLine = measurementLinesRef.current[currentLineCount - 1]
       measurementLinesRef.current = [
-        ...measurementLinesRef.current.slice(0, lineStartIndex),
+        ...measurementLinesRef.current.slice(0, savedLineStartIndex),
         lastLine
       ]
     }
 
-    // 记录当前测量的线条（直接存储引用，而不是索引）
-    const currentMeasurementLine = measurementLinesRef.current[measurementLinesRef.current.length - 1]
 
     // 记录当前测量添加的所有标记引用
     // 在 finishMeasurement 被调用时，measurementMarkersRef 中已经包含了：
@@ -1969,29 +1995,36 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
       e.stopPropagation()
       e.preventDefault()
 
-      // 移除当前测量的线条
-      if (currentMeasurementLine) {
-        map.removeLayer(currentMeasurementLine)
-        const lineIndex = measurementLinesRef.current.indexOf(currentMeasurementLine)
-        if (lineIndex > -1) {
-          measurementLinesRef.current.splice(lineIndex, 1)
-        }
+      // 移除从 savedLineStartIndex 开始的所有测量线条（包括最终线和中间线）
+      const lineEndIdx = measurementLinesRef.current.length
+      for (let i = lineEndIdx - 1; i >= savedLineStartIndex; i--) {
+        const line = measurementLinesRef.current[i]
+        if (line) map.removeLayer(line)
       }
+      measurementLinesRef.current.splice(savedLineStartIndex, lineEndIdx - savedLineStartIndex)
 
       // 使用记录的标记起始索引，精确移除当前测量的所有标记
-      const markerStartIdx = markerStartIndex
       const markerEndIdx = measurementMarkersRef.current.length
-      for (let i = markerEndIdx - 1; i >= markerStartIdx; i--) {
+      for (let i = markerEndIdx - 1; i >= markerStartIndex; i--) {
         const m = measurementMarkersRef.current[i]
-        if (m) {
-          map.removeLayer(m)
-        }
+        if (m) map.removeLayer(m)
       }
-      measurementMarkersRef.current.splice(markerStartIdx, markerEndIdx - markerStartIdx)
+      measurementMarkersRef.current.splice(markerStartIndex, markerEndIdx - markerStartIndex)
 
       // 重置起始索引为当前数组长度（删除后数组已更新）
       measurementLineStartIndexRef.current = measurementLinesRef.current.length
       measurementMarkerStartIndexRef.current = measurementMarkersRef.current.length
+
+      // 清除预览虚线和标签（双击结束测量时由 finishMeasurement 清理，
+      // 但点击删除按钮不会触发 finishMeasurement，需要手动清理）
+      if (shadowLineRef.current) {
+        map.removeLayer(shadowLineRef.current)
+        shadowLineRef.current = null
+      }
+      if (shadowLabelRef.current) {
+        map.removeLayer(shadowLabelRef.current)
+        shadowLabelRef.current = null
+      }
     })
 
     // 更新线条起始索引，为下一次测量做准备
@@ -2658,7 +2691,6 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
         await loadLeaflet()
 
         const L = leafletRef.current
-        const savedState = mapStateService.getState()
         const container = mapRef.current
 
         if (!container) {
@@ -2669,15 +2701,83 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
           return
         }
 
-        // 检查并清理已初始化的容器
+        // === 共享地图实例复用 ===
+        const cached = __sharedMapCache
+        if (cached.map && cached.leafletContainer) {
+          // 缓存的 Leaflet 容器存在，移到当前组件容器中复用
+          const leafletContainer = cached.leafletContainer
+          if (__sharedHiddenContainer && __sharedHiddenContainer.contains(leafletContainer)) {
+            container.appendChild(leafletContainer)
+          } else if (!container.contains(leafletContainer)) {
+            container.appendChild(leafletContainer)
+          }
+
+          // 恢复地图引用
+          mapInstanceRef.current = cached.map
+          tileLayerRef.current = cached.tileLayer
+          initializedRef.current = true
+          isInitializingRef.current = false
+
+          // 恢复地图状态
+          const savedState = mapStateService.getState()
+          cached.map.setView(savedState.center, savedState.zoom)
+          cached.map.invalidateSize()
+
+          // 重置光标为默认，避免上一页面遗留的手型/十字光标
+          cached.map.getContainer().style.cursor = ''
+          cached.map.dragging.enable()
+          cached.map.doubleClickZoom.enable()
+
+          // 确保缓存的瓦片图层有 load 事件监听（首次初始化时通过 mapLayerType 变化添加）
+          if (cached.tileLayer && !(cached.tileLayer as any).__reuseListenerAttached) {
+            cached.tileLayer.on('load', () => {
+              hasLoadedAnyTileRef.current = true
+              hasNetworkErrorRef.current = false
+              if (networkError.visible) {
+                setNetworkError(prev => ({ ...prev, visible: false }))
+              }
+            })
+            ;(cached.tileLayer as any).__reuseListenerAttached = true
+          }
+
+          // 重新初始化各管理器
+          if (!mapInfoLayerManagerRef.current) {
+            const manager = new MapInfoLayerManager()
+            manager.setMap(cached.map)
+            mapInfoLayerManagerRef.current = manager
+          }
+          if (!geoDataLayerManagerRef.current) {
+            const geoManager = new GeoDataLayerManager()
+            geoManager.init(cached.map)
+            geoDataLayerManagerRef.current = geoManager
+          }
+
+          // 加载扇区数据（触发扇区图层重建）
+          await loadSectorData()
+
+          setLoading(false)
+          setIsMapInitialized(true)
+          return
+        }
+        // ============================
+
+        const savedState = mapStateService.getState()
+
+        // 创建子容器（独立的DOM元素，组件卸载时可移动到隐藏存储保持存活）
+        const leafletContainer = document.createElement('div')
+        leafletContainer.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%;'
+        container.appendChild(leafletContainer)
+
+        // 检查并清理已初始化的容器（遗留保护）
         const hasLeafletMap = container.querySelector('.leaflet-container')
         if (hasLeafletMap) {
           console.log('[OnlineMap] 检测到旧的地图实例，清理容器')
           container.innerHTML = ''
+          container.appendChild(leafletContainer)
         }
 
         // 创建地图实例
-        const map = L.map(container, {
+        const map = L.map(leafletContainer, {
           ...L.Map.prototype.options,
           zoomControl: false,
           attributionControl: false, // 禁用版权标签
@@ -2694,18 +2794,18 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
         // 设置默认光标
         map.getContainer().style.cursor = 'default'
 
-        // 添加测量模式下的十字光标和预览线
+        // 添加测量模式下的十字光标和预览线（使用模块级共享 ref）
         map.on('mousemove', (e: L.LeafletMouseEvent) => {
-          if (captureModeRef.current) {
+          if (__sharedCaptureModeRef.current) {
             map.getContainer().style.cursor = 'crosshair'
             return
           }
-          if (measureModeRef.current) {
+          if (__sharedMeasureModeRef.current) {
             map.getContainer().style.cursor = 'crosshair'
 
             // 如果已经有至少一个点，显示跟随鼠标的虚线
-            if (measurePointsRef.current.length > 0) {
-              const lastPoint = measurePointsRef.current[measurePointsRef.current.length - 1]
+            if (__sharedMeasurePointsRef.current.length > 0) {
+              const lastPoint = __sharedMeasurePointsRef.current[__sharedMeasurePointsRef.current.length - 1]
               const mouseLatLng = e.latlng
 
               // 更新虚线
@@ -2726,8 +2826,8 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
 
               // 更新悬浮距离标签
               let totalDist = 0
-              for (let i = 0; i < measurePointsRef.current.length - 1; i++) {
-                totalDist += calculateDistance(measurePointsRef.current[i].lat, measurePointsRef.current[i].lng, measurePointsRef.current[i + 1].lat, measurePointsRef.current[i + 1].lng)
+              for (let i = 0; i < __sharedMeasurePointsRef.current.length - 1; i++) {
+                totalDist += calculateDistance(__sharedMeasurePointsRef.current[i].lat, __sharedMeasurePointsRef.current[i].lng, __sharedMeasurePointsRef.current[i + 1].lat, __sharedMeasurePointsRef.current[i + 1].lng)
               }
               const lastSegment = calculateDistance(lastPoint.lat, lastPoint.lng, mouseLatLng.lat, mouseLatLng.lng)
               const currentTotal = totalDist + lastSegment
@@ -2761,12 +2861,12 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
           }
         })
 
-        // 监听双击事件结束测量
+        // 监听双击事件结束测量（使用模块级共享 ref）
         map.on('dblclick', (e: L.LeafletMouseEvent) => {
-          if (measureModeRef.current) {
+          if (__sharedMeasureModeRef.current) {
             // 禁止双击缩放
             e.originalEvent.stopPropagation()
-            finishMeasurementRef.current()
+            __sharedFinishMeasurementRef.current?.()
           }
         })
 
@@ -2776,8 +2876,17 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
           attribution: '&copy; <a href="https://www.amap.com/">高德地图</a>',
           maxZoom: 18,
           minZoom: 3,
-          preferCanvas: true  // 🔥 使用 Canvas 渲染器而非 DOM/SVG，提升瓦片渲染性能
+          crossOrigin: 'anonymous',  // 跨域标识，与 Canvas 配合防止渲染拖影
         }).addTo(map)
+
+        // 监听瓦片加载事件（用于检测网络恢复），直接在首次创建时添加
+        tileLayer.on('load', () => {
+          hasLoadedAnyTileRef.current = true
+          hasNetworkErrorRef.current = false
+          if (networkError.visible) {
+            setNetworkError(prev => ({ ...prev, visible: false }))
+          }
+        })
 
         // 监听浏览器网络状态变化（仅依赖系统级事件）
         const handleOnline = () => {
@@ -2816,6 +2925,14 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
         tileLayerRef.current = tileLayer
         mapInstanceRef.current = map
 
+        // 保存地图实例到共享缓存（后续页面切换可复用）
+        __sharedMapCache = {
+          map: map,
+          tileLayer: tileLayer,
+          leafletContainer: leafletContainer,
+          mapLayerType: savedState.mapLayerType,
+        }
+
         // 监听地图移动和缩放
         const saveMapState = () => {
           const center = map.getCenter()
@@ -2829,9 +2946,9 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
         map.on('moveend', saveMapState)
         map.on('zoomend', saveMapState)
 
-        // 监听地图点击事件，点击其他区域时隐藏扇区信息面板
+        // 监听地图点击事件（使用模块级共享 ref，跨组件实例保持最新）
         map.on('click', (event: L.LeafletMouseEvent) => {
-          handleMapClickRef.current(event)
+          __sharedHandleMapClickRef.current?.(event)
         })
 
         // 监听地图右键事件，用于结束测量
@@ -2888,20 +3005,131 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
     initMap()
 
     return () => {
-      // 清理地图实例
+      // === 步骤一：优先清理各页面特有的数据图层（必须使用 map.removeLayer） ===
+      // 必须在 mapInstanceRef 置空前完成，否则无法从 Leaflet 地图上移除图层
+      // 解决：页面切换时旧扇区图层残留导致的 ① 图层污染 ② 性能累积退化
       if (mapInstanceRef.current) {
-        try {
-          mapInstanceRef.current.remove()
-        } catch (e) {
-          // 忽略清理错误
+        const map = mapInstanceRef.current
+
+        // 1. 移除扇区 SVG 图层（每个页面的 mode 不同，必须完全重建）
+        if (lteSectorLayerRef.current) {
+          try { map.removeLayer(lteSectorLayerRef.current) } catch (e) { /* ignore */ }
+          lteSectorLayerRef.current = null
         }
-        mapInstanceRef.current = null
+        if (nrSectorLayerRef.current) {
+          try { map.removeLayer(nrSectorLayerRef.current) } catch (e) { /* ignore */ }
+          nrSectorLayerRef.current = null
+        }
+
+        // 2. 清理各管理器维护的图层（点位图、MapInfo 等）
+        if (mapInfoLayerManagerRef.current) {
+          mapInfoLayerManagerRef.current.clear()
+          mapInfoLayerManagerRef.current = null
+        }
+        if (geoDataLayerManagerRef.current) {
+          geoDataLayerManagerRef.current.clear()
+          geoDataLayerManagerRef.current = null
+        }
+        loadedMapInfoLayersRef.current.clear()
+        mapInfoLayerRefsRef.current.clear()
+
+        // 3. 清理打点标记和装饰图层（MapPage 专用，需跨页面清除以免污染）
+        // 打点标记 (capture markers)
+        captureMarkersRef.current.forEach(marker => {
+          try { map.removeLayer(marker) } catch (e) { /* ignore */ }
+        })
+        captureMarkersRef.current = []
+        // 打点标签
+        markerLabelElementsRef.current.forEach(labelMarker => {
+          try { map.removeLayer(labelMarker) } catch (e) { /* ignore */ }
+        })
+        markerLabelElementsRef.current.clear()
+        markerLabelsRef.current.clear()
+        // 定位标记 (search location)
+        locationMarkersRef.current.forEach(marker => {
+          try { map.removeLayer(marker) } catch (e) { /* ignore */ }
+        })
+        locationMarkersRef.current = []
+        // 装饰图层
+        if (decorationLayerRef.current) {
+          try { map.removeLayer(decorationLayerRef.current) } catch (e) { /* ignore */ }
+          decorationLayerRef.current = null
+        }
+
+        // 4. 清理测距痕迹（线条、标记、预览线），避免跨页面残留
+        measurementLinesRef.current.forEach(line => {
+          try { map.removeLayer(line) } catch (e) { /* ignore */ }
+        })
+        measurementLinesRef.current = []
+        measurementMarkersRef.current.forEach(marker => {
+          try { map.removeLayer(marker) } catch (e) { /* ignore */ }
+        })
+        measurementMarkersRef.current = []
+        if (measurementDistanceRef.current) {
+          try { map.removeLayer(measurementDistanceRef.current) } catch (e) { /* ignore */ }
+          measurementDistanceRef.current = null
+        }
+        if (shadowLineRef.current) {
+          try { map.removeLayer(shadowLineRef.current) } catch (e) { /* ignore */ }
+          shadowLineRef.current = null
+        }
+        if (shadowLabelRef.current) {
+          try { map.removeLayer(shadowLabelRef.current) } catch (e) { /* ignore */ }
+          shadowLabelRef.current = null
+        }
+        measurementLineStartIndexRef.current = 0
+        measurementMarkerStartIndexRef.current = 0
+        // 清除搜索标记
+        searchMarkerRef.current.forEach(marker => {
+          try { map.removeLayer(marker) } catch (e) { /* ignore */ }
+        })
+        searchMarkerRef.current = []
+
+        // === 步骤二：缓存地图实例（瓦片图层保持存活，仅移除数据图层） ===
+        if (tileLayerRef.current) {
+          const tileLayer = tileLayerRef.current
+          const leafletContainer = map.getContainer()
+          const center = map.getCenter()
+          const zoom = map.getZoom()
+
+          // 将 Leaflet 容器从当前组件 DOM 中分离，移到隐藏存储区域
+          if (leafletContainer.parentNode) {
+            leafletContainer.parentNode.removeChild(leafletContainer)
+          }
+          if (!__sharedHiddenContainer) {
+            __sharedHiddenContainer = document.createElement('div')
+            __sharedHiddenContainer.style.display = 'none'
+            document.body.appendChild(__sharedHiddenContainer)
+          }
+          __sharedHiddenContainer.appendChild(leafletContainer)
+
+          // 保存缓存（仅缓存底层地图和瓦片，数据图层已在上面清理）
+          __sharedMapCache = {
+            map: map,
+            tileLayer: tileLayer,
+            leafletContainer: leafletContainer,
+            mapLayerType: mapLayerType,
+          }
+
+          // 保存地图状态到 mapStateService
+          mapStateService.setState({
+            center: [center.lat, center.lng] as [number, number],
+            zoom: zoom,
+            mapLayerType: mapLayerType,
+          })
+        }
       }
+
+      // === 步骤三：清理 React ref 和浏览器级资源 ===
+      mapInstanceRef.current = null
+      tileLayerRef.current = null
+
       // 清理瓦片加载超时定时器
       if (tileLoadTimeoutRef.current) {
         clearTimeout(tileLoadTimeoutRef.current)
         tileLoadTimeoutRef.current = null
       }
+
       // 清理网络事件监听器和定时器
       if (networkEventListenersRef.current) {
         if (networkEventListenersRef.current.cleanup) {
@@ -2913,25 +3141,13 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
         }
         networkEventListenersRef.current = null
       }
+
       // 重置正在初始化标志，但保持 initializedRef 为 true 以防止 Strict Mode 第二次调用
       isInitializingRef.current = false
       // 注意：不重置 initializedRef，因为同一个组件实例（Strict Mode 双重调用）不应该初始化两次
       // 如果组件完全卸载后重新挂载，useEffect 会重新执行，此时 initializedRef 会在新的闭包中重新创建
-      tileLayerRef.current = null
-      if (mapInfoLayerManagerRef.current) {
-        mapInfoLayerManagerRef.current.clear() // 清理所有图层
-        mapInfoLayerManagerRef.current = null
-      }
-      // 清理地理化数据图层
-      if (geoDataLayerManagerRef.current) {
-        geoDataLayerManagerRef.current.clear()
-        geoDataLayerManagerRef.current = null
-      }
-      loadedMapInfoLayersRef.current.clear() // 清理已加载图层记录
-      mapInfoLayerRefsRef.current.clear() // 清理图层引用映射
-      lteSectorLayerRef.current = null
-      nrSectorLayerRef.current = null
-      console.log('[OnlineMap] 清理完成')
+
+      console.log('[OnlineMap] 页面切换 - 地图实例已缓存复用（所有数据图层已清理）')
     }
     // 只在mount时执行一次
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2943,14 +3159,20 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
   const finishMeasurementRef = useRef(finishMeasurement)
   const undoLastPointRef = useRef(undoLastPoint)
 
-  // 更新refs
+  // 更新refs（含模块级共享 ref，确保地图缓存后事件监听器能访问最新的组件状态）
   useEffect(() => {
     handleMapClickRef.current = handleMapClick
     measurePointsRef.current = measurePoints
     finishMeasurementRef.current = finishMeasurement
     undoLastPointRef.current = undoLastPoint
     measureModeRef.current = measureMode
-  }, [handleMapClick, measurePoints, finishMeasurement, undoLastPoint, measureMode])
+    // 同步模块级共享 ref（地图事件监听器通过它们访问最新状态）
+    __sharedCaptureModeRef.current = captureMode
+    __sharedMeasureModeRef.current = measureMode
+    __sharedMeasurePointsRef.current = measurePoints
+    __sharedFinishMeasurementRef.current = finishMeasurement
+    __sharedHandleMapClickRef.current = handleMapClick
+  }, [handleMapClick, measurePoints, finishMeasurement, measureMode, captureMode])
 
   useEffect(() => {
     if (mapInstanceRef.current) {
@@ -4237,6 +4459,13 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
     const L = window.L
     const map = mapInstanceRef.current
 
+    // 共享实例复用保护：如果已有瓦片图层且类型与缓存一致，跳过重建
+    // 避免页面切换时不必要的瓦片重新下载
+    if (tileLayerRef.current && __sharedMapCache.map && __sharedMapCache.mapLayerType === mapLayerType) {
+      console.log('[OnlineMap] 复用缓存瓦片图层，类型匹配，跳过重建')
+      return
+    }
+
     // 移除旧的瓦片图层
     if (tileLayerRef.current) {
       map.removeLayer(tileLayerRef.current)
@@ -4255,7 +4484,7 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
       attribution: '&copy; <a href="https://www.amap.com/">高德地图</a>',
       maxZoom: 18,
       minZoom: 3,
-      preferCanvas: true  // 🔥 使用 Canvas 渲染器而非 DOM/SVG，提升瓦片渲染性能
+      crossOrigin: 'anonymous'  // 跨域标识，与 Canvas 配合防止渲染拖影
     }).addTo(map)
 
     // 监听所有瓦片加载完成事件（用于检测网络恢复）
@@ -4271,6 +4500,9 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
     })
 
     tileLayerRef.current = newTileLayer
+
+    // 同步共享缓存中的 mapLayerType，使下次类型比较守卫正确判断
+    __sharedMapCache.mapLayerType = mapLayerType
   }, [isMapInitialized, mapLayerType])
 
   // 地图点击事件已经在handleMapClick中处理，这里的useEffect是重复的，会导致事件被多次绑定
@@ -4699,6 +4931,8 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
         visible={panelVisible}
         onClose={hideSectorInfo}
         position={clickPosition}
+        onMouseEnter={onPanelMouseEnter}
+        onMouseLeave={onPanelMouseLeave}
       />
 
       {/* 地图容器 */}
@@ -4772,8 +5006,39 @@ function OverlappingSectorsMenu({ sectors, position, onSelect, onClose }: {
   onSelect: (sector: RenderSectorData) => void,
   onClose: () => void
 }) {
+  const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // 5 秒自动关闭
+  const startAutoClose = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(() => {
+      onClose()
+      timerRef.current = null
+    }, 5000)
+  }, [onClose])
+
+  useEffect(() => {
+    startAutoClose()
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
+  }, [startAutoClose])
+
+  // 点击外部关闭
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        onClose()
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside, true)
+    return () => document.removeEventListener('mousedown', handleClickOutside, true)
+  }, [onClose])
+
   return (
     <div
+      ref={menuRef}
       style={{
         position: 'fixed',
         left: position.x + 10,
@@ -4788,9 +5053,26 @@ function OverlappingSectorsMenu({ sectors, position, onSelect, onClose }: {
         fontFamily: 'sans-serif'
       }}
       onClick={(e) => e.stopPropagation()}
+      onMouseEnter={() => { if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null } }}
+      onMouseLeave={startAutoClose}
     >
-      <div style={{ padding: '6px 12px 10px 12px', fontSize: '12px', color: '#64748b', borderBottom: '1px solid #f1f5f9', marginBottom: '4px' }}>
+      <div style={{ position: 'relative', padding: '6px 32px 10px 12px', fontSize: '12px', color: '#64748b', borderBottom: '1px solid #f1f5f9', marginBottom: '4px' }}>
         检测到 {sectors.length} 个重叠扇区:
+        {/* 关闭按钮 */}
+        <button
+          onClick={(e) => { e.stopPropagation(); onClose() }}
+          style={{
+            position: 'absolute', top: '2px', right: '6px',
+            width: '20px', height: '20px', display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
+            border: 'none', background: 'transparent',
+            cursor: 'pointer', borderRadius: '4px',
+            color: '#999', fontSize: '14px', lineHeight: '1', padding: 0, zIndex: 1
+          }}
+          onMouseEnter={(e) => { (e.target as HTMLElement).style.background = '#f3f4f6'; (e.target as HTMLElement).style.color = '#374151' }}
+          onMouseLeave={(e) => { (e.target as HTMLElement).style.background = 'transparent'; (e.target as HTMLElement).style.color = '#999' }}
+          title="关闭"
+        >✕</button>
       </div>
       <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
         {sectors.map(sector => (

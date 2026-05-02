@@ -3,7 +3,9 @@
  *
  * 功能:
  * - 显示小区关键属性
- * - 点击地图其他地方时淡出动画隐藏
+ * - 点击面板外部区域自动关闭
+ * - 右上角 X 关闭按钮
+ * - 5秒无交互自动关闭（鼠标悬停暂停计时）
  * - 支持自定义属性字段
  */
 import { useState, useEffect, useRef, useCallback } from 'react'
@@ -25,16 +27,16 @@ export interface SectorInfoPanelProps {
     x: number
     y: number
   }
-  /** 鼠标进入回调 */
+  /** 鼠标进入回调（暂停自动关闭计时器） */
   onMouseEnter?: () => void
-  /** 鼠标离开回调 */
+  /** 鼠标离开回调（恢复自动关闭计时器） */
   onMouseLeave?: () => void
 }
 
 /**
  * 扇区属性信息面板
  */
-export function SectorInfoPanel({ sector, visible, position, onMouseEnter, onMouseLeave }: SectorInfoPanelProps) {
+export function SectorInfoPanel({ sector, visible, position, onClose, onMouseEnter, onMouseLeave }: SectorInfoPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null)
 
   // 右键菜单状态
@@ -57,6 +59,21 @@ export function SectorInfoPanel({ sector, visible, position, onMouseEnter, onMou
       window.removeEventListener('contextmenu', handleGlobalClick)
     }
   }, [contextMenu])
+
+  // 点击面板外部区域时关闭面板（比依赖地图click事件更可靠）
+  useEffect(() => {
+    if (!visible) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        onClose()
+      }
+    }
+    // 使用 mousedown 确保在 mouseup 前捕获，避免与 Leaflet 事件冲突
+    document.addEventListener('mousedown', handleClickOutside, true)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside, true)
+    }
+  }, [visible, onClose])
 
   // 处理复制功能
   const handleCopy = useCallback((e: React.MouseEvent) => {
@@ -189,7 +206,45 @@ export function SectorInfoPanel({ sector, visible, position, onMouseEnter, onMou
 
 
         {/* 属性列表 */}
-        <div className="p-4 space-y-1">
+        <div className="p-4 space-y-1 relative">
+          {/* 关闭按钮 */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onClose()
+            }}
+            style={{
+              position: 'absolute',
+              top: '6px',
+              right: '8px',
+              width: '20px',
+              height: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: 'none',
+              background: 'transparent',
+              cursor: 'pointer',
+              borderRadius: '4px',
+              color: '#999',
+              fontSize: '14px',
+              lineHeight: '1',
+              padding: 0,
+              zIndex: 1
+            }}
+            onMouseEnter={(e) => {
+              (e.target as HTMLElement).style.background = '#f3f4f6'
+              ;(e.target as HTMLElement).style.color = '#374151'
+            }}
+            onMouseLeave={(e) => {
+              (e.target as HTMLElement).style.background = 'transparent'
+              ;(e.target as HTMLElement).style.color = '#999'
+            }}
+            title="关闭"
+          >
+            ✕
+          </button>
+
           {/* 小区名称 - 标题样式 - 确保不透明 */}
           <div style={{
             color: '#000000',
@@ -377,11 +432,11 @@ export function useSectorInfoPanel() {
       setClickPosition(undefined)
     }
 
-    // 25秒后自动淡出 (满足需求: 25秒)
+    // 5秒后自动关闭
     timerRef.current = setTimeout(() => {
       setPanelVisible(false)
       timerRef.current = null
-    }, 25000)
+    }, 5000)
   }
 
   const hideSectorInfo = () => {
@@ -393,11 +448,32 @@ export function useSectorInfoPanel() {
     setPanelVisible(false)
   }
 
+  // 鼠标进入面板时暂停自动关闭计时器
+  const onPanelMouseEnter = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current)
+      timerRef.current = null
+    }
+  }
+
+  // 鼠标离开面板时重新启动 5 秒自动关闭计时器
+  const onPanelMouseLeave = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current)
+    }
+    timerRef.current = setTimeout(() => {
+      setPanelVisible(false)
+      timerRef.current = null
+    }, 5000)
+  }
+
   return {
     selectedSector,
     panelVisible,
     clickPosition,
     showSectorInfo,
-    hideSectorInfo
+    hideSectorInfo,
+    onPanelMouseEnter,
+    onPanelMouseLeave
   }
 }

@@ -721,7 +721,7 @@ export function TACPage() {
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
-            {'小区选择'}
+            {t('pci.cellSelection') || '小区选择'}
             {selectedCellIds.size > 0 && (
               <span className="ml-2 px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">
                 {selectedCellIds.size}

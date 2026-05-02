@@ -289,7 +289,9 @@
     "hideLegend": "Hide Legend",
     "selectedCell": "Selected Cell",
     "sameFreqPCI": "Same Freq & PCI",
-    "otherCell": "Other Cells"
+    "otherCell": "Other Cells",
+    "cellSelection": "Cell Selection",
+    "selectedCount": "{{count}} cells selected"
   },
   "neighbor": {
     "title": "Neighbor Planning",
