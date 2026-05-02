@@ -299,6 +299,49 @@ class TaskManager:
             logger.error(f"解析输入数据集失败: {e}")
             raise
 
+    def _find_full_params_item(self) -> Optional[Any]:
+        """
+        仅查找全量工参文件，不依赖待规划小区文件。
+
+        用于当PCI规划使用前端选中小区时，避免对待规划小区文件的任何依赖。
+
+        Returns:
+            full_params_item: DataItem 或 None
+        """
+        try:
+            data_service.reload_index()
+            data_items = data_service.list_data()
+
+            full_params_item = None
+            full_params_upload_time = None
+
+            for item in data_items:
+                if item.type.value == "excel":
+                    data_info = data_service.index.get(item.id, {})
+                    file_type = data_info.get("fileType", "")
+                    upload_date = data_info.get("uploadDate", "")
+                    filename = item.name.lower()
+
+                    if file_type == "full_params":
+                        if full_params_item is None or (upload_date and (
+                            full_params_upload_time is None or upload_date > full_params_upload_time
+                        )):
+                            full_params_item = item
+                            full_params_upload_time = upload_date
+                    elif file_type not in ("target_cells", "full_params_backup"):
+                        if filename.startswith("projectparameter_mongoose"):
+                            if full_params_item is None or (upload_date and (
+                                full_params_upload_time is None or upload_date > full_params_upload_time
+                            )):
+                                full_params_item = item
+                                full_params_upload_time = upload_date
+
+            return full_params_item
+
+        except Exception as e:
+            logger.error(f"查找全量工参文件失败: {e}")
+            raise
+
     def _extract_target_cell_keys(
         self, target_cells_data: Any, network_type_str: str
     ) -> set:
@@ -432,17 +475,18 @@ class TaskManager:
     # 原有方法
     # ============================================================
 
-    def _validate_pci_data_files(self, network_type: NetworkType) -> None:
+    def _validate_pci_data_files(self, network_type: NetworkType, skip_target_cells: bool = False) -> None:
         """
         验证PCI规划所需的数据文件
 
         Args:
             network_type: 网络类型(LTE或NR)
+            skip_target_cells: 是否跳过待规划小区文件检查（当使用前端选中的小区时可跳过）
 
         Raises:
             ValueError: 当数据文件缺失或不符合要求时
         """
-        logger.info(f"[TaskManager] 开始验证PCI数据文件, network_type={network_type}")
+        logger.info(f"[TaskManager] 开始验证PCI数据文件, network_type={network_type}, skip_target_cells={skip_target_cells}")
 
         # 1. 检查文件存在性
         data_items = data_service.list_data()
@@ -457,7 +501,7 @@ class TaskManager:
                 full_params_file = item
 
         # 2. 验证文件存在
-        if not target_cells_file:
+        if not skip_target_cells and not target_cells_file:
             raise ValueError(
                 "未找到待规划小区文件。请上传文件名以'cell-tree-export'开头的Excel文件。"
             )
@@ -466,85 +510,90 @@ class TaskManager:
                 "未找到全量工参文件。请上传文件名以'ProjectParameter_mongoose'开头的Excel文件。"
             )
 
-        logger.info(f"[TaskManager] 找到数据文件: 待规划={target_cells_file.name}, 全量工参={full_params_file.name}")
+        # 3. 验证数据完整性 - 当skip_target_cells=True时跳过待规划小区数据的验证
+        if not skip_target_cells:
+            logger.info(f"[TaskManager] 找到数据文件: 待规划={target_cells_file.name}, 全量工参={full_params_file.name}")
 
-        # 3. 验证数据完整性
-        try:
-            target_data = data_service.get_data(target_cells_file.id)
-            if not target_data:
-                raise ValueError("待规划小区文件数据为空")
+            try:
+                target_data = data_service.get_data(target_cells_file.id)
+                if not target_data:
+                    raise ValueError("待规划小区文件数据为空")
 
-            network_type_str = network_type.value
+                network_type_str = network_type.value
 
-            # 处理两种数据结构：{'LTE': [...], 'NR': [...]} 或 [site1, site2, ...]
-            sites_data = []
-            if isinstance(target_data, dict):
-                # 新结构：{"LTE": [...], "NR": [...]}
-                if network_type_str in target_data:
-                    sites_data = target_data[network_type_str]
-                    logger.info(f"[TaskManager] 数据为新格式(字典)，找到{len(sites_data)}个站点")
+                # 处理两种数据结构：{'LTE': [...], 'NR': [...]} 或 [site1, site2, ...]
+                sites_data = []
+                if isinstance(target_data, dict):
+                    # 新结构：{"LTE": [...], "NR": [...]}
+                    if network_type_str in target_data:
+                        sites_data = target_data[network_type_str]
+                        logger.info(f"[TaskManager] 数据为新格式(字典)，找到{len(sites_data)}个站点")
+                    else:
+                        # 网络类型不存在
+                        available_types = list(target_data.keys())
+                        raise ValueError(
+                            f"待规划小区文件中未找到{network_type_str}网络数据。"
+                            f"可用的网络类型: {', '.join(available_types)}"
+                        )
+                elif isinstance(target_data, list):
+                    # 旧结构：直接是站点列表
+                    sites_data = target_data
+                    logger.info(f"[TaskManager] 数据为旧格式(列表)，找到{len(sites_data)}个站点")
                 else:
-                    # 网络类型不存在
-                    available_types = list(target_data.keys())
+                    raise ValueError(f"不支持的数据格式: {type(target_data)}")
+
+                # 检查数据是否为空
+                if not sites_data or len(sites_data) == 0:
                     raise ValueError(
-                        f"待规划小区文件中未找到{network_type_str}网络数据。"
-                        f"可用的网络类型: {', '.join(available_types)}"
+                        f"{network_type_str}网络数据为空。请检查数据文件是否包含有效的站点数据。"
                     )
-            elif isinstance(target_data, list):
-                # 旧结构：直接是站点列表
-                sites_data = target_data
-                logger.info(f"[TaskManager] 数据为旧格式(列表)，找到{len(sites_data)}个站点")
-            else:
-                raise ValueError(f"不支持的数据格式: {type(target_data)}")
 
-            # 检查数据是否为空
-            if not sites_data or len(sites_data) == 0:
-                raise ValueError(
-                    f"{network_type_str}网络数据为空。请检查数据文件是否包含有效的站点数据。"
+                # 4. 验证数据结构完整性（检查第一个站点）
+                first_site = sites_data[0]
+
+                # 检查站点级别必需字段
+                if 'id' not in first_site or first_site['id'] is None:
+                    raise ValueError("站点数据缺少必需字段: id")
+
+                # 检查sectors字段
+                if 'sectors' not in first_site:
+                    raise ValueError("站点数据缺少必需字段: sectors")
+
+                sectors = first_site.get('sectors', [])
+                if not sectors or len(sectors) == 0:
+                    raise ValueError("站点没有小区数据(sectors为空)")
+
+                # 检查第一个小区的必需字段
+                first_sector = sectors[0]
+                required_fields = ['id', 'longitude', 'latitude', 'azimuth']
+                missing_fields = [
+                    field for field in required_fields
+                    if field not in first_sector or first_sector[field] is None
+                ]
+
+                if missing_fields:
+                    raise ValueError(
+                        f"小区数据缺少必需字段: {', '.join(missing_fields)}。"
+                        f"请确保数据包含以下字段: {', '.join(required_fields)}"
+                    )
+
+                # 统计总小区数
+                total_sectors = sum(len(site.get('sectors', [])) for site in sites_data)
+                logger.info(
+                    f"[TaskManager] 数据验证通过: {network_type_str}网络包含{len(sites_data)}个站点，{total_sectors}个小区"
                 )
 
-            # 4. 验证数据结构完整性（检查第一个站点）
-            first_site = sites_data[0]
-
-            # 检查站点级别必需字段
-            if 'id' not in first_site or first_site['id'] is None:
-                raise ValueError("站点数据缺少必需字段: id")
-
-            # 检查sectors字段
-            if 'sectors' not in first_site:
-                raise ValueError("站点数据缺少必需字段: sectors")
-
-            sectors = first_site.get('sectors', [])
-            if not sectors or len(sectors) == 0:
-                raise ValueError("站点没有小区数据(sectors为空)")
-
-            # 检查第一个小区的必需字段
-            first_sector = sectors[0]
-            required_fields = ['id', 'longitude', 'latitude', 'azimuth']
-            missing_fields = [
-                field for field in required_fields
-                if field not in first_sector or first_sector[field] is None
-            ]
-
-            if missing_fields:
+            except ValueError:
+                raise
+            except Exception as e:
+                logger.error(f"[TaskManager] 数据验证失败: {str(e)}")
                 raise ValueError(
-                    f"小区数据缺少必需字段: {', '.join(missing_fields)}。"
-                    f"请确保数据包含以下字段: {', '.join(required_fields)}"
+                    f"数据文件验证失败: {str(e)}。请确保上传的Excel文件格式正确。"
                 )
-
-            # 统计总小区数
-            total_sectors = sum(len(site.get('sectors', [])) for site in sites_data)
-            logger.info(
-                f"[TaskManager] 数据验证通过: {network_type_str}网络包含{len(sites_data)}个站点，{total_sectors}个小区"
-            )
-
-        except ValueError:
-            raise
-        except Exception as e:
-            logger.error(f"[TaskManager] 数据验证失败: {str(e)}")
-            raise ValueError(
-                f"数据文件验证失败: {str(e)}。请确保上传的Excel文件格式正确。"
-            )
+        else:
+            # skip_target_cells=True时只记录全量工参文件信息
+            if full_params_file:
+                logger.info(f"[TaskManager] 已跳过待规划小区文件验证（使用前端选中小区），仅验证全量工参: {full_params_file.name}")
 
     async def create_pci_task(self, config: PCIConfig) -> str:
         """创建PCI规划任务 - 增强数据验证"""
@@ -552,7 +601,9 @@ class TaskManager:
 
         # **新增**: 预验证数据文件
         try:
-            self._validate_pci_data_files(config.networkType)
+            # 如果提供了selectedCellIds，验证可以跳过待规划小区文件的检查
+            has_selected_cells = config.selectedCellIds and len(config.selectedCellIds) > 0
+            self._validate_pci_data_files(config.networkType, skip_target_cells=has_selected_cells)
         except ValueError as e:
             logger.error(f"[TaskManager] 数据文件验证失败: {str(e)}")
             raise
@@ -678,39 +729,60 @@ class TaskManager:
             network_type_str = config.networkType.value  # "LTE" 或 "NR"
 
             try:
-                # 1. 使用辅助方法一次性确定输入数据集
-                datasets = self._resolve_input_datasets(network_type_str)
-                target_cells_item = datasets["target_cells_item"]
-                full_params_item = datasets["full_params_item"]
+                # 检查是否使用前端选中的小区
+                has_selected_cells = hasattr(config, 'selectedCellIds') and config.selectedCellIds and len(config.selectedCellIds) > 0
 
-                # 验证数据项
-                if not target_cells_item:
-                    raise ValueError(
-                        f"未找到待规划小区文件（前缀为'cell-tree-export'的Excel文件）"
+                if has_selected_cells:
+                    # 方式A：使用前端选中的小区ID（完全不依赖待规划小区文件）
+                    logger.info(f"[TaskManager] PCI规划: 使用前端选中的小区, 数量={len(config.selectedCellIds)}")
+                    target_cell_keys = set(config.selectedCellIds)
+
+                    # 只查找全量工参文件，跳过待规划小区文件
+                    full_params_item = self._find_full_params_item()
+                    if not full_params_item:
+                        raise ValueError("未找到全量工参文件（前缀为'ProjectParameter_mongoose'的Excel文件）")
+
+                    full_params_data = data_service.get_data(full_params_item.id)
+                    logger.info(f"[TaskManager] PCI规划: 使用全量工参文件: {full_params_item.name}")
+
+                    if not full_params_data:
+                        raise ValueError("全量工参文件为空")
+                else:
+                    # 方式B：使用待规划小区文件（原有逻辑）
+                    # 1. 使用辅助方法一次性确定输入数据集
+                    datasets = self._resolve_input_datasets(network_type_str)
+                    target_cells_item = datasets["target_cells_item"]
+                    full_params_item = datasets["full_params_item"]
+
+                    # 验证数据项
+                    if not target_cells_item:
+                        raise ValueError(
+                            f"未找到待规划小区文件（前缀为'cell-tree-export'的Excel文件）"
+                        )
+                    if not full_params_item:
+                        raise ValueError(
+                            f"未找到全量工参文件（前缀为'ProjectParameter_mongoose'的Excel文件）"
+                        )
+
+                    # 2. 加载数据
+                    target_cells_data = data_service.get_data(target_cells_item.id)
+                    full_params_data = data_service.get_data(full_params_item.id)
+                    logger.info(f"使用待规划小区文件: {target_cells_item.name}")
+                    logger.info(f"使用全量工参文件: {full_params_item.name}")
+
+                    if not target_cells_data:
+                        raise ValueError("待规划小区文件为空")
+                    if not full_params_data:
+                        raise ValueError("全量工参文件为空")
+
+                    # 3. 使用辅助方法提取待规划小区的 cell_key（优化：统一处理逻辑）
+                    target_cell_keys = self._extract_target_cell_keys(
+                        target_cells_data, network_type_str
                     )
-                if not full_params_item:
-                    raise ValueError(
-                        f"未找到全量工参文件（前缀为'ProjectParameter_mongoose'的Excel文件）"
-                    )
 
-                # 2. 加载数据
-                target_cells_data = data_service.get_data(target_cells_item.id)
-                full_params_data = data_service.get_data(full_params_item.id)
-                logger.info(f"使用待规划小区文件: {target_cells_item.name}")
-                logger.info(f"使用全量工参文件: {full_params_item.name}")
-
-                if not target_cells_data:
-                    raise ValueError("待规划小区文件为空")
-                if not full_params_data:
-                    raise ValueError("全量工参文件为空")
-
-                # 3. 使用辅助方法提取待规划小区的 cell_key（优化：统一处理逻辑）
-                target_cell_keys = self._extract_target_cell_keys(
-                    target_cells_data, network_type_str
-                )
                 logger.info(f"共找到 {len(target_cell_keys)} 个待规划小区")
                 if not target_cell_keys:
-                    raise ValueError(f"待规划小区文件中没有{network_type_str}数据")
+                    raise ValueError(f"没有{network_type_str}类型的待规划小区数据")
 
                 # 4. 从全量工参中提取站点列表
                 full_sites = []
@@ -1052,12 +1124,32 @@ class TaskManager:
                 progress_callback,
             )
 
+            # 当提供了selectedCellIds时，过滤结果只保留选中的小区
+            has_selected_cells = config.selectedCellIds and len(config.selectedCellIds) > 0
+            if has_selected_cells:
+                selected_set = set(config.selectedCellIds)
+                filtered_results = []
+                for cell in results:
+                    sector_id = cell.get("sectorId", "")
+                    site_id = cell.get("siteId", "")
+                    cell_key = f"{site_id}_{sector_id}"
+                    if cell_key in selected_set or sector_id in selected_set:
+                        filtered_results.append(cell)
+                results = filtered_results
+                # 重新统计
+                total_cells = len(results)
+                matched_count = sum(1 for c in results if c.get("matched"))
+                unmatched_count = sum(1 for c in results if not c.get("matched"))
+                mismatched_count = sum(1 for c in results if c.get("tac") != c.get("existingTac") and c.get("existingTac") is not None)
+                singularity_count = sum(1 for c in results if c.get("isSingularity"))
+                logger.info(f"[TaskManager] TAC核查: 已根据选中小区过滤, 保留{total_cells}个小区")
+            else:
+                total_cells = len(results)
+
             # 完成任务
             task.status = TaskStatus.COMPLETED
             self._persist_task(task.task_id)
             task.completed_at = datetime.now()
- 
-            total_cells = len(results)
 
             task.result = {
                 "taskId": task.task_id,
@@ -1118,40 +1210,61 @@ class TaskManager:
             from app.services.data_service import data_service
             from app.core.config import settings
  
-            # 1. 查找数据文件（匹配待规划小区和全量工参）
-            data_items = data_service.list_data()
-            target_cells_data = None
-            full_params_data = None
- 
-            for item in data_items:
-                if item.type.value == "excel":
-                    filename = item.name.lower()
-                    if filename.startswith("cell-tree-export"):
-                        target_cells_data = data_service.get_data(item.id)
-                    elif filename.startswith("projectparameter_mongoose"):
-                        full_params_data = data_service.get_data(item.id)
-                    
-                    if target_cells_data and full_params_data:
-                        break
- 
-            if not target_cells_data:
-                raise ValueError("未找到待规划小区文件（cell-tree-export）")
+            # 1. 检查是否使用前端选中的小区
+            has_selected_cells = hasattr(config, 'selectedCellIds') and config.selectedCellIds and len(config.selectedCellIds) > 0
 
-            # 2. 匹配待规划小区与全量工参获取坐标
-            target_cell_keys = set()
-            if isinstance(target_cells_data, dict):
-                if network_type in target_cells_data:
-                    for site in target_cells_data[network_type]:
-                        site_id = site.get("id", "")
-                        for sector in site.get("sectors", []):
-                            sector_id = sector.get("id", "")
-                            # 处理 site_id_cell_id 格式
-                            if f"{site_id}_{site_id}" in sector_id:
-                                real_sector_id = sector_id.split("_")[-1]
-                                target_cell_keys.add(f"{site_id}_{real_sector_id}")
-                            else:
-                                target_cell_keys.add(sector_id)
-            
+            if has_selected_cells:
+                # 方式A：使用前端选中的小区ID（完全不依赖待规划小区文件）
+                logger.info(f"[TaskManager] TAC规划: 使用前端选中的小区, 数量={len(config.selectedCellIds)}")
+                target_cell_keys = set(config.selectedCellIds)
+
+                # 只查找全量工参文件
+                data_items = data_service.list_data()
+                full_params_data = None
+                for item in data_items:
+                    if item.type.value == "excel":
+                        filename = item.name.lower()
+                        if filename.startswith("projectparameter_mongoose"):
+                            full_params_data = data_service.get_data(item.id)
+                            if full_params_data:
+                                break
+
+                if not full_params_data:
+                    raise ValueError("未找到全量工参文件（projectparameter_mongoose）")
+            else:
+                # 方式B：使用待规划小区文件（原有逻辑）
+                data_items = data_service.list_data()
+                target_cells_data = None
+                full_params_data = None
+
+                for item in data_items:
+                    if item.type.value == "excel":
+                        filename = item.name.lower()
+                        if filename.startswith("cell-tree-export"):
+                            target_cells_data = data_service.get_data(item.id)
+                        elif filename.startswith("projectparameter_mongoose"):
+                            full_params_data = data_service.get_data(item.id)
+
+                        if target_cells_data and full_params_data:
+                            break
+
+                if not target_cells_data:
+                    raise ValueError("未找到待规划小区文件（cell-tree-export）")
+
+                # 2. 从待规划小区文件中提取小区keys
+                target_cell_keys = set()
+                if isinstance(target_cells_data, dict):
+                    if network_type in target_cells_data:
+                        for site in target_cells_data[network_type]:
+                            site_id = site.get("id", "")
+                            for sector in site.get("sectors", []):
+                                sector_id = sector.get("id", "")
+                                if f"{site_id}_{site_id}" in sector_id:
+                                    real_sector_id = sector_id.split("_")[-1]
+                                    target_cell_keys.add(f"{site_id}_{real_sector_id}")
+                                else:
+                                    target_cell_keys.add(sector_id)
+
             logger.info(f"[TaskManager] TAC规划: 待规划小区数量={len(target_cell_keys)}")
             
             # 从全量工参中提取匹配的小区信息（带坐标）

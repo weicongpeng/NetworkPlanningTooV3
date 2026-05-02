@@ -1101,7 +1101,10 @@ export function NeighborPage() {
                 label={i18n.planningType}
                 value={config.planningType}
                 options={['LTE-LTE', 'NR-NR', 'NR-LTE']}
-                onChange={(value) => setConfig({ ...config, planningType: value })}
+                onChange={(value) => {
+                  setSelectedCellIds(new Set())
+                  setConfig({ ...config, planningType: value })
+                }}
                 disabled={isRunning}
               />
 
@@ -1224,7 +1227,7 @@ export function NeighborPage() {
                         value={cellSearchValue}
                         onChange={(e) => setCellSearchValue(e.target.value)}
                         placeholder={i18n.cellSearchPlaceholder}
-                        className="w-full pl-8 pr-3 py-1.5 text-xs bg-background border border-border rounded-lg focus:outline-none focus:ring-1 focus:ring-primary"
+                        className="w-full pl-8 pr-3 py-1.5 text-xs bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary"
                       />
                     </div>
                     <button
@@ -1281,33 +1284,45 @@ export function NeighborPage() {
                       }
 
                       return (
-                        <div className="flex-1 overflow-y-auto space-y-0.5">
-                          {filtered.map(sector => (
-                            <div
-                              key={sector.id}
-                              onClick={() => toggleCellSelection(sector.id)}
-                              className={`flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-colors text-xs ${
-                                selectedCellIds.has(sector.id)
-                                  ? 'bg-blue-50 border border-blue-200'
-                                  : 'hover:bg-muted/50 border border-transparent'
-                              }`}
-                            >
-                              <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
-                                selectedCellIds.has(sector.id)
-                                  ? 'bg-blue-500 border-blue-500'
-                                  : 'border-border'
-                              }`}>
-                                {selectedCellIds.has(sector.id) && (
-                                  <Check size={12} className="text-white" />
-                                )}
-                              </div>
-                              <span className="font-mono w-20 truncate" title={sector.siteId || 'N/A'}>{sector.siteId || 'N/A'}</span>
-                              <span className="font-mono w-20 truncate" title={sector.id.split('_').pop() || sector.id}>
-                                {sector.id.split('_').pop() || sector.id}
-                              </span>
-                              <span className="flex-1 truncate" title={sector.name}>{sector.name}</span>
-                            </div>
-                          ))}
+                        <div className="overflow-x-auto overflow-y-auto rounded-lg border border-border flex-1 min-h-0">
+                          <table className="w-full text-xs text-left border-collapse table-fixed">
+                            <thead className="sticky top-0 z-10 bg-background border-b border-border shadow-sm">
+                              <tr>
+                                <th className="p-2 bg-muted border-r border-border w-10 z-10"></th>
+                                <th className="p-2 bg-muted border-r border-border w-[80px] z-10 text-[10px] font-medium">{i18n.sourceSiteId}</th>
+                                <th className="p-2 bg-muted border-r border-border w-[80px] z-10 text-[10px] font-medium">{i18n.sourceCellId}</th>
+                                <th className="p-2 bg-muted border-r border-border z-10 text-[10px] font-medium">{i18n.sourceCellName}</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                              {filtered.map(sector => (
+                                <tr
+                                  key={sector.id}
+                                  onClick={() => toggleCellSelection(sector.id)}
+                                  className={`cursor-pointer transition-colors ${
+                                    selectedCellIds.has(sector.id)
+                                      ? 'bg-blue-50/50'
+                                      : 'bg-card hover:bg-muted/50'
+                                  }`}
+                                >
+                                  <td className="p-2 border-r border-border w-10">
+                                    <div className={`w-4 h-4 rounded-sm border flex items-center justify-center ${
+                                      selectedCellIds.has(sector.id)
+                                        ? 'bg-blue-500 border-blue-500'
+                                        : 'border-border'
+                                    }`}>
+                                      {selectedCellIds.has(sector.id) && (
+                                        <Check size={12} className="text-white" />
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="p-2 font-mono truncate border-r border-border w-[80px]" title={sector.siteId || 'N/A'}>{sector.siteId || 'N/A'}</td>
+                                  <td className="p-2 font-mono truncate border-r border-border w-[80px]" title={sector.id.split('_').pop() || sector.id}>{sector.id.split('_').pop() || sector.id}</td>
+                                  <td className="p-2 truncate border-r border-border" title={sector.name}>{sector.name}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
                         </div>
                       )
                     })()
@@ -1364,7 +1379,7 @@ export function NeighborPage() {
                       <p className="font-semibold">{i18n.taskFailed}</p>
                     </div>
                   ) : taskResult.status === 'completed' ? (
-                    <div className="flex-1 overflow-hidden">
+                    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                       {taskResult.results && taskResult.results.length > 0 ? (
                         <NeighborTable
                           results={filteredResults}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { Play, Download, Loader2, AlertCircle, CheckCircle2, FileSpreadsheet, Search, GripVertical } from 'lucide-react'
+import { Play, Download, Loader2, AlertCircle, CheckCircle2, FileSpreadsheet, Search, GripVertical, Check, List } from 'lucide-react'
 import { tacApi } from '../services/api'
 import { useTACStore } from '../store/tacStore'
 import { OnlineMap } from '../components/Map/OnlineMap'
@@ -7,6 +7,7 @@ import { TACLegend } from '../components/Map/TACLegend'
 import { tacDataSyncService } from '../services/tacDataSyncService'
 import { tacColorMapper } from '../utils/tacColors'
 import type { OnlineMapRef } from '../components/Map/OnlineMap'
+import type { RenderSectorData } from '../services/mapDataService'
 import { mapDataService } from '../services/mapDataService'
 import { DATA_REFRESH_EVENT } from '../store/dataStore'
 import { useTranslation } from 'react-i18next'
@@ -64,6 +65,13 @@ export function TACPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const taskResult = result as TACResultData | null
+
+  // 小区选择页签状态
+  const [activeLeftTab, setActiveLeftTab] = useState<'cell-selection' | 'planning-result'>('planning-result')
+  const [selectedCellIds, setSelectedCellIds] = useState<Set<string>>(new Set())
+  const [cellSearchValue, setCellSearchValue] = useState('')
+  const [cellListData, setCellListData] = useState<{ lte: RenderSectorData[]; nr: RenderSectorData[] }>({ lte: [], nr: [] })
+  const [cellListLoading, setCellListLoading] = useState(false)
 
   // 插花检测配置状态
   const [singularityConfig, setSingularityConfig] = useState({
@@ -300,11 +308,12 @@ export function TACPage() {
     errorCountRef.current = 0
 
     try {
-      // 构建完整的TAC配置（包含插花检测配置）
-      const fullConfig = {
+      // 构建完整的TAC配置（包含插花检测配置和选中小区）
+      const fullConfig: any = {
         networkType: config!.networkType,
         enableSingularityCheck: true,
         singularityConfig: singularityConfig,
+        selectedCellIds: selectedCellIds.size > 0 ? Array.from(selectedCellIds) : undefined,
       }
 
       const response = await tacApi.plan(fullConfig)
@@ -526,6 +535,48 @@ export function TACPage() {
     }
   }, [filteredResults])
 
+  // 加载小区列表数据
+  const loadCellList = useCallback(async () => {
+    setCellListLoading(true)
+    try {
+      const mapData = await mapDataService.getMapData(12, false)
+      setCellListData({
+        lte: mapData.lteSectors || [],
+        nr: mapData.nrSectors || []
+      })
+    } catch (err) {
+      console.error('[TACPage] 加载小区列表失败:', err)
+    } finally {
+      setCellListLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadCellList() }, [loadCellList])
+
+  const toggleCellSelection = (cellId: string) => {
+    setSelectedCellIds(prev => {
+      const next = new Set(prev)
+      if (next.has(cellId)) next.delete(cellId)
+      else next.add(cellId)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    const networkType = (config?.networkType || 'LTE') as 'LTE' | 'NR'
+    const sectors = networkType === 'LTE' ? cellListData.lte : cellListData.nr
+    const allIds = sectors.map(s => s.id)
+    const allSelected = allIds.length > 0 && allIds.every(id => selectedCellIds.has(id))
+    setSelectedCellIds(prev => {
+      const next = new Set(prev)
+      if (allSelected) allIds.forEach(id => next.delete(id))
+      else allIds.forEach(id => next.add(id))
+      return next
+    })
+  }
+
+  const clearSelections = () => setSelectedCellIds(new Set())
+
   return (
     <div className="h-full flex flex-col p-4 min-h-0">
       {/* 页面标题 */}
@@ -544,7 +595,11 @@ export function TACPage() {
                   name="networkType"
                   value="LTE"
                   checked={config?.networkType === 'LTE'}
-                  onChange={(e) => setConfig({ networkType: e.target.value as 'LTE' | 'NR' })}
+                  onChange={(e) => {
+                    setSelectedCellIds(new Set())
+                    setConfig({ networkType: e.target.value as 'LTE' | 'NR' })
+                    loadCellList()
+                  }}
                   disabled={loading || taskResult?.status === 'processing'}
                   className="w-3 h-3 text-primary"
                 />
@@ -556,7 +611,11 @@ export function TACPage() {
                   name="networkType"
                   value="NR"
                   checked={config?.networkType === 'NR'}
-                  onChange={(e) => setConfig({ networkType: e.target.value as 'LTE' | 'NR' })}
+                  onChange={(e) => {
+                    setSelectedCellIds(new Set())
+                    setConfig({ networkType: e.target.value as 'LTE' | 'NR' })
+                    loadCellList()
+                  }}
                   disabled={loading || taskResult?.status === 'processing'}
                   className="w-3 h-3 text-primary"
                 />
@@ -650,145 +709,222 @@ export function TACPage() {
         </div>
       )}
 
-      {/* 核查结果 */}
-      {taskResult && (
-        <div className="bg-card p-5 rounded-lg border border-border flex-1 min-h-0 flex flex-col overflow-hidden">
-          {/* 标题行 + 统计卡片 */}
-          <div className="mb-4 shrink-0">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                {taskResult.status === 'completed' ? (
-                  <CheckCircle2 size={20} className="text-green-500" />
-                ) : taskResult.status === 'failed' ? (
-                  <AlertCircle size={20} className="text-red-500" />
-                ) : (
-                  <Loader2 size={20} className="animate-spin text-primary" />
-                )}
-                <h2 className="text-lg font-semibold">{t('tac.checkResult') || '核查结果'}</h2>
-                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                  {getNetworkTypeLabel(taskResult?.networkType || config?.networkType || 'LTE')}
+      {/* 小区选择与结果面板（页签切换） */}
+      <div className="bg-card p-4 rounded-lg border border-border flex-1 min-h-0 flex flex-col overflow-hidden">
+        {/* 页签切换栏 */}
+        <div className="flex items-center gap-1 mb-3 border-b border-border shrink-0">
+          <button
+            onClick={() => setActiveLeftTab('cell-selection')}
+            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+              activeLeftTab === 'cell-selection'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {'小区选择'}
+            {selectedCellIds.size > 0 && (
+              <span className="ml-2 px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">
+                {selectedCellIds.size}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveLeftTab('planning-result')}
+            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+              activeLeftTab === 'planning-result'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {t('tac.checkResult') || '核查结果'}
+            {taskResult?.status === 'completed' && (
+              <span className="ml-2 px-1.5 py-0.5 text-xs bg-green-100 text-green-700 rounded-full">✓</span>
+            )}
+          </button>
+        </div>
+
+        {/* 页签内容 */}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          {activeLeftTab === 'cell-selection' ? (
+            /* 小区选择面板 */
+            <div className="flex flex-col h-full overflow-hidden">
+              <div className="flex items-center gap-2 mb-2 shrink-0">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" size={14} />
+                  <input
+                    type="text"
+                    value={cellSearchValue}
+                    onChange={(e) => setCellSearchValue(e.target.value)}
+                    placeholder="搜索基站ID、小区ID或名称..."
+                    className="w-full pl-8 pr-3 py-1.5 text-xs bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary"
+                  />
+                </div>
+                <button onClick={toggleSelectAll} className="px-2 py-1.5 text-xs bg-card border border-border rounded-lg hover:bg-muted/80 transition-colors shrink-0">
+                  {(() => {
+                    const nt = (config?.networkType || 'LTE') as 'LTE' | 'NR'
+                    const secs = nt === 'LTE' ? cellListData.lte : cellListData.nr
+                    return secs.length > 0 && secs.every(s => selectedCellIds.has(s.id)) ? '取消全选' : '全选'
+                  })()}
+                </button>
+                <button onClick={clearSelections} className="px-2 py-1.5 text-xs bg-card border border-border rounded-lg hover:bg-muted/80 transition-colors shrink-0">清空选择</button>
+                <span className="text-xs text-muted-foreground ml-auto shrink-0">
+                  {'已选中 {{count}} 个小区'.replace('{{count}}', String(selectedCellIds.size))}
                 </span>
               </div>
-
-              {taskResult.status === 'completed' && (
-                <button
-                  onClick={() => handleExport('xlsx')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-400 text-white rounded-md hover:bg-blue-500 transition-colors text-sm"
-                >
-                  <Download size={14} />
-                  <span>{t('tac.export') || '导出'}</span>
-                </button>
-              )}
-            </div>
-
-            {/* 统计卡片 - 紧凑横向排列 */}
-            <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
-              <div className="px-2.5 py-1.5 bg-muted/50 rounded-md">
-                <p className="text-[10px] text-muted-foreground">{t('tac.networkType') || '网络类型'}</p>
-                <p className="text-sm font-semibold">{taskResult.networkType || '-'}</p>
+              <div className="text-xs text-muted-foreground mb-2 shrink-0">
+                {'数据源：{{type}} 小区'.replace('{{type}}', config?.networkType || 'LTE')}
               </div>
-              <div className="px-2.5 py-1.5 bg-muted/50 rounded-md">
-                <p className="text-[10px] text-muted-foreground">{t('tac.totalCells') || '总小区'}</p>
-                <p className="text-sm font-semibold">{taskResult.totalCells || 0}</p>
-              </div>
-              <div className="px-2.5 py-1.5 bg-green-500/10 border border-green-500/20 rounded-md">
-                <p className="text-[10px] text-green-600">{t('tac.matched') || '匹配成功'}</p>
-                <p className="text-sm font-semibold text-green-600">{taskResult.matchedCells || 0}</p>
-              </div>
-              <div className="px-2.5 py-1.5 bg-orange-500/10 border border-orange-500/20 rounded-md">
-                <p className="text-[10px] text-orange-600">{t('tac.unmatched') || '未匹配'}</p>
-                <p className="text-sm font-semibold text-orange-600">{taskResult.unmatchedCells || 0}</p>
-              </div>
-              <div className="px-2.5 py-1.5 bg-red-500/10 border border-red-500/20 rounded-md">
-                <p className="text-[10px] text-red-600">{t('tac.tacMismatch') || 'TAC错配'}</p>
-                <p className="text-sm font-semibold text-red-600">{taskResult.mismatchedCells || 0}</p>
-              </div>
-              <div className="px-2.5 py-1.5 bg-blue-500/10 border border-blue-500/20 rounded-md">
-                <p className="text-[10px] text-blue-600">{t('tac.mismatchRate') || '错配率'}</p>
-                <p className="text-sm font-semibold text-blue-600">
-                  {taskResult.matchedCells > 0
-                    ? ((taskResult.mismatchedCells / taskResult.matchedCells) * 100).toFixed(1)
-                    : '0'}
-                  %
-                </p>
-              </div>
-              <div className="px-2.5 py-1.5 bg-purple-500/10 border border-purple-500/20 rounded-md">
-                <p className="text-[10px] text-purple-600">{t('tac.singularity') || 'TAC插花'}</p>
-                <p className="text-sm font-semibold text-purple-600">{taskResult.singularityCount || 0}</p>
-              </div>
-              <div className="px-2.5 py-1.5 bg-muted/50 rounded-md">
-                <p className="text-[10px] text-muted-foreground">{t('tac.matchRate') || '匹配率'}</p>
-                <p className="text-sm font-semibold">
-                  {taskResult.totalCells > 0
-                    ? ((taskResult.matchedCells / taskResult.totalCells) * 100).toFixed(1)
-                    : '0'}
-                  %
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* 任务状态 */}
-          <div className="mb-4 shrink-0">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs font-medium">{t('tac.progress') || '核查进度'}</span>
-              <span className="text-xs text-muted-foreground">
-                {taskResult.status === 'completed'
-                  ? (t('tac.completed') || '已完成')
-                  : taskResult.status === 'failed'
-                    ? (t('tac.failed') || '失败')
-                    : taskResult.status === 'processing'
-                      ? (t('tac.processing') || '进行中')
-                      : (t('tac.waiting') || '等待中')} ({taskResult.progress}%)
-              </span>
-            </div>
-            <div className="w-full bg-muted rounded-full h-1.5">
-              <div
-                className={`h-1.5 rounded-full transition-all duration-300 ${taskResult.status === 'completed'
-                    ? 'bg-green-500'
-                    : taskResult.status === 'failed'
-                      ? 'bg-red-500'
-                      : 'bg-primary'
-                  }`}
-                style={{ width: `${taskResult.progress}%` }}
-              />
-            </div>
-          </div>
-
-          {/* 两栏布局：结果表格 + 地图 */}
-          <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0 overflow-hidden">
-            {/* 左列：结果表格 */}
-            <div className="flex flex-col flex-1 min-w-0 min-h-0 w-1/2">
-              {/* 任务错误信息 */}
-              {taskResult.status === 'failed' && taskResult.error && (
-                <div className="mb-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle size={14} className="text-red-500 flex-shrink-0 mt-0.5" />
-                    <p className="text-xs text-red-600">{taskResult.error}</p>
-                  </div>
+              {cellListLoading ? (
+                <div className="flex-1 flex items-center justify-center text-muted-foreground">
+                  <Loader2 className="animate-spin" size={24} />
+                  <span className="ml-2 text-sm">加载中...</span>
                 </div>
-              )}
-
-              {/* 详细结果表格 */}
-              {taskResult.status === 'completed' && taskResult.results && (
-                <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-                  <div className="flex justify-end mb-3 shrink-0">
-                    <button
-                      onClick={() => setSearchEnabled(!searchEnabled)}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-sm ${searchEnabled
-                          ? 'bg-blue-400 text-white hover:bg-blue-500'
-                          : 'bg-muted hover:bg-muted/80'
-                        }`}
-                    >
-                      <Search size={16} />
-                      {t('tac.search') || '搜索'}
-                    </button>
+              ) : (() => {
+                const nt = (config?.networkType || 'LTE') as 'LTE' | 'NR'
+                const sectors = nt === 'LTE' ? cellListData.lte : cellListData.nr
+                const filtered = cellSearchValue
+                  ? sectors.filter(s => (s.siteId || '').includes(cellSearchValue) || s.id.includes(cellSearchValue) || (s.name || '').includes(cellSearchValue))
+                  : sectors
+                if (filtered.length === 0) return (<div className="flex-1 flex items-center justify-center text-muted-foreground"><p>暂无小区数据</p></div>)
+  return (
+    <div className="overflow-x-auto overflow-y-auto rounded-lg border border-border flex-1 min-h-0">
+      <table className="w-full text-xs text-left border-collapse table-fixed">
+        <thead className="sticky top-0 z-10 bg-background border-b border-border shadow-sm">
+          <tr>
+            <th className="p-2 bg-muted border-r border-border w-10 z-10"></th>
+            <th className="p-2 bg-muted border-r border-border w-[80px] z-10 text-[10px] font-medium">基站ID</th>
+            <th className="p-2 bg-muted border-r border-border w-[80px] z-10 text-[10px] font-medium">小区ID</th>
+            <th className="p-2 bg-muted border-r border-border z-10 text-[10px] font-medium">小区名称</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {filtered.map(sector => (
+            <tr key={sector.id} onClick={() => toggleCellSelection(sector.id)}
+              className={`cursor-pointer transition-colors ${selectedCellIds.has(sector.id) ? 'bg-blue-50/50' : 'bg-card hover:bg-muted/50'}`}>
+              <td className="p-2 border-r border-border w-10">
+                <div className={`w-4 h-4 rounded-sm border flex items-center justify-center ${selectedCellIds.has(sector.id) ? 'bg-blue-500 border-blue-500' : 'border-border'}`}>
+                  {selectedCellIds.has(sector.id) && <Check size={12} className="text-white" />}
+                </div>
+              </td>
+              <td className="p-2 font-mono truncate border-r border-border w-[80px]" title={sector.siteId || 'N/A'}>{sector.siteId || 'N/A'}</td>
+              <td className="p-2 font-mono truncate border-r border-border w-[80px]" title={sector.id.split('_').pop() || sector.id}>{sector.id.split('_').pop() || sector.id}</td>
+              <td className="p-2 truncate border-r border-border" title={sector.name}>{sector.name}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+})()}
+</div>
+          ) : (
+            /* 规划结果面板 */
+            <div className="flex flex-col h-full min-h-0 overflow-hidden">
+              {taskResult ? (
+                <>
+                  {/* 标题行 + 统计卡片 */}
+                  <div className="mb-3 shrink-0">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        {taskResult.status === 'completed' ? (
+                          <CheckCircle2 size={20} className="text-green-500" />
+                        ) : taskResult.status === 'failed' ? (
+                          <AlertCircle size={20} className="text-red-500" />
+                        ) : (
+                          <Loader2 size={20} className="animate-spin text-primary" />
+                        )}
+                        <h2 className="text-base font-semibold">{t('tac.checkResult') || '核查结果'}</h2>
+                        <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                          {getNetworkTypeLabel(taskResult?.networkType || config?.networkType || 'LTE')}
+                        </span>
+                      </div>
+                      {taskResult.status === 'completed' && (
+                        <button onClick={() => handleExport('xlsx')} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-400 text-white rounded-md hover:bg-blue-500 transition-colors text-sm">
+                          <Download size={14} />
+                          <span>{t('tac.export') || '导出'}</span>
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
+                      <div className="px-2.5 py-1.5 bg-muted/50 rounded-md">
+                        <p className="text-[10px] text-muted-foreground">{t('tac.networkType') || '网络类型'}</p>
+                        <p className="text-sm font-semibold">{taskResult.networkType || '-'}</p>
+                      </div>
+                      <div className="px-2.5 py-1.5 bg-muted/50 rounded-md">
+                        <p className="text-[10px] text-muted-foreground">{t('tac.totalCells') || '总小区'}</p>
+                        <p className="text-sm font-semibold">{taskResult.totalCells || 0}</p>
+                      </div>
+                      <div className="px-2.5 py-1.5 bg-green-500/10 border border-green-500/20 rounded-md">
+                        <p className="text-[10px] text-green-600">{t('tac.matched') || '匹配成功'}</p>
+                        <p className="text-sm font-semibold text-green-600">{taskResult.matchedCells || 0}</p>
+                      </div>
+                      <div className="px-2.5 py-1.5 bg-orange-500/10 border border-orange-500/20 rounded-md">
+                        <p className="text-[10px] text-orange-600">{t('tac.unmatched') || '未匹配'}</p>
+                        <p className="text-sm font-semibold text-orange-600">{taskResult.unmatchedCells || 0}</p>
+                      </div>
+                      <div className="px-2.5 py-1.5 bg-red-500/10 border border-red-500/20 rounded-md">
+                        <p className="text-[10px] text-red-600">{t('tac.tacMismatch') || 'TAC错配'}</p>
+                        <p className="text-sm font-semibold text-red-600">{taskResult.mismatchedCells || 0}</p>
+                      </div>
+                      <div className="px-2.5 py-1.5 bg-blue-500/10 border border-blue-500/20 rounded-md">
+                        <p className="text-[10px] text-blue-600">{t('tac.mismatchRate') || '错配率'}</p>
+                        <p className="text-sm font-semibold text-blue-600">
+                          {taskResult.matchedCells > 0 ? ((taskResult.mismatchedCells / taskResult.matchedCells) * 100).toFixed(1) : '0'}%
+                        </p>
+                      </div>
+                      <div className="px-2.5 py-1.5 bg-purple-500/10 border border-purple-500/20 rounded-md">
+                        <p className="text-[10px] text-purple-600">{t('tac.singularity') || 'TAC插花'}</p>
+                        <p className="text-sm font-semibold text-purple-600">{taskResult.singularityCount || 0}</p>
+                      </div>
+                      <div className="px-2.5 py-1.5 bg-muted/50 rounded-md">
+                        <p className="text-[10px] text-muted-foreground">{t('tac.matchRate') || '匹配率'}</p>
+                        <p className="text-sm font-semibold">
+                          {taskResult.totalCells > 0 ? ((taskResult.matchedCells / taskResult.totalCells) * 100).toFixed(1) : '0'}%
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div
-                    ref={tableContainerRef}
-                    onScroll={handleScroll}
-                    className="overflow-x-auto overflow-y-auto flex-1 min-h-0"
-                  >
+
+                  {/* 任务状态 */}
+                  <div className="mb-3 shrink-0">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-medium">{t('tac.progress') || '核查进度'}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {taskResult.status === 'completed' ? (t('tac.completed') || '已完成')
+                          : taskResult.status === 'failed' ? (t('tac.failed') || '失败')
+                          : taskResult.status === 'processing' ? (t('tac.processing') || '进行中')
+                          : (t('tac.waiting') || '等待中')} ({taskResult.progress}%)
+                      </span>
+                    </div>
+                    <div className="w-full bg-muted rounded-full h-1.5">
+                      <div className={`h-1.5 rounded-full transition-all duration-300 ${taskResult.status === 'completed' ? 'bg-green-500' : taskResult.status === 'failed' ? 'bg-red-500' : 'bg-primary'}`}
+                        style={{ width: `${taskResult.progress}%` }} />
+                    </div>
+                  </div>
+
+                  {/* 两栏布局：结果表格 + 地图 */}
+                  <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0 overflow-hidden">
+                    {/* 左列：结果表格 */}
+                    <div className="flex flex-col flex-1 min-w-0 min-h-0 w-1/2">
+                      {taskResult.status === 'failed' && taskResult.error && (
+                        <div className="mb-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                          <div className="flex items-start gap-2">
+                            <AlertCircle size={14} className="text-red-500 flex-shrink-0 mt-0.5" />
+                            <p className="text-xs text-red-600">{taskResult.error}</p>
+                          </div>
+                        </div>
+                      )}
+                      {taskResult.status === 'completed' && taskResult.results && (
+                        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                          <div className="flex justify-end mb-3 shrink-0">
+                            <button onClick={() => setSearchEnabled(!searchEnabled)}
+                              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-sm ${searchEnabled ? 'bg-blue-400 text-white hover:bg-blue-500' : 'bg-muted hover:bg-muted/80'}`}>
+                              <Search size={16} />
+                              {t('tac.search') || '搜索'}
+                            </button>
+                          </div>
+                          <div ref={tableContainerRef} onScroll={handleScroll}
+                            className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
                     <table className="w-full text-xs border-collapse table-fixed">
                       <thead className="sticky top-0 z-20 bg-background border-b border-border shadow-sm">
                         <tr>
@@ -1002,8 +1138,29 @@ export function TACPage() {
               </div>
             </div>
           </div>
+
+          {/* 导出路径提示 */}
+          {taskResult?.exportPath && (
+            <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-sm">
+              <div className="flex items-center gap-2">
+                <Download size={16} className="text-blue-500 flex-shrink-0" />
+                <span className="text-blue-600">
+                  {t('tac.exportedFile') || '已导出文件:'} <span className="font-mono">{taskResult.exportPath}</span>
+                </span>
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="flex-1 flex items-center justify-center text-muted-foreground flex-col">
+          <List size={48} className="mb-4 opacity-30" />
+          <p>选择网络类型后点击「开始核查」查看结果</p>
         </div>
       )}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

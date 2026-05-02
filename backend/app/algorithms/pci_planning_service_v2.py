@@ -43,6 +43,8 @@ class SiteSectorInfo:
     height: float = 30.0
     pci: Optional[int] = None
     earfcn: Optional[float] = None  # 下行频点，用于判断同频
+    cell_cover_type: int = 1  # 小区覆盖类型: 1=室外, 4=室内
+    station_spacing: Optional[float] = None  # 站间距（所属物理站点与最近8个站点的平均距离，公里）
 
 
 @dataclass
@@ -178,6 +180,99 @@ class PCIPlanningService:
             ):
                 same_site.append(sector)
         return same_site
+
+    def _calculate_station_spacing(
+        self, all_sectors: List[SiteSectorInfo]
+    ) -> None:
+        """计算每个小区的站间距（该站点与最近8个物理站点的平均距离）
+
+        1. 将室外小区按经纬度聚类为物理站点（100米内视为同站点）
+        2. 计算每个物理站点质心
+        3. 对每个站点，计算与最近8个其他站点的平均距离（排除规划站本身）
+        4. 同站点下的所有小区共享同一站间距
+
+        室分小区(cell_cover_type=4)不参与站间距计算，其station_spacing为None。
+        """
+        # 过滤出室外小区（排除室分）
+        outdoor_sectors = [s for s in all_sectors if s.cell_cover_type != 4]
+
+        if len(outdoor_sectors) <= 1:
+            for sector in all_sectors:
+                sector.station_spacing = None
+            return
+
+        # Step 1: 将室外小区聚类为物理站点（100米内视为同站点）
+        # 使用贪心聚类：每个小区的坐标若与已有站点质心距离<=100米则归入该站点
+        SAME_SITE_DISTANCE_M = 100  # 100米
+        SAME_SITE_DISTANCE_KM = SAME_SITE_DISTANCE_M / 1000.0
+
+        site_clusters: List[List[SiteSectorInfo]] = []
+
+        for sector in outdoor_sectors:
+            # 尝试归入已有站点
+            placed = False
+            for cluster in site_clusters:
+                # 使用簇内第一个小区作为参考坐标（各小区经纬度几乎相同）
+                ref = cluster[0]
+                dist = self.calculate_distance(
+                    sector.latitude, sector.longitude,
+                    ref.latitude, ref.longitude
+                )
+                if dist <= SAME_SITE_DISTANCE_KM:
+                    cluster.append(sector)
+                    placed = True
+                    break
+            if not placed:
+                site_clusters.append([sector])
+
+        # Step 2: 计算每个物理站点的质心坐标
+        site_centroids = []
+        for cluster in site_clusters:
+            avg_lat = sum(s.latitude for s in cluster) / len(cluster)
+            avg_lon = sum(s.longitude for s in cluster) / len(cluster)
+            site_centroids.append((avg_lat, avg_lon, cluster))
+
+        # Step 3: 对每个站点，计算与最近8个其他站点的平均距离
+        # 先计算所有站点间距离矩阵
+        num_sites = len(site_centroids)
+        site_distances: List[List[Tuple[int, float]]] = []  # [(site_idx, distance_km), ...]
+
+        for i in range(num_sites):
+            distances = []
+            lat_i, lon_i, _ = site_centroids[i]
+            for j in range(num_sites):
+                if i == j:
+                    continue
+                lat_j, lon_j, _ = site_centroids[j]
+                dist = self.calculate_distance(lat_i, lon_i, lat_j, lon_j)
+                distances.append((j, dist))
+            distances.sort(key=lambda x: x[1])
+            site_distances.append(distances)
+
+        # Step 4: 为每个站点的所有小区赋予站间距
+        for i, (_, _, cluster) in enumerate(site_centroids):
+            distances = site_distances[i]
+            nearest_count = min(8, len(distances))
+            if nearest_count == 0:
+                spacing = None
+            else:
+                nearest_dists = [d[1] for d in distances[:nearest_count]]
+                spacing = sum(nearest_dists) / nearest_count
+
+            for sector in cluster:
+                sector.station_spacing = spacing
+
+            nearest_site_ids = [str(d[0]) for d in distances[:nearest_count]]
+            print(
+                f"[PCI规划] 物理站点{i} (共{len(cluster)}个小区) 站间距: "
+                f"{spacing:.3f}km "
+                f"(基于{nearest_count}个最近站点, 索引={', '.join(nearest_site_ids)})"
+            )
+
+        # 室分小区站间距为None
+        for sector in all_sectors:
+            if sector.cell_cover_type == 4:
+                sector.station_spacing = None
 
     def check_same_site_mod_conflict(
         self,
@@ -325,6 +420,7 @@ class PCIPlanningService:
         target_earfcn: Optional[float],
         exclude_sector_id: str,
         all_sectors: List[SiteSectorInfo],
+        planning_sector: Optional[SiteSectorInfo] = None,
     ) -> Tuple[bool, float]:
         """验证PCI是否满足复用距离要求
 
@@ -332,6 +428,9 @@ class PCIPlanningService:
         1. 已分配的PCI列表 (self.assigned_pcis)
         2. 背景小区PCI (self.background_assigned_pcis)
         3. 原始工参数据中的PCI (all_sectors) - 包含本站PCI
+
+        当提供了planning_sector且其station_spacing有值时，叠加站间距约束：
+        复用距离必须同时满足 config.distance_threshold 和 station_spacing 中的较大值。
         """
         min_distance = float("inf")
 
@@ -372,8 +471,13 @@ class PCIPlanningService:
             if dist < min_distance:
                 min_distance = dist
 
+        # 计算有效阈值：取config阈值和站间距中的较大值
+        effective_threshold = self.config.distance_threshold
+        if planning_sector and planning_sector.station_spacing is not None:
+            effective_threshold = max(effective_threshold, planning_sector.station_spacing)
+
         # 检查是否满足最小复用距离
-        is_valid = min_distance >= self.config.distance_threshold
+        is_valid = min_distance >= effective_threshold
         return is_valid, min_distance
 
     def get_available_pcis(
@@ -384,8 +488,12 @@ class PCIPlanningService:
         exclude_sector_id: str,
         all_sectors: List[SiteSectorInfo],
         preferred_mod: Optional[int] = None,
+        planning_sector: Optional[SiteSectorInfo] = None,
     ) -> List[Tuple[int, float]]:
         """获取可用的PCI列表，按距离排序
+
+        Args:
+            planning_sector: 当前正在规划的小区，用于传递站间距约束
 
         Returns:
             List of (pci, min_distance) tuples
@@ -445,7 +553,7 @@ class PCIPlanningService:
             ):
                 continue  # 跳过有冲突的PCI
 
-            # 检查复用距离
+            # 检查复用距离（传递planning_sector用于站间距约束）
             is_valid, min_distance = self.validate_pci_reuse_distance(
                 pci,
                 target_lat,
@@ -453,6 +561,7 @@ class PCIPlanningService:
                 target_earfcn,
                 exclude_sector_id,
                 all_sectors,
+                planning_sector=planning_sector,
             )
 
             if is_valid:
@@ -518,6 +627,7 @@ class PCIPlanningService:
                     sector.id,
                     all_sectors,
                     preferred_mod,
+                    planning_sector=sector,
                 )
 
                 # 如果有可用PCI，选择最合适的
@@ -551,6 +661,7 @@ class PCIPlanningService:
                     sector.id,
                     all_sectors,
                     None,
+                    planning_sector=sector,
                 )
 
                 if available_pcis:
@@ -651,7 +762,7 @@ class PCIPlanningService:
                 print(f"[DEBUG best_compromise] 跳过PCI {pci} (模值冲突)")
                 continue
 
-            # 计算实际最小距离
+            # 计算实际最小距离（传递planning_sector用于站间距约束）
             _, min_distance = self.validate_pci_reuse_distance(
                 pci,
                 sector.latitude,
@@ -659,6 +770,7 @@ class PCIPlanningService:
                 sector.earfcn,
                 sector.id,
                 all_sectors,
+                planning_sector=sector,
             )
             print(f"[DEBUG best_compromise] PCI {pci}: min_distance={min_distance}")
 
@@ -702,6 +814,7 @@ class PCIPlanningService:
             sector.earfcn,
             sector.id,
             all_sectors,
+            planning_sector=sector,
         )
         self.assigned_pcis.append(
             (fallback_pci, sector.latitude, sector.longitude, sector.earfcn)
@@ -791,6 +904,7 @@ class PCIPlanningService:
                         height=sector_data.get("height", 30),
                         pci=sector_data.get("pci"),
                         earfcn=frequency,  # 修复：使用统一的频点变量而不是直接获取earfcn
+                        cell_cover_type=sector_data.get("cell_cover_type", 1),
                     )
                 )
 
@@ -858,6 +972,10 @@ class PCIPlanningService:
             print(f"[PCI规划] 加载背景小区: {bg_count} 个 (已剔除待规划小区)")
 
         total_sites = len(sites_data)
+
+        # 计算每个小区的站间距（该站点与最近8个物理站点的平均距离）
+        # 室分小区(cell_cover_type=4)不参与计算
+        self._calculate_station_spacing(all_sectors)
 
         # 按站点分组
         site_sectors: Dict[str, List[SiteSectorInfo]] = {}

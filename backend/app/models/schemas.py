@@ -193,6 +193,10 @@ class PCIConfig(BaseModel):
         default=False,
         description="是否同步执行TAC规划"
     )
+    selectedCellIds: Optional[List[str]] = Field(
+        default=None,
+        description="选中的小区ID列表（格式：siteId_sectorId），当提供时使用选中小区的数据而非待规划小区文件"
+    )
     customRules: Optional[List[Dict[str, Any]]] = None
 
     @field_validator('pciModulus')
@@ -461,6 +465,10 @@ class TACConfig(BaseModel):
             "singularity_threshold": 0.5,
         },
         description="TAC插花检测配置",
+    )
+    selectedCellIds: Optional[List[str]] = Field(
+        default=None,
+        description="选中的小区ID列表（格式：siteId_sectorId），当提供时使用选中小区的数据而非待规划小区文件"
     )
 
 

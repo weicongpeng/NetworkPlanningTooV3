@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Play, Download, Settings, Loader2, AlertCircle, Search, X, Ruler, Save, Check, GripVertical } from 'lucide-react'
+import { Play, Download, Settings, Loader2, AlertCircle, Search, X, Ruler, Save, Check, GripVertical, List } from 'lucide-react'
 import { pciApi, dataApi } from '../services/api'
 import type { ApiResponse } from '@shared/types'
 import { useTaskStore } from '../store/taskStore'
@@ -148,7 +148,7 @@ export function PCIPage() {
   const { t } = useTranslation()
   const [config, setConfig] = useState({
     networkType: 'LTE',
-    distanceThreshold: 5.0,
+    distanceThreshold: 10.0,
     inheritModulus: false,  // 新增：是否继承全量工参模数
     useMod3: true,          // LTE时可用
     useMod30: false,        // NR时可用
@@ -199,6 +199,16 @@ export function PCIPage() {
     minReuseDistance: ''
   })
   const [filteredResults, setFilteredResults] = useState<any[]>([])
+
+  // 左列页签状态：'cell-selection' | 'planning-result'
+  const [activeLeftTab, setActiveLeftTab] = useState<'cell-selection' | 'planning-result'>('planning-result')
+  // 选中的小区ID集合（格式：sector.id，如 siteId_sectorId）
+  const [selectedCellIds, setSelectedCellIds] = useState<Set<string>>(new Set())
+  // 小区选择页搜索值
+  const [cellSearchValue, setCellSearchValue] = useState('')
+  // 小区列表数据（从地图服务获取）
+  const [cellListData, setCellListData] = useState<{ lte: RenderSectorData[]; nr: RenderSectorData[] }>({ lte: [], nr: [] })
+  const [cellListLoading, setCellListLoading] = useState(false)
 
   // 翻译后的表格列配置
   const PCI_COLUMNS = [
@@ -575,7 +585,8 @@ export function PCIPage() {
           min: pciMin,
           max: pciMax
         },
-        enableTACPlanning: config.enableTACPlanning
+        enableTACPlanning: config.enableTACPlanning,
+        selectedCellIds: selectedCellIds.size > 0 ? Array.from(selectedCellIds) : undefined
       })
 
       if (response.success && response.data) {
@@ -1206,6 +1217,68 @@ export function PCIPage() {
     setIsWhitelistEnabled(true)
   }
 
+  // 加载小区列表数据（根据当前的网络类型）
+  const loadCellList = useCallback(async () => {
+    setCellListLoading(true)
+    try {
+      const mapData = await mapDataService.getMapData(12, false)
+      setCellListData({
+        lte: mapData.lteSectors || [],
+        nr: mapData.nrSectors || []
+      })
+    } catch (err) {
+      console.error('[PCIPage] 加载小区列表失败:', err)
+    } finally {
+      setCellListLoading(false)
+    }
+  }, [])
+
+  // 初始加载小区列表
+  useEffect(() => {
+    loadCellList()
+  }, [loadCellList])
+
+  // 切换单个小区选中状态
+  const toggleCellSelection = (cellId: string) => {
+    setSelectedCellIds(prev => {
+      const next = new Set(prev)
+      if (next.has(cellId)) {
+        next.delete(cellId)
+      } else {
+        next.add(cellId)
+      }
+      return next
+    })
+  }
+
+  // 全选/取消全选当前网络类型的小区
+  const toggleSelectAll = () => {
+    const networkType = config.networkType as 'LTE' | 'NR'
+    const sectors = networkType === 'LTE' ? cellListData.lte : cellListData.nr
+    const allIds = sectors.map(s => s.id)
+    const allSelected = allIds.length > 0 && allIds.every(id => selectedCellIds.has(id))
+    if (allSelected) {
+      // 取消全选
+      setSelectedCellIds(prev => {
+        const next = new Set(prev)
+        allIds.forEach(id => next.delete(id))
+        return next
+      })
+    } else {
+      // 全选
+      setSelectedCellIds(prev => {
+        const next = new Set(prev)
+        allIds.forEach(id => next.add(id))
+        return next
+      })
+    }
+  }
+
+  // 清空所有选中
+  const clearSelections = () => {
+    setSelectedCellIds(new Set())
+  }
+
   return (
     <div className="h-full flex flex-col p-4 min-h-0">
       <h1 className="text-3xl font-bold mb-6 shrink-0">{t('pci.title') || 'PCI规划'}</h1>
@@ -1236,6 +1309,7 @@ export function PCIPage() {
                 value={config.networkType}
                 options={['LTE', 'NR']}
                 onChange={(value) => {
+                  setSelectedCellIds(new Set())
                   setConfig({
                     ...config,
                     networkType: value,
@@ -1243,6 +1317,7 @@ export function PCIPage() {
                     useMod30: value === 'NR',
                     pciRange: value === 'LTE' ? '0-503' : '0-1007'
                   })
+                  loadCellList()
                 }}
                 disabled={isRunning}
               />
@@ -1346,211 +1421,364 @@ export function PCIPage() {
             })()}
           </div>
 
-          {/* 规划结果 */}
-          <div className="bg-card p-3 rounded-lg border border-border flex flex-col min-h-0">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-6">
-                <h2 className="text-base font-semibold">{t('pci.planningResult') || '规划结果'}</h2>
-                {currentTaskResult?.status === 'completed' && (
-                  <div className="flex items-center gap-4 text-sm">
-                    <span className="text-blue-600">{t('pci.siteTotal') || '基站总数'}：<span className="font-bold text-blue-600">{currentTaskResult.totalSites || 0}</span></span>
-                    <span className="text-blue-600">{t('pci.cellTotal') || '小区总数'}：<span className="font-bold text-blue-600">{currentTaskResult.totalSectors || 0}</span></span>
-                  </div>
+          {/* 小区选择与结果面板（页签切换） */}
+          <div className="bg-card p-3 rounded-lg border border-border flex flex-col min-h-0 overflow-hidden">
+            {/* 页签切换栏 */}
+            <div className="flex items-center gap-1 mb-3 border-b border-border shrink-0">
+              <button
+                onClick={() => setActiveLeftTab('cell-selection')}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+                  activeLeftTab === 'cell-selection'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {t('pci.cellSelection') || '小区选择'}
+                {selectedCellIds.size > 0 && (
+                  <span className="ml-2 px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">
+                    {selectedCellIds.size}
+                  </span>
                 )}
-              </div>
-              {currentTaskResult?.status === 'completed' && (
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => setResultSearchEnabled(!resultSearchEnabled)}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-xs font-medium ${
-                      resultSearchEnabled
-                        ? 'bg-blue-400 text-white hover:bg-blue-500'
-                        : 'bg-card border border-border hover:bg-muted/80'
-                    }`}
-                  >
-                    <Search size={14} />
-                    {t('pci.search') || '搜索'}
-                  </button>
-                  <button
-                    onClick={handleExport}
-                    className="flex items-center justify-center gap-2 px-4 py-2 bg-card border border-border rounded-lg hover:bg-muted/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium whitespace-nowrap"
-                  >
-                    <Download size={14} />
-                    {t('pci.export') || '导出结果'}
-                  </button>
-                  <button
-                    onClick={handleApplyToParams}
-                    disabled={applyingToParams}
-                    className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all text-xs font-medium whitespace-nowrap ${
-                      applySuccess
-                        ? 'bg-green-500/20 border border-green-500/50 text-green-600'
-                        : applyingToParams
-                          ? 'bg-blue-500/20 border border-blue-500/50 text-blue-600'
-                          : 'bg-card border border-border hover:bg-muted/80'
-                    } disabled:opacity-50 disabled:cursor-not-allowed`}
-                  >
-                    {applyingToParams ? (
-                      <>
-                        <Loader2 size={14} className="animate-spin" />
-                        {t('pci.applying') || '应用中...'}
-                      </>
-                    ) : applySuccess ? (
-                      <>
-                        <Check size={14} />
-                        {t('pci.applied') || '已应用'}
-                      </>
-                    ) : (
-                      <>
-                        <Save size={14} />
-                        {t('pci.apply') || '应用到工参'}
-                      </>
-                    )}
-                  </button>
+              </button>
+              <button
+                onClick={() => setActiveLeftTab('planning-result')}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+                  activeLeftTab === 'planning-result'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {t('pci.planningResult') || '规划结果'}
+                {currentTaskResult?.status === 'completed' && (
+                  <span className="ml-2 px-1.5 py-0.5 text-xs bg-green-100 text-green-700 rounded-full">✓</span>
+                )}
+              </button>
+            </div>
+
+            {/* 页签内容 */}
+            <div className="flex-1 min-h-0 overflow-hidden">
+              {activeLeftTab === 'cell-selection' ? (
+                /* 小区选择面板 */
+                <div className="flex flex-col h-full overflow-hidden">
+                  {/* 工具栏：搜索、全选、清空 */}
+                  <div className="flex items-center gap-2 mb-2 shrink-0">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" size={14} />
+                      <input
+                        type="text"
+                        value={cellSearchValue}
+                        onChange={(e) => setCellSearchValue(e.target.value)}
+                        placeholder={t('pci.cellSearchPlaceholder') || '搜索基站ID、小区ID或名称...'}
+                        className="w-full pl-8 pr-3 py-1.5 text-xs bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary"
+                      />
+                    </div>
+                    <button
+                      onClick={toggleSelectAll}
+                      className="px-2 py-1.5 text-xs bg-card border border-border rounded-lg hover:bg-muted/80 transition-colors shrink-0"
+                    >
+                      {(() => {
+                        const networkType = config.networkType as 'LTE' | 'NR'
+                        const sectors = networkType === 'LTE' ? cellListData.lte : cellListData.nr
+                        const allSelected = sectors.length > 0 && sectors.every(s => selectedCellIds.has(s.id))
+                        return allSelected ? (t('pci.deselectAll') || '取消全选') : (t('pci.selectAll') || '全选')
+                      })()}
+                    </button>
+                    <button
+                      onClick={clearSelections}
+                      className="px-2 py-1.5 text-xs bg-card border border-border rounded-lg hover:bg-muted/80 transition-colors shrink-0"
+                    >
+                      {t('pci.clearSelections') || '清空选择'}
+                    </button>
+                    <span className="text-xs text-muted-foreground ml-auto shrink-0">
+                      {(t('pci.selectedCount') || '已选中 {{count}} 个小区').replace('{{count}}', String(selectedCellIds.size))}
+                    </span>
+                  </div>
+
+                  {/* 数据源提示 */}
+                  <div className="text-xs text-muted-foreground mb-2 shrink-0">
+                    {(t('pci.cellListSource') || '数据源：{{type}} 小区').replace('{{type}}', config.networkType)}
+                  </div>
+
+                  {/* 小区列表 */}
+                  {cellListLoading ? (
+                    <div className="flex-1 flex items-center justify-center text-muted-foreground">
+                      <Loader2 className="animate-spin" size={24} />
+                      <span className="ml-2 text-sm">{t('pci.loadingCells') || '加载中...'}</span>
+                    </div>
+                  ) : (
+                    (() => {
+                      const networkType = config.networkType as 'LTE' | 'NR'
+                      const sectors = networkType === 'LTE' ? cellListData.lte : cellListData.nr
+                      const filtered = cellSearchValue
+                        ? sectors.filter(s =>
+                            (s.siteId || '').includes(cellSearchValue) ||
+                            s.id.includes(cellSearchValue) ||
+                            (s.name || '').includes(cellSearchValue)
+                          )
+                        : sectors
+
+                      if (filtered.length === 0) {
+                        return (
+                          <div className="flex-1 flex items-center justify-center text-muted-foreground">
+                            <p>{t('pci.noCells') || '暂无小区数据'}</p>
+                          </div>
+                        )
+                      }
+
+                      return (
+                        <div className="overflow-x-auto overflow-y-auto rounded-lg border border-border flex-1 min-h-0">
+                          <table className="w-full text-xs text-left border-collapse table-fixed">
+                            <thead className="sticky top-0 z-10 bg-background border-b border-border shadow-sm">
+                              <tr>
+                                <th className="p-2 bg-muted border-r border-border w-10 z-10"></th>
+                                <th className="p-2 bg-muted border-r border-border w-[80px] z-10 text-[10px] font-medium">{t('pci.siteId') || '基站ID'}</th>
+                                <th className="p-2 bg-muted border-r border-border w-[80px] z-10 text-[10px] font-medium">{t('pci.sectorId') || '小区ID'}</th>
+                                <th className="p-2 bg-muted border-r border-border z-10 text-[10px] font-medium">{t('pci.sectorName') || '小区名称'}</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                              {filtered.map(sector => (
+                                <tr
+                                  key={sector.id}
+                                  onClick={() => toggleCellSelection(sector.id)}
+                                  className={`cursor-pointer transition-colors ${
+                                    selectedCellIds.has(sector.id)
+                                      ? 'bg-blue-50/50'
+                                      : 'bg-card hover:bg-muted/50'
+                                  }`}
+                                >
+                                  <td className="p-2 border-r border-border w-10">
+                                    <div className={`w-4 h-4 rounded-sm border flex items-center justify-center ${
+                                      selectedCellIds.has(sector.id)
+                                        ? 'bg-blue-500 border-blue-500'
+                                        : 'border-border'
+                                    }`}>
+                                      {selectedCellIds.has(sector.id) && (
+                                        <Check size={12} className="text-white" />
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="p-2 font-mono truncate border-r border-border w-[80px]" title={sector.siteId || 'N/A'}>{sector.siteId || 'N/A'}</td>
+                                  <td className="p-2 font-mono truncate border-r border-border w-[80px]" title={sector.id.split('_').pop() || sector.id}>{sector.id.split('_').pop() || sector.id}</td>
+                                  <td className="p-2 truncate border-r border-border" title={sector.name}>{sector.name}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )
+                    })()
+                  )}
+                </div>
+              ) : (
+                /* 规划结果面板 */
+                <div className="flex flex-col h-full min-h-0 overflow-hidden">
+                  {currentTaskResult?.status === 'completed' && (
+                    <div className="flex items-center justify-between mb-3 shrink-0">
+                      <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-4 text-sm">
+                          <span className="text-blue-600">{t('pci.siteTotal') || '基站总数'}：<span className="font-bold text-blue-600">{currentTaskResult.totalSites || 0}</span></span>
+                          <span className="text-blue-600">{t('pci.cellTotal') || '小区总数'}：<span className="font-bold text-blue-600">{currentTaskResult.totalSectors || 0}</span></span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => setResultSearchEnabled(!resultSearchEnabled)}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-xs font-medium ${
+                            resultSearchEnabled
+                              ? 'bg-blue-400 text-white hover:bg-blue-500'
+                              : 'bg-card border border-border hover:bg-muted/80'
+                          }`}
+                        >
+                          <Search size={14} />
+                          {t('pci.search') || '搜索'}
+                        </button>
+                        <button
+                          onClick={handleExport}
+                          className="flex items-center justify-center gap-2 px-4 py-2 bg-card border border-border rounded-lg hover:bg-muted/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium whitespace-nowrap"
+                        >
+                          <Download size={14} />
+                          {t('pci.export') || '导出结果'}
+                        </button>
+                        <button
+                          onClick={handleApplyToParams}
+                          disabled={applyingToParams}
+                          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all text-xs font-medium whitespace-nowrap ${
+                            applySuccess
+                              ? 'bg-green-500/20 border border-green-500/50 text-green-600'
+                              : applyingToParams
+                                ? 'bg-blue-500/20 border border-blue-500/50 text-blue-600'
+                                : 'bg-card border border-border hover:bg-muted/80'
+                          } disabled:opacity-50 disabled:cursor-not-allowed`}
+                        >
+                          {applyingToParams ? (
+                            <>
+                              <Loader2 size={14} className="animate-spin" />
+                              {t('pci.applying') || '应用中...'}
+                            </>
+                          ) : applySuccess ? (
+                            <>
+                              <Check size={14} />
+                              {t('pci.applied') || '已应用'}
+                            </>
+                          ) : (
+                            <>
+                              <Save size={14} />
+                              {t('pci.apply') || '应用到工参'}
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {!currentTaskResult ? (
+                    <div className="flex-1 flex items-center justify-center text-muted-foreground flex-col">
+                      <List size={48} className="mb-4 opacity-30" />
+                      <p>{t('pci.configAndPlan') || '配置参数后点击「开始规划」查看结果'}</p>
+                      <p className="text-xs mt-2">{t('pci.uploadRequired') || '需要先上传「全量工参」和「待规划小区」文件'}</p>
+                    </div>
+                  ) : currentTaskResult.status === 'failed' ? (
+                    <div className="flex-1 flex items-center justify-center text-red-500">
+                      <AlertCircle size={48} className="mb-4" />
+                      <p className="font-semibold">{t('pci.planFailed') || '规划任务失败'}</p>
+                    </div>
+                  ) : currentTaskResult.status === 'completed' ? (
+                    <>
+                      {/* 结果表格 */}
+                      {currentTaskResult.results && currentTaskResult.results.length > 0 ? (
+                        <div className="overflow-x-auto overflow-y-auto rounded-lg border border-border flex-1 min-h-0">
+                          <table className="w-full text-xs text-left border-collapse table-fixed">
+                            <thead className="sticky top-0 z-20 bg-background border-b border-border shadow-sm">
+                              <tr>
+                                {PCI_COLUMNS.map((column) => (
+                                  <th
+                                    key={column.key}
+                                    className="p-2 bg-muted z-20 relative group border-r border-border"
+                                    style={{ width: `${pciColumnWidths[column.key]}px`, minWidth: `${pciColumnWidths[column.key]}px` }}
+                                  >
+                                    <span className="block pr-3">{column.label}</span>
+                                    {resultSearchEnabled && (
+                                      <input
+                                        type="text"
+                                        value={resultSearchFilters[column.key as keyof typeof resultSearchFilters]}
+                                        onChange={(e) => handleResultSearchChange(column.key, e.target.value)}
+                                        placeholder={t('pci.search') || '搜索'}
+                                        className="mt-1 w-full p-1 border border-border rounded text-[10px] bg-white dark:bg-slate-800"
+                                      />
+                                    )}
+                                    <div
+                                      className={`table-resize-handle ${pciResizingColumn === column.key ? 'resizing' : ''}`}
+                                      onMouseDown={(e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        handlePciResizeStart(column.key, e.clientX)
+                                      }}
+                                    >
+                                      <GripVertical size={12} className="opacity-0 group-hover:opacity-40 text-muted-foreground absolute right-0.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                    </div>
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                              {filteredResults.map((sector: any, idx: number) => {
+                                const normalizedSiteId = String(sector.siteId).trim()
+                                const normalizedSectorId = String(sector.sectorId).trim()
+                                const sectorKey = `${normalizedSiteId}-${normalizedSectorId}`
+                                const isSelected = selectedSectorKey === sectorKey
+
+                                return (
+                                  <tr
+                                    key={`${sector.siteId}-${sector.sectorId}-${idx}`}
+                                    className={`border-b cursor-pointer transition-colors ${
+                                      isSelected
+                                        ? 'bg-[#87CEEB]'
+                                        : 'bg-card hover:bg-muted/50'
+                                    }`}
+                                    onClick={() => handleResultRowClick(
+                                      sector.siteId,
+                                      sector.sectorId,
+                                      sector.newPCI,
+                                      sector.frequency || sector.earfcn || sector.ssb_frequency || null
+                                    )}
+                                  >
+                                    {PCI_COLUMNS.map((column) => {
+                                      const width = pciColumnWidths[column.key]
+                                      const getCellValue = () => {
+                                        switch (column.key) {
+                                          case 'networkType':
+                                            return sector.networkType || '-'
+                                          case 'siteId':
+                                            return sector.siteId
+                                          case 'cellId':
+                                            return sector.managedElementId || sector.siteName || sector.siteId
+                                          case 'sectorId':
+                                            return sector.sectorId
+                                          case 'sectorName':
+                                            return sector.sectorName
+                                          case 'frequency':
+                                            return sector.frequency || sector.earfcn || sector.ssb_frequency || '-'
+                                          case 'originalPCI':
+                                            return sector.originalPCI ?? '-'
+                                          case 'newPCI':
+                                            return sector.newPCI
+                                          case 'originalMod':
+                                            return sector.originalMod ?? '-'
+                                          case 'newMod':
+                                            return sector.newMod ?? '-'
+                                          case 'tac':
+                                            return sector.tac ?? '-'
+                                          case 'assignmentReason':
+                                            return sector.assignmentReason || '-'
+                                          case 'minReuseDistance':
+                                            return sector.minReuseDistance && isFinite(Number(sector.minReuseDistance))
+                                              ? Number(sector.minReuseDistance).toFixed(2) + ' km'
+                                              : '-'
+                                          default:
+                                            return null
+                                        }
+                                      }
+
+                                      const value = getCellValue()
+                                      const isTruncated = column.key === 'sectorName' || column.key === 'assignmentReason'
+
+                                      return (
+                                        <td
+                                          key={column.key}
+                                          className={`p-2 border-r border-border ${isTruncated ? 'truncate' : ''} ${column.key === 'newPCI' ? 'font-semibold' : ''}`}
+                                          style={{
+                                            width: `${width}px`,
+                                            minWidth: `${width}px`,
+                                            maxWidth: `${width}px`
+                                          }}
+                                          title={isTruncated ? value : undefined}
+                                        >
+                                          {value}
+                                        </td>
+                                      )
+                                    })}
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="flex-1 flex items-center justify-center text-muted-foreground">
+                          <p>{t('pci.noResult') || '暂无匹配结果'}</p>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center text-muted-foreground">
+                      <Loader2 className="animate-spin mb-4" size={48} />
+                      <p>{t('pci.planning') || '规划进行中，请稍候...'}</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-
-            {!currentTaskResult ? (
-              <div className="text-center py-16 text-muted-foreground">
-                <Settings size={48} className="mx-auto mb-4 opacity-50" />
-                <p>{t('pci.configAndPlan') || '配置参数后点击"开始规划"查看结果'}</p>
-                <p className="text-xs mt-2">{t('pci.uploadRequired') || '需要先上传"全量工参"和"待规划小区"文件'}</p>
-              </div>
-            ) : currentTaskResult.status === 'failed' ? (
-              <div className="text-center py-16 text-red-500">
-                <AlertCircle size={48} className="mx-auto mb-4" />
-                <p className="font-semibold">{t('pci.planFailed') || '规划任务失败'}</p>
-              </div>
-            ) : currentTaskResult.status === 'completed' ? (
-              <>
-                {/* 结果表格 */}
-                {currentTaskResult.results && currentTaskResult.results.length > 0 && (
-                  <div className="overflow-x-auto overflow-y-auto rounded-lg border border-border flex-1 min-h-0">
-                    <table className="w-full text-xs text-left border-collapse table-fixed">
-                      <thead className="sticky top-0 z-20 bg-background border-b border-border shadow-sm">
-                        <tr>
-                          {PCI_COLUMNS.map((column) => (
-                            <th
-                              key={column.key}
-                              className="p-2 bg-muted z-20 relative group border-r border-border"
-                              style={{ width: `${pciColumnWidths[column.key]}px`, minWidth: `${pciColumnWidths[column.key]}px` }}
-                            >
-                              <span className="block pr-3">{column.label}</span>
-                              {resultSearchEnabled && (
-                                <input
-                                  type="text"
-                                  value={resultSearchFilters[column.key as keyof typeof resultSearchFilters]}
-                                  onChange={(e) => handleResultSearchChange(column.key, e.target.value)}
-                                  placeholder={t('pci.search') || '搜索'}
-                                  className="mt-1 w-full p-1 border border-border rounded text-[10px] bg-white dark:bg-slate-800"
-                                />
-                              )}
-                              <div
-                                className={`table-resize-handle ${pciResizingColumn === column.key ? 'resizing' : ''}`}
-                                onMouseDown={(e) => {
-                                  e.preventDefault()
-                                  e.stopPropagation()
-                                  handlePciResizeStart(column.key, e.clientX)
-                                }}
-                              >
-                                <GripVertical size={12} className="opacity-0 group-hover:opacity-40 text-muted-foreground absolute right-0.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                              </div>
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {filteredResults.map((sector: any, idx: number) => {
-                          // 确保键值格式一致（转换为字符串，去除首尾空格）
-                          const normalizedSiteId = String(sector.siteId).trim()
-                          const normalizedSectorId = String(sector.sectorId).trim()
-                          const sectorKey = `${normalizedSiteId}-${normalizedSectorId}`
-                          const isSelected = selectedSectorKey === sectorKey
-
-                          return (
-                            <tr
-                              key={`${sector.siteId}-${sector.sectorId}-${idx}`}
-                              className={`border-b cursor-pointer transition-colors ${
-                                isSelected
-                                  ? 'bg-[#87CEEB]'
-                                  : 'bg-card hover:bg-muted/50'
-                              }`}
-                              onClick={() => handleResultRowClick(
-                                sector.siteId,
-                                sector.sectorId,
-                                sector.newPCI,
-                                sector.frequency || sector.earfcn || sector.ssb_frequency || null
-                              )}
-                            >
-                              {PCI_COLUMNS.map((column) => {
-                                const width = pciColumnWidths[column.key]
-                                const getCellValue = () => {
-                                  switch (column.key) {
-                                    case 'networkType':
-                                      return sector.networkType || '-'
-                                    case 'siteId':
-                                      return sector.siteId
-                                    case 'cellId':
-                                      return sector.managedElementId || sector.siteName || sector.siteId
-                                    case 'sectorId':
-                                      return sector.sectorId
-                                    case 'sectorName':
-                                      return sector.sectorName
-                                    case 'frequency':
-                                      return sector.frequency || sector.earfcn || sector.ssb_frequency || '-'
-                                    case 'originalPCI':
-                                      return sector.originalPCI ?? '-'
-                                    case 'newPCI':
-                                      return sector.newPCI
-                                    case 'originalMod':
-                                      return sector.originalMod ?? '-'
-                                    case 'newMod':
-                                      return sector.newMod ?? '-'
-                                    case 'tac':
-                                      return sector.tac ?? '-'
-                                    case 'assignmentReason':
-                                      return sector.assignmentReason || '-'
-                                    case 'minReuseDistance':
-                                      return sector.minReuseDistance && isFinite(Number(sector.minReuseDistance))
-                                        ? Number(sector.minReuseDistance).toFixed(2) + ' km'
-                                        : '-'
-                                    default:
-                                      return null
-                                  }
-                                }
-
-                                const value = getCellValue()
-                                const isTruncated = column.key === 'sectorName' || column.key === 'assignmentReason'
-
-                                return (
-                                  <td
-                                    key={column.key}
-                                    className={`p-2 border-r border-border ${isTruncated ? 'truncate' : ''} ${column.key === 'newPCI' ? 'font-semibold' : ''}`}
-                                    style={{
-                                      width: `${width}px`,
-                                      minWidth: `${width}px`,
-                                      maxWidth: `${width}px`
-                                    }}
-                                    title={isTruncated ? value : undefined}
-                                  >
-                                    {value}
-                                  </td>
-                                )
-                              })}
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="text-center py-16 text-muted-foreground">
-                <Loader2 className="animate-spin mx-auto mb-4" size={48} />
-                <p>{t('pci.planning') || '规划进行中，请稍候...'}</p>
-              </div>
-            )}
           </div>
         </div>
 

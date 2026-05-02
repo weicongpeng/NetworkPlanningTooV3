@@ -289,7 +289,17 @@
     "hideLegend": "隐藏图例",
     "selectedCell": "选中的小区",
     "sameFreqPCI": "同频同PCI",
-    "otherCell": "其他小区"
+    "otherCell": "其他小区",
+    "cellSelection": "小区选择",
+    "selectAll": "全选",
+    "deselectAll": "取消全选",
+    "clearSelections": "清空选择",
+    "selectedCount": "已选中 {{count}} 个小区",
+    "cellSearchPlaceholder": "搜索基站ID、小区ID或名称...",
+    "noCells": "暂无小区数据",
+    "loadingCells": "加载中...",
+    "cellListSource": "数据源：{{type}} 小区",
+    "noResult": "暂无匹配结果"
   },
   "neighbor": {
     "title": "邻区规划",

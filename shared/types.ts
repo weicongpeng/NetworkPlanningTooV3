@@ -87,6 +87,7 @@ export interface PCIConfig {
   enableTACPlanning?: boolean
   enableCollisionCheck?: boolean
   enableConfusionCheck?: boolean
+  selectedCellIds?: string[]  // 选中的小区ID列表（格式：siteId_sectorId）
   customRules?: PCIRule[]
 }
 
@@ -205,6 +206,7 @@ export interface TACConfig {
     searchRadius: number
     singularityThreshold: number
   }
+  selectedCellIds?: string[]  // 选中的小区ID列表（格式：siteId_sectorId）
 }
 
 export interface TACResult {
