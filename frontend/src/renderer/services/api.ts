@@ -595,6 +595,11 @@ export const mapApi = {
     return apiClient.get('/map/data')
   },
 
+  // 获取小区选择列表（轻量API）
+  getCells: async (): Promise<ApiResponse<{ lte: any[]; nr: any[]; total: number }>> => {
+    return apiClient.get('/map/cells')
+  },
+
   // 获取在线地图配置
   getOnlineConfig: async (): Promise<ApiResponse<any>> => {
     return apiClient.get('/map/online-config')

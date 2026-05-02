@@ -174,6 +174,76 @@ def _load_map_data_from_files(data_service) -> Dict[str, Any]:
     }
 
 
+@router.get("/cells", response_model=Dict[str, Any])
+async def get_cell_list(limit: int = 50000) -> Dict[str, Any]:
+    """获取小区选择列表（轻量API，不含坐标转换）
+    
+    比 /api/v1/map/data 轻量许多：
+    - 只返回 id/name/siteId/networkType 四个字段
+    - 跳过扇区验证、坐标转换、边界计算
+    - 复用 _load_map_data_from_files() 的缓存机制
+    """
+    try:
+        from app.services.data_service import data_service
+        global _map_data_cache, _map_data_cache_time
+
+        # 复用地图数据的文件缓存
+        current_time = time.time()
+        if _map_data_cache is None or (current_time - _map_data_cache_time) > _map_data_cache_ttl:
+            _map_data_cache = await run_in_threadpool(_load_map_data_from_files, data_service)
+            _map_data_cache_time = current_time
+
+        all_sites = _map_data_cache.get("sites", [])
+        cells_lte: List[Dict[str, Any]] = []
+        cells_nr: List[Dict[str, Any]] = []
+        dedup_set: set = set()
+
+        for site in all_sites:
+            site_name = site.get("name", "")
+            network_type = site.get("networkType", "")
+            site_id = site.get("id") or site.get("siteId") or ""
+            sectors = site.get("sectors") or []
+
+            for sector in sectors:
+                cell_id = sector.get("id") or sector.get("cellId") or sector.get("sectorId") or ""
+                unique_key = f"{site_id}_{cell_id}"
+
+                # 去重：同一站点下相同ID的扇区只保留一个
+                if unique_key in dedup_set:
+                    continue
+                dedup_set.add(unique_key)
+
+                sector_name = sector.get("name") or site_name or unique_key
+
+                cell_item = {
+                    "id": unique_key,
+                    "name": sector_name,
+                    "siteId": site_id,
+                    "networkType": network_type
+                }
+
+                if network_type == "LTE":
+                    cells_lte.append(cell_item)
+                elif network_type == "NR":
+                    cells_nr.append(cell_item)
+
+                if len(cells_lte) + len(cells_nr) >= limit:
+                    break
+            if len(cells_lte) + len(cells_nr) >= limit:
+                break
+
+        return {
+            "success": True,
+            "data": {
+                "lte": cells_lte,
+                "nr": cells_nr,
+                "total": len(cells_lte) + len(cells_nr)
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/cache/clear", response_model=Dict[str, Any])
 async def clear_map_cache() -> Dict[str, Any]:
     """清除地图数据缓存"""

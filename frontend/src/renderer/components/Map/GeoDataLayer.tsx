@@ -574,32 +574,18 @@ export class GeoDataLayer {
    * 设置可见性
    */
   setVisible(map: L.Map, visible: boolean): this {
-    // 🔴 强制输出 - 使用 alert 确保能看到
-    console.error('🔴🔴🔴 [GeoDataLayer] setVisible 被调用！id=' + this.id + ', visible=' + visible)
-    console.log(`[GeoDataLayer] ========== setVisible 被调用 ==========`)
-    console.log(`[GeoDataLayer] id: ${this.id}`)
-    console.log(`[GeoDataLayer] name: ${this.name}`)
-    console.log(`[GeoDataLayer] geometryType: ${this.geometryType}`)
-    console.log(`[GeoDataLayer] visible: ${this.visible} -> ${visible}`)
-    console.log(`[GeoDataLayer] data.length: ${this.data.length}`)
-    console.log(`[GeoDataLayer] 🗺️ map 存在:`, !!map)
-
     this.visible = visible
     if (visible) {
-      console.log(`[GeoDataLayer] 调用 addTo(map)`)
       try {
-        const result = this.addTo(map)
-        console.log(`[GeoDataLayer] ✅ addTo 返回:`, result)
+        this.addTo(map)
       } catch (error) {
-        console.error(`[GeoDataLayer] ❌ addTo 出错:`, error)
+        console.error(`[GeoDataLayer] addTo 出错:`, error)
         throw error
       }
     } else {
-      console.log(`[GeoDataLayer] 调用 remove(map)`)
       this.remove(map)
     }
 
-    console.log(`[GeoDataLayer] ========== setVisible 完成 ==========`)
     return this
   }
 

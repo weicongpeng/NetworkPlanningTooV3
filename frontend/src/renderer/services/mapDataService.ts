@@ -502,3 +502,84 @@ export class MapDataService {
 
 // 单例导出
 export const mapDataService = new MapDataService()
+
+// ============================================================
+// 轻量级小区列表服务（独立于地图数据，用于小区选择表格）
+// ============================================================
+
+/** 小区选择列表项（最小字段） */
+export interface CellListItem {
+  id: string
+  name: string
+  siteId: string
+  networkType: 'LTE' | 'NR'
+}
+
+/** 小区列表响应 */
+interface CellListResponse {
+  lte: CellListItem[]
+  nr: CellListItem[]
+}
+
+// 独立缓存（10分钟，与后端缓存TTL一致，减少跨期错配）
+let _cellListCache: { data: CellListResponse | null; time: number } = {
+  data: null, time: 0
+}
+const _CELL_LIST_CACHE_TTL = 10 * 60 * 1000
+
+/**
+ * 获取小区选择列表（轻量级，跳过坐标转换和扇区验证）
+ *
+ * 与 getMapData() 的区别：
+ * - 只返回 id/name/siteId/networkType 四个字段
+ * - 调用后端轻量 API /map/cells
+ * - 独立缓存（10分钟 TTL）
+ * - 不经过 IndexedDB
+ */
+export async function getCellList(): Promise<CellListResponse> {
+  // 检查缓存
+  if (_cellListCache.data && Date.now() - _cellListCache.time < _CELL_LIST_CACHE_TTL) {
+    console.log('[CellList] 使用内存缓存')
+    return _cellListCache.data
+  }
+
+  try {
+    const t0 = performance.now()
+    console.log('[CellList] 从后端获取小区列表')
+    const response = await mapApi.getCells()
+    const t1 = performance.now()
+
+    // 去重：使用 Set 确保 id 唯一，防御后端脏数据
+    const seen = new Set<string>()
+    const dedupLte: CellListItem[] = []
+    const dedupNr: CellListItem[] = []
+    for (const item of (response?.data?.lte || [])) {
+      if (!seen.has(item.id)) { seen.add(item.id); dedupLte.push(item) }
+    }
+    for (const item of (response?.data?.nr || [])) {
+      if (!seen.has(item.id)) { seen.add(item.id); dedupNr.push(item) }
+    }
+    const t2 = performance.now()
+
+    const data: CellListResponse = {
+      lte: dedupLte,
+      nr: dedupNr
+    }
+
+    // 写入缓存
+    _cellListCache = { data, time: Date.now() }
+    console.log(`[CellList] 获取完成: LTE=${data.lte.length}, NR=${data.nr.length}, API耗时=${(t1-t0).toFixed(0)}ms, 去重耗时=${(t2-t1).toFixed(0)}ms`)
+    return data
+  } catch (error) {
+    console.error('[CellList] 获取失败:', error)
+    return { lte: [], nr: [] }
+  }
+}
+
+/**
+ * 清除小区列表缓存（当工参数据重新导入时调用）
+ */
+export function clearCellListCache(): void {
+  _cellListCache = { data: null, time: 0 }
+  console.log('[CellList] 缓存已清除')
+}

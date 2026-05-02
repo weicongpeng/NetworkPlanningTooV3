@@ -7,11 +7,12 @@ import { OnlineMap, type OnlineMapRef } from '../components/Map/OnlineMap'
 import { PCILegend } from '../components/Map/PCILegend'
 import { MapTypeSwitch } from '../components/Map/MapTypeSwitch'
 import { pciDataSyncService } from '../services/pciDataSyncService'
-import { mapDataService } from '../services/mapDataService'
+import { mapDataService, getCellList } from '../services/mapDataService'
 import { CoordinateTransformer } from '../utils/coordinate'
-import type { RenderSectorData } from '../services/mapDataService'
+import type { RenderSectorData, CellListItem } from '../services/mapDataService'
 import { triggerDataRefresh, DATA_REFRESH_EVENT } from '../store/dataStore'
 import { useTranslation } from 'react-i18next'
+import { CellSelectionTable } from '../components/CellSelectionTable'
 
 // PCI表格列配置（静态版本，用于组件外部）
 const PCI_COLUMNS_STATIC = [
@@ -204,10 +205,8 @@ export function PCIPage() {
   const [activeLeftTab, setActiveLeftTab] = useState<'cell-selection' | 'planning-result'>('planning-result')
   // 选中的小区ID集合（格式：sector.id，如 siteId_sectorId）
   const [selectedCellIds, setSelectedCellIds] = useState<Set<string>>(new Set())
-  // 小区选择页搜索值
-  const [cellSearchValue, setCellSearchValue] = useState('')
-  // 小区列表数据（从地图服务获取）
-  const [cellListData, setCellListData] = useState<{ lte: RenderSectorData[]; nr: RenderSectorData[] }>({ lte: [], nr: [] })
+  // 小区列表数据（从轻量API获取）
+  const [cellListData, setCellListData] = useState<{ lte: CellListItem[]; nr: CellListItem[] }>({ lte: [], nr: [] })
   const [cellListLoading, setCellListLoading] = useState(false)
 
   // 翻译后的表格列配置
@@ -1221,10 +1220,10 @@ export function PCIPage() {
   const loadCellList = useCallback(async () => {
     setCellListLoading(true)
     try {
-      const mapData = await mapDataService.getMapData(12, false)
+      const data = await getCellList()
       setCellListData({
-        lte: mapData.lteSectors || [],
-        nr: mapData.nrSectors || []
+        lte: data.lte || [],
+        nr: data.nr || []
       })
     } catch (err) {
       console.error('[PCIPage] 加载小区列表失败:', err)
@@ -1452,6 +1451,9 @@ export function PCIPage() {
                 {currentTaskResult?.status === 'completed' && (
                   <span className="ml-2 px-1.5 py-0.5 text-xs bg-green-100 text-green-700 rounded-full">✓</span>
                 )}
+                {currentTaskResult?.status === 'failed' && (
+                  <span className="ml-2 inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold">!</span>
+                )}
               </button>
             </div>
 
@@ -1460,115 +1462,27 @@ export function PCIPage() {
               {activeLeftTab === 'cell-selection' ? (
                 /* 小区选择面板 */
                 <div className="flex flex-col h-full overflow-hidden">
-                  {/* 工具栏：搜索、全选、清空 */}
-                  <div className="flex items-center gap-2 mb-2 shrink-0">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" size={14} />
-                      <input
-                        type="text"
-                        value={cellSearchValue}
-                        onChange={(e) => setCellSearchValue(e.target.value)}
-                        placeholder={t('pci.cellSearchPlaceholder') || '搜索基站ID、小区ID或名称...'}
-                        className="w-full pl-8 pr-3 py-1.5 text-xs bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary"
-                      />
-                    </div>
-                    <button
-                      onClick={toggleSelectAll}
-                      className="px-2 py-1.5 text-xs bg-card border border-border rounded-lg hover:bg-muted/80 transition-colors shrink-0"
-                    >
-                      {(() => {
-                        const networkType = config.networkType as 'LTE' | 'NR'
-                        const sectors = networkType === 'LTE' ? cellListData.lte : cellListData.nr
-                        const allSelected = sectors.length > 0 && sectors.every(s => selectedCellIds.has(s.id))
-                        return allSelected ? (t('pci.deselectAll') || '取消全选') : (t('pci.selectAll') || '全选')
-                      })()}
-                    </button>
-                    <button
-                      onClick={clearSelections}
-                      className="px-2 py-1.5 text-xs bg-card border border-border rounded-lg hover:bg-muted/80 transition-colors shrink-0"
-                    >
-                      {t('pci.clearSelections') || '清空选择'}
-                    </button>
-                    <span className="text-xs text-muted-foreground ml-auto shrink-0">
-                      {(t('pci.selectedCount') || '已选中 {{count}} 个小区').replace('{{count}}', String(selectedCellIds.size))}
-                    </span>
-                  </div>
-
-                  {/* 数据源提示 */}
-                  <div className="text-xs text-muted-foreground mb-2 shrink-0">
-                    {(t('pci.cellListSource') || '数据源：{{type}} 小区').replace('{{type}}', config.networkType)}
-                  </div>
-
-                  {/* 小区列表 */}
-                  {cellListLoading ? (
-                    <div className="flex-1 flex items-center justify-center text-muted-foreground">
-                      <Loader2 className="animate-spin" size={24} />
-                      <span className="ml-2 text-sm">{t('pci.loadingCells') || '加载中...'}</span>
-                    </div>
-                  ) : (
-                    (() => {
+                  <CellSelectionTable
+                    sectors={(() => {
                       const networkType = config.networkType as 'LTE' | 'NR'
-                      const sectors = networkType === 'LTE' ? cellListData.lte : cellListData.nr
-                      const filtered = cellSearchValue
-                        ? sectors.filter(s =>
-                            (s.siteId || '').includes(cellSearchValue) ||
-                            s.id.includes(cellSearchValue) ||
-                            (s.name || '').includes(cellSearchValue)
-                          )
-                        : sectors
-
-                      if (filtered.length === 0) {
-                        return (
-                          <div className="flex-1 flex items-center justify-center text-muted-foreground">
-                            <p>{t('pci.noCells') || '暂无小区数据'}</p>
-                          </div>
-                        )
-                      }
-
-                      return (
-                        <div className="overflow-x-auto overflow-y-auto rounded-lg border border-border flex-1 min-h-0">
-                          <table className="w-full text-xs text-left border-collapse table-fixed">
-                            <thead className="sticky top-0 z-10 bg-background border-b border-border shadow-sm">
-                              <tr>
-                                <th className="p-2 bg-muted border-r border-border w-10 z-10"></th>
-                                <th className="p-2 bg-muted border-r border-border w-[80px] z-10 text-[10px] font-medium">{t('pci.siteId') || '基站ID'}</th>
-                                <th className="p-2 bg-muted border-r border-border w-[80px] z-10 text-[10px] font-medium">{t('pci.sectorId') || '小区ID'}</th>
-                                <th className="p-2 bg-muted border-r border-border z-10 text-[10px] font-medium">{t('pci.sectorName') || '小区名称'}</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                              {filtered.map(sector => (
-                                <tr
-                                  key={sector.id}
-                                  onClick={() => toggleCellSelection(sector.id)}
-                                  className={`cursor-pointer transition-colors ${
-                                    selectedCellIds.has(sector.id)
-                                      ? 'bg-blue-50/50'
-                                      : 'bg-card hover:bg-muted/50'
-                                  }`}
-                                >
-                                  <td className="p-2 border-r border-border w-10">
-                                    <div className={`w-4 h-4 rounded-sm border flex items-center justify-center ${
-                                      selectedCellIds.has(sector.id)
-                                        ? 'bg-blue-500 border-blue-500'
-                                        : 'border-border'
-                                    }`}>
-                                      {selectedCellIds.has(sector.id) && (
-                                        <Check size={12} className="text-white" />
-                                      )}
-                                    </div>
-                                  </td>
-                                  <td className="p-2 font-mono truncate border-r border-border w-[80px]" title={sector.siteId || 'N/A'}>{sector.siteId || 'N/A'}</td>
-                                  <td className="p-2 font-mono truncate border-r border-border w-[80px]" title={sector.id.split('_').pop() || sector.id}>{sector.id.split('_').pop() || sector.id}</td>
-                                  <td className="p-2 truncate border-r border-border" title={sector.name}>{sector.name}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )
-                    })()
-                  )}
+                      return networkType === 'LTE' ? cellListData.lte : cellListData.nr
+                    })()}
+                    selectedCellIds={selectedCellIds}
+                    onToggleCell={toggleCellSelection}
+                    onSelectAll={toggleSelectAll}
+                    onClearSelections={clearSelections}
+                    selectedCountText={(t('pci.selectedCount') || '已选中 {{count}} 个小区').replace('{{count}}', String(selectedCellIds.size))}
+                    dataSourceText={(t('pci.cellListSource') || '数据源：{{type}} 小区').replace('{{type}}', config.networkType)}
+                    searchPlaceholder={t('pci.cellSearchPlaceholder') || '搜索基站ID、小区ID或名称...'}
+                    loading={cellListLoading}
+                    columnLabels={{
+                      siteId: t('pci.siteId') || '基站ID',
+                      cellId: t('pci.sectorId') || '小区ID',
+                      cellName: t('pci.sectorName') || '小区名称',
+                      selectAll: t('pci.selectAll') || '全选',
+                      clearSelections: t('pci.clearSelections') || '清空选择'
+                    }}
+                  />
                 </div>
               ) : (
                 /* 规划结果面板 */

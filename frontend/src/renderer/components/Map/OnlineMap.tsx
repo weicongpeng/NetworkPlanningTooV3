@@ -4383,25 +4383,8 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
 
           if (geoDataLayerManagerRef.current && mapInstanceRef.current) {
             const geoLayer = geoDataLayerManagerRef.current.getLayer(layerFile.id)
-            console.log('[OnlineMap] geoLayer 获取结果:', !!geoLayer)
             if (geoLayer) {
-              // 🔍 详细的类型检查
-              console.log('[OnlineMap] 🔍 geoLayer 详细检查:')
-              console.log('[OnlineMap]  - constructor.name:', geoLayer.constructor.name)
-              console.log('[OnlineMap]  - geoLayer.setVisible.toString():', geoLayer.setVisible.toString())
-              console.log('[OnlineMap]  - Object.keys(geoLayer):', Object.keys(geoLayer).slice(0, 20))
-
-              // 🔴 包装方法以确保日志输出
-              const originalSetVisible = geoLayer.setVisible.bind(geoLayer)
-              const layerId = layerFile.id // 捕获 layer ID
-              geoLayer.setVisible = function(map: any, visible: boolean) {
-                console.error('🔴🔴🔴 包装的 setVisible 被调用！id=' + layerId + ', visible=' + visible)
-                console.error('🔴🔴🔴 this =', this)
-                console.error('🔴🔴🔴 arguments:', arguments)
-                return originalSetVisible(map, visible)
-              }
-
-              console.log('[OnlineMap] 调用包装后的 geoLayer.setVisible(', layerFile.visible, ')')
+              geoLayer.setVisible(mapInstance, layerFile.visible)
 
               try {
                 const result = geoLayer.setVisible(mapInstanceRef.current, layerFile.visible)
