@@ -33,22 +33,22 @@ export const THEME_COLORS: Record<ColorScheme, ThemeColors> = {
 }
 
 export const DARK_THEME_VARS = {
-  background: '222.2 84% 4.9%',
-  foreground: '210 40% 98%',
-  card: '222.2 84% 4.9%',
-  cardForeground: '210 40% 98%',
-  popover: '222.2 84% 4.9%',
-  popoverForeground: '210 40% 98%',
-  secondary: '217.2 32.6% 12%',
-  secondaryForeground: '210 40% 98%',
-  muted: '217.2 32.6% 8%',
-  mutedForeground: '215 20.2% 65.1%',
-  accent: '217.2 32.6% 12%',
-  accentForeground: '210 40% 98%',
+  background: '0 0% 20%',
+  foreground: '0 0% 95%',
+  card: '0 0% 23%',
+  cardForeground: '0 0% 95%',
+  popover: '0 0% 23%',
+  popoverForeground: '0 0% 95%',
+  secondary: '0 0% 16%',
+  secondaryForeground: '0 0% 95%',
+  muted: '0 0% 16%',
+  mutedForeground: '0 0% 65%',
+  accent: '0 0% 16%',
+  accentForeground: '0 0% 95%',
   destructive: '0 62.8% 30.6%',
-  destructiveForeground: '210 40% 98%',
-  border: '217.2 32.6% 17.5%',
-  input: '217.2 32.6% 17.5%',
+  destructiveForeground: '0 0% 95%',
+  border: '0 0% 16%',
+  input: '0 0% 16%',
   ring: '207 90% 54%'
 }
 
