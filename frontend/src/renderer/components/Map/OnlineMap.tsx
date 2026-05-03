@@ -857,6 +857,7 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
         const labelNameText = t('map.labelName') || '标签'
         const longitudeText = t('map.longitude') || '经度'
         const latitudeText = t('map.latitude') || '纬度'
+        const confirmBtnText = t('common.confirm') || '确定'
 
         const popupContent = `
           <div style="padding:10px 12px;min-width:280px;background:#fff;color:#000;border:1px solid #d1d5db;border-radius:8px;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,0.15);" onclick="event.stopPropagation()">
@@ -872,9 +873,10 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
               <input id="${latInputId}" type="text" value="${marker.lat.toFixed(6)}"
                 style="${inputStyle}" ${inputFocus} />
             </div>
-            <div style="margin-top:10px;padding-top:8px;border-top:1px solid #e5e7eb;text-align:right;">
+            <div style="margin-top:10px;padding-top:8px;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;gap:8px;">
+              <button class="confirm-btn" style="background:#22c55e;border:1px solid #22c55e;cursor:pointer;color:#fff;font-size:12px;padding:4px 14px;border-radius:4px;transition:all 0.15s;">${confirmBtnText}</button>
               <button class="cp-all-btn" style="background:#3b82f6;border:1px solid #3b82f6;cursor:pointer;color:#fff;font-size:12px;padding:4px 14px;border-radius:4px;transition:all 0.15s;">${copyBtnText}</button>
-              <button class="del-btn" style="background:#ef4444;border:1px solid #ef4444;cursor:pointer;color:#fff;font-size:12px;padding:4px 14px;border-radius:4px;transition:all 0.15s;margin-left:8px;">${deleteBtnText}</button>
+              <button class="del-btn" style="background:#ef4444;border:1px solid #ef4444;cursor:pointer;color:#fff;font-size:12px;padding:4px 14px;border-radius:4px;transition:all 0.15s;">${deleteBtnText}</button>
             </div>
           </div>
         `
@@ -933,6 +935,20 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
               if (idx > -1) {
                 mapMarkersRef.current.splice(idx, 1)
               }
+            })
+          })
+
+          // 确定按钮事件 — 触发输入保存并关闭弹窗
+          document.querySelectorAll('.capture-popup-white .confirm-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+              const labelInput = document.getElementById(inputId) as HTMLInputElement
+              labelInput?.focus()
+              labelInput?.blur()
+              const lngInput = document.getElementById(lngInputId) as HTMLInputElement
+              lngInput?.blur()
+              const latInput = document.getElementById(latInputId) as HTMLInputElement
+              latInput?.blur()
+              mapMarker.closePopup()
             })
           })
 
@@ -1613,6 +1629,7 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
         const inputFocus = `onfocus="this.style.borderColor='#3b82f6';this.style.boxShadow='0 0 0 2px rgba(59,130,246,0.2)'" onblur="this.style.borderColor='#d1d5db';this.style.boxShadow='none'"`
         const deleteBtnText = t('map.delete') || '删除'
         const copyBtnText = t('map.copy') || '复制'
+        const confirmBtnText = t('common.confirm') || '确定'
         const propertiesText = t('map.properties') || '属性'
         const labelNameText = t('map.labelName') || '标签'
         const longitudeText = t('map.longitude') || '经度'
@@ -1632,9 +1649,10 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
               <input id="${latInputId}" type="text" value="${wgsLat.toFixed(6)}"
                 style="${inputStyle}" ${inputFocus} />
             </div>
-            <div style="margin-top:10px;padding-top:8px;border-top:1px solid #e5e7eb;text-align:right;">
+            <div style="margin-top:10px;padding-top:8px;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;gap:8px;">
+              <button class="confirm-btn" style="background:#22c55e;border:1px solid #22c55e;cursor:pointer;color:#fff;font-size:12px;padding:4px 14px;border-radius:4px;transition:all 0.15s;">${confirmBtnText}</button>
               <button class="cp-all-btn" style="background:#3b82f6;border:1px solid #3b82f6;cursor:pointer;color:#fff;font-size:12px;padding:4px 14px;border-radius:4px;transition:all 0.15s;">${copyBtnText}</button>
-              <button class="del-btn" style="background:#ef4444;border:1px solid #ef4444;cursor:pointer;color:#fff;font-size:12px;padding:4px 14px;border-radius:4px;transition:all 0.15s;margin-left:8px;">${deleteBtnText}</button>
+              <button class="del-btn" style="background:#ef4444;border:1px solid #ef4444;cursor:pointer;color:#fff;font-size:12px;padding:4px 14px;border-radius:4px;transition:all 0.15s;">${deleteBtnText}</button>
             </div>
           </div>
         `
@@ -1693,6 +1711,20 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
               if (idx > -1) {
                 captureMarkersRef.current.splice(idx, 1)
               }
+            })
+          })
+
+          // 确定按钮事件 — 触发输入保存并关闭弹窗
+          document.querySelectorAll('.capture-popup-white .confirm-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+              const labelInput = document.getElementById(inputId) as HTMLInputElement
+              labelInput?.focus()
+              labelInput?.blur()  // 触发 blur 事件 → saveLabel
+              const lngInput = document.getElementById(lngInputId) as HTMLInputElement
+              lngInput?.blur()
+              const latInput = document.getElementById(latInputId) as HTMLInputElement
+              latInput?.blur()
+              marker.closePopup()
             })
           })
 
