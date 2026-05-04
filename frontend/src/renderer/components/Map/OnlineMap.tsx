@@ -1081,6 +1081,20 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
         mapInstanceRef.current.removeLayer(measurementDistanceRef.current)
         measurementDistanceRef.current = null
       }
+
+      // 清除当前绘制中的点数据，避免残留旧点污染新测量
+      setMeasurePoints([])
+      measurePointsRef.current = []
+
+      // 清除预览虚线和标签
+      if (shadowLineRef.current) {
+        mapInstanceRef.current.removeLayer(shadowLineRef.current)
+        shadowLineRef.current = null
+      }
+      if (shadowLabelRef.current) {
+        mapInstanceRef.current.removeLayer(shadowLabelRef.current)
+        shadowLabelRef.current = null
+      }
     },
 
     setNeighborHighlight: (config: NeighborHighlightConfig | null) => {
@@ -2022,33 +2036,37 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
     }).addTo(map)
     measurementMarkersRef.current.push(deleteButton)
 
-    // 为删除按钮添加点击事件
-    deleteButton.getElement()?.addEventListener('click', (e: Event) => {
-      e.stopPropagation()
-      e.preventDefault()
+    // 在 deleteButton 上存储索引，避免闭包捕获过期值
+    ;(deleteButton as any)._savedLineStartIndex = savedLineStartIndex
+    ;(deleteButton as any)._markerStartIndex = markerStartIndex
 
-      // 移除从 savedLineStartIndex 开始的所有测量线条（包括最终线和中间线）
+    // 使用 Leaflet 的 on('click') 事件系统替代 getElement()?.addEventListener
+    // 后者在 DOM 元素未就绪时可能静默失败，导致点击 X 无响应
+    deleteButton.on('click', function (this: typeof deleteButton) {
+      const startLineIdx = (this as any)._savedLineStartIndex as number
+      const startMarkerIdx = (this as any)._markerStartIndex as number
+
+      // 移除从 startLineIdx 开始的所有测量线条
       const lineEndIdx = measurementLinesRef.current.length
-      for (let i = lineEndIdx - 1; i >= savedLineStartIndex; i--) {
+      for (let i = lineEndIdx - 1; i >= startLineIdx; i--) {
         const line = measurementLinesRef.current[i]
         if (line) map.removeLayer(line)
       }
-      measurementLinesRef.current.splice(savedLineStartIndex, lineEndIdx - savedLineStartIndex)
+      measurementLinesRef.current.splice(startLineIdx, lineEndIdx - startLineIdx)
 
-      // 使用记录的标记起始索引，精确移除当前测量的所有标记
+      // 移除从 startMarkerIdx 开始的所有标记（含总长标签和删除按钮自身）
       const markerEndIdx = measurementMarkersRef.current.length
-      for (let i = markerEndIdx - 1; i >= markerStartIndex; i--) {
+      for (let i = markerEndIdx - 1; i >= startMarkerIdx; i--) {
         const m = measurementMarkersRef.current[i]
         if (m) map.removeLayer(m)
       }
-      measurementMarkersRef.current.splice(markerStartIndex, markerEndIdx - markerStartIndex)
+      measurementMarkersRef.current.splice(startMarkerIdx, markerEndIdx - startMarkerIdx)
 
-      // 重置起始索引为当前数组长度（删除后数组已更新）
+      // 重置起始索引
       measurementLineStartIndexRef.current = measurementLinesRef.current.length
       measurementMarkerStartIndexRef.current = measurementMarkersRef.current.length
 
-      // 清除预览虚线和标签（双击结束测量时由 finishMeasurement 清理，
-      // 但点击删除按钮不会触发 finishMeasurement，需要手动清理）
+      // 清除预览虚线和标签
       if (shadowLineRef.current) {
         map.removeLayer(shadowLineRef.current)
         shadowLineRef.current = null
@@ -2199,10 +2217,32 @@ export const OnlineMap = forwardRef<OnlineMapRef, OnlineMapProps>(({
         shadowLabelRef.current = null
       }
 
-      // 退出测距模式时：保留已完成的测量轨迹，只重置当前绘制中的点
+      // 退出测距模式时：清理未完成的测量痕迹（已点击的点标记/线条但未双击结束）
       if (!measureMode) {
-        setMeasurePoints([])
         measurePointsRef.current = []
+        setMeasurePoints([])
+
+        // 清除当前未完成的测量线条（从 lineStartIndexRef 开始到末尾的线条都是未完成的）
+        const lineFromIdx = measurementLineStartIndexRef.current
+        const totalLines = measurementLinesRef.current.length
+        if (totalLines > lineFromIdx) {
+          for (let i = totalLines - 1; i >= lineFromIdx; i--) {
+            const line = measurementLinesRef.current[i]
+            if (line) map.removeLayer(line)
+          }
+          measurementLinesRef.current.splice(lineFromIdx, totalLines - lineFromIdx)
+        }
+
+        // 清除当前未完成的测量标记（从 markerStartIndexRef 开始到末尾的标记都是未完成的）
+        const markerFromIdx = measurementMarkerStartIndexRef.current
+        const totalMarkers = measurementMarkersRef.current.length
+        if (totalMarkers > markerFromIdx) {
+          for (let i = totalMarkers - 1; i >= markerFromIdx; i--) {
+            const m = measurementMarkersRef.current[i]
+            if (m) map.removeLayer(m)
+          }
+          measurementMarkersRef.current.splice(markerFromIdx, totalMarkers - markerFromIdx)
+        }
       }
     }
   }, [measureMode])

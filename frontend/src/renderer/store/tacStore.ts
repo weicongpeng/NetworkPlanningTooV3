@@ -1,35 +1,29 @@
+/**
+ * TAC核查配置存储（仅持久化网络类型偏好）
+ *
+ * taskId 和 result 改用 taskStore 管理（与 PCI/邻区规划统一）
+ * 避免从 localStorage 恢复旧结果时自动应用到地图
+ */
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 interface TACState {
-  taskId: string | null
   config: {
     networkType: 'LTE' | 'NR'
   } | null
-  result: any | null
-  setTaskId: (taskId: string | null) => void
   setConfig: (config: { networkType: 'LTE' | 'NR' }) => void
-  setResult: (result: any) => void
-  clearTAC: () => void
 }
 
 export const useTACStore = create<TACState>()(
   persist(
     (set) => ({
-      taskId: null,
       config: null,
-      result: null,
-      setTaskId: (taskId) => set({ taskId }),
       setConfig: (config) => set({ config }),
-      setResult: (result) => set({ result }),
-      clearTAC: () => set({ taskId: null, result: null })
     }),
     {
       name: 'tac-storage',
       partialize: (state) => ({
-        taskId: state.taskId,
-        config: state.config,
-        result: state.result
+        config: state.config
       })
     }
   )

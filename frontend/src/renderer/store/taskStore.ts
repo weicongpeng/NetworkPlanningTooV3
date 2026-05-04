@@ -6,7 +6,7 @@ import { persist } from 'zustand/middleware'
  * 用于跨页面保持任务状态，解决切换窗口后状态丢失的问题
  */
 
-export type TaskType = 'parameter_update' | 'pci_planning' | 'neighbor_planning' | 'upload'
+export type TaskType = 'parameter_update' | 'pci_planning' | 'neighbor_planning' | 'tac_check' | 'upload'
 export type TaskStatus = 'idle' | 'running' | 'completed' | 'failed'
 
 export interface Task {
@@ -56,6 +56,9 @@ interface TaskState {
 
   // 获取最新的邻区规划任务结果
   getLatestNeighborTask: () => Task | undefined
+
+  // 获取最新的TAC核查任务结果
+  getLatestTACCheckTask: () => Task | undefined
   // 设置模块活跃任务ID
   setActiveTaskId: (type: TaskType, id: string | null) => void
 }
@@ -68,6 +71,7 @@ export const useTaskStore = create<TaskState>()(
         parameter_update: null,
         pci_planning: null,
         neighbor_planning: null,
+        tac_check: null,
         upload: null
       },
 
@@ -207,6 +211,18 @@ export const useTaskStore = create<TaskState>()(
           return endTimeB - endTimeA;
         });
 
+        return sortedTasks.length > 0 ? sortedTasks[0] : undefined;
+      },
+
+      getLatestTACCheckTask: () => {
+        const state = get();
+        const tacTasks = Object.values(state.tasks)
+          .filter(task => task.type === 'tac_check');
+        const sortedTasks = tacTasks.sort((a, b) => {
+          const endTimeA = a.endTime || a.startTime || 0;
+          const endTimeB = b.endTime || b.startTime || 0;
+          return endTimeB - endTimeA;
+        });
         return sortedTasks.length > 0 ? sortedTasks[0] : undefined;
       },
 

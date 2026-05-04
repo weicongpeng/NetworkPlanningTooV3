@@ -1087,8 +1087,10 @@ export function PCIPage() {
     // 清除搜索定位标记
     setSearchMarkers([])
     mapRef.current?.clearLocationMarkers()
-    // 清除测距标记
+    // 清除测距标记并退出测距模式
     mapRef.current?.clearMeasurements()
+    mapRef.current?.setMeasureMode(false)
+    setMeasureMode(false)
     console.log('[PCIPage] 已清除所有标记（定位 + 测距）')
   }
 

@@ -5571,5 +5571,73 @@
     "created_at": "2026-05-04T22:41:17.978324",
     "started_at": "2026-05-04T22:41:17.990352",
     "completed_at": null
+  },
+  "7b002b70-3ec6-4031-9422-f014f000672c": {
+    "task_id": "7b002b70-3ec6-4031-9422-f014f000672c",
+    "task_type": "tac_planning",
+    "config": {
+      "networkType": "LTE",
+      "enableSingularityCheck": true,
+      "singularityConfig": {
+        "search_radius": 1500,
+        "azimuth_tolerance": 60,
+        "singularity_threshold": 0.5
+      },
+      "selectedCellIds": [
+        "53190_141",
+        "428664_22",
+        "428664_11",
+        "428664_12",
+        "53190_131",
+        "541778_50"
+      ]
+    },
+    "status": "completed",
+    "progress": 100,
+    "result": null,
+    "error": null,
+    "created_at": "2026-05-04T23:27:22.358199",
+    "started_at": "2026-05-04T23:27:22.358797",
+    "completed_at": null
+  },
+  "e3da1684-4db0-47b7-b9f9-80089440ba19": {
+    "task_id": "e3da1684-4db0-47b7-b9f9-80089440ba19",
+    "task_type": "tac",
+    "config": {
+      "networkType": "LTE",
+      "enableSingularityCheck": true,
+      "singularityConfig": {
+        "searchRadius": 1500,
+        "singularityThreshold": 0.5
+      },
+      "selectedCellIds": null
+    },
+    "status": "completed",
+    "progress": 95,
+    "result": null,
+    "error": null,
+    "created_at": "2026-05-04T23:35:00.096288",
+    "started_at": "2026-05-04T23:35:00.109689",
+    "completed_at": null
+  },
+  "7f950f99-70e8-4c25-9c13-5ae5332a11c6": {
+    "task_id": "7f950f99-70e8-4c25-9c13-5ae5332a11c6",
+    "task_type": "tac",
+    "config": {
+      "networkType": "LTE",
+      "enableSingularityCheck": true,
+      "singularityConfig": {
+        "searchRadius": 1500,
+        "singularityThreshold": 0.5
+      },
+      "selectedCellIds": null
+    },
+    "status": "completed",
+    "progress": 95,
+    "result": null,
+    "error": null,
+    "created_at": "2026-05-04T23:59:39.503756",
+    "started_at": "2026-05-04T23:59:39.515916",
+    "completed_at": null
   }
 }

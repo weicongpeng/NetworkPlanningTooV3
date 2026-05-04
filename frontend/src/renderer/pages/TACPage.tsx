@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { Play, Download, Loader2, AlertCircle, CheckCircle2, FileSpreadsheet, Search, GripVertical, Check, List } from 'lucide-react'
+import { Play, Download, Loader2, AlertCircle, CheckCircle2, FileSpreadsheet, Search, GripVertical, Check, List, Ruler, X } from 'lucide-react'
 import { tacApi } from '../services/api'
 import { useTACStore } from '../store/tacStore'
+import { useTaskStore } from '../store/taskStore'
 import { OnlineMap } from '../components/Map/OnlineMap'
 import { TACLegend } from '../components/Map/TACLegend'
 import { tacDataSyncService } from '../services/tacDataSyncService'
@@ -62,10 +63,16 @@ const MAX_ERRORS = 5
 
 export function TACPage() {
   const { t } = useTranslation()
-  const { taskId, config, result, setTaskId, setConfig, setResult, clearTAC } = useTACStore()
+  const { config, setConfig } = useTACStore()
+  const { activeTaskIds, setActiveTaskId, getLatestTACCheckTask } = useTaskStore()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const taskResult = result as TACResultData | null
+  const [localTaskResult, setLocalTaskResult] = useState<TACResultData | null>(null)
+
+  // 从 taskStore 恢复最近的任务结果，行为与 PCI/邻区规划一致
+  const latestTACCheckTask = getLatestTACCheckTask()
+  const taskId = activeTaskIds.tac_check
+  const taskResult = localTaskResult || (latestTACCheckTask?.result as TACResultData | null)
 
   // 小区选择页签状态
   const [activeLeftTab, setActiveLeftTab] = useState<'cell-selection' | 'planning-result'>('planning-result')
@@ -83,18 +90,21 @@ export function TACPage() {
   const mapRef = useRef<OnlineMapRef>(null)
   const [isLegendVisible, setIsLegendVisible] = useState(true)
   const [selectedSectorKey, setSelectedSectorKey] = useState<string | null>(null)
+  const [measureMode, setMeasureMode] = useState(false)
+  // 标记是否为首次挂载（用于跳过从 localStorage 恢复的旧结果自动应用）
+  const isInitialMount = useRef(true)
 
   // 页面加载时检查任务是否仍然存在，如果不存在则清除状态
   useEffect(() => {
     const checkTaskExists = async () => {
-      if (taskId && result?.status === 'processing') {
+      if (taskId && taskResult?.status === 'processing') {
         try {
           await tacApi.getProgress(taskId)
           // 如果任务存在，不进行任何操作，轮询 useEffect 会继续处理
         } catch (err: any) {
           // 如果任务不存在（404）或其他错误，清除状态
           console.log('任务已不存在，清除TAC状态')
-          clearTAC()
+          setActiveTaskId('tac_check', null); setLocalTaskResult(null)
           setError(null)
         }
       }
@@ -132,10 +142,10 @@ export function TACPage() {
       try {
         const response = await tacApi.getProgress(taskId)
         if (response.success && response.data) {
-          setResult({
+          setLocalTaskResult({
             ...response.data,
             exportPath: taskResult?.exportPath
-          })
+          } as TACResultData)
 
           // 任务完成或失败，停止轮询
           if (response.data.status === 'completed' || response.data.status === 'failed') {
@@ -149,7 +159,7 @@ export function TACPage() {
         // 如果任务不存在（404），清除状态并停止轮询
         if (err.code === 404 || err.message?.includes('任务不存在')) {
           stopPolling()
-          clearTAC()
+          setActiveTaskId('tac_check', null); setLocalTaskResult(null)
           setError(null)
           console.log('任务已不存在，已清除TAC状态')
           return
@@ -176,7 +186,7 @@ export function TACPage() {
     return () => {
       stopPolling()
     }
-  }, [taskId, taskResult?.status, setResult, clearTAC])
+  }, [taskId, taskResult?.status, setLocalTaskResult, setActiveTaskId])
 
   // 初始化TAC数据同步服务
   useEffect(() => {
@@ -223,6 +233,12 @@ export function TACPage() {
 
   // TAC结果加载后同步到数据服务，并触发地图全量加载
   useEffect(() => {
+    // 跳过首次挂载：避免从 localStorage 恢复的历史结果自动应用到地图
+    if (isInitialMount.current) {
+      isInitialMount.current = false
+      return
+    }
+
     if (taskResult?.status === 'completed' && taskResult.results) {
       console.log('[TACPage] 任务完成，同步数据并初始化地图')
       const taskNetworkType = taskResult.networkType || config?.networkType || 'LTE'
@@ -255,6 +271,28 @@ export function TACPage() {
   // 地图扇区点击处理
   const handleMapSectorClick = (sector: any) => {
     console.log('Map sector clicked:', sector)
+  }
+
+  // 清除所有标记（定位标记 + 测距标记）
+  const handleClearAllMarkers = useCallback(() => {
+    mapRef.current?.clearMeasurements()
+    mapRef.current?.setMeasureMode(false)
+    setMeasureMode(false)
+  }, [])
+
+  // 切换测距模式
+  const handleToggleMeasure = () => {
+    const newMode = !measureMode
+    setMeasureMode(newMode)
+    mapRef.current?.setMeasureMode(newMode)
+    if (!newMode) {
+      mapRef.current?.clearMeasurements()
+    }
+  }
+
+  // 测距模式结束回调
+  const handleMeasureModeEnd = () => {
+    setMeasureMode(false)
   }
 
   // 结果行点击处理
@@ -303,8 +341,8 @@ export function TACPage() {
 
     setLoading(true)
     setError(null)
-    setResult(null)
-    clearTAC()
+    setLocalTaskResult(null)
+    setActiveTaskId('tac_check', null); setLocalTaskResult(null)
     errorCountRef.current = 0
 
     try {
@@ -319,12 +357,12 @@ export function TACPage() {
       const response = await tacApi.plan(fullConfig)
       if (response.success && response.data) {
         const newTaskId = response.data.taskId
-        setTaskId(newTaskId)
+        setActiveTaskId('tac_check', newTaskId)
 
         // 初始获取任务状态
         const progressResponse = await tacApi.getProgress(newTaskId)
         if (progressResponse.success && progressResponse.data) {
-          setResult(progressResponse.data)
+          setLocalTaskResult(progressResponse.data as TACResultData)
         }
       } else {
         setError(response.message || (t('tac.startFailed') || '启动TAC核查任务失败'))
@@ -377,7 +415,7 @@ export function TACPage() {
       }, 100)
 
       // 记录导出路径
-      setResult((prev: TACResultData | null) => prev ? { ...prev, exportPath: filename } : null)
+      setLocalTaskResult((prev: TACResultData | null) => prev ? { ...prev, exportPath: filename } : null)
     } catch (err: any) {
       console.error('导出失败:', err)
       setError((t('tac.exportFailed') || '导出失败:') + (err.message || (t('tac.unknownError') || '未知错误')))
@@ -1073,10 +1111,31 @@ export function TACPage() {
             {/* 右列：地图窗口 */}
             <div className="flex flex-col flex-1 min-w-0 min-h-0 w-1/2">
               <div className="bg-card rounded-lg border border-border p-3 flex-1 flex flex-col relative min-h-0">
+                {/* 地图工具栏 */}
+                <div className="absolute top-4 right-16 z-[1000] flex flex-col gap-2">
+                  <button
+                    onClick={handleToggleMeasure}
+                    className={`flex items-center justify-center w-9 h-9 rounded-lg border transition-colors shadow-md ${
+                      measureMode ? 'bg-primary text-white border-primary' : 'bg-card text-foreground border-border hover:bg-muted/80'
+                    }`}
+                    title={measureMode ? (t('pci.exitMeasureMode') || '退出测距模式') : (t('pci.enterMeasureMode') || '进入测距模式')}
+                  >
+                    <Ruler size={16} />
+                  </button>
+                  <button
+                    onClick={handleClearAllMarkers}
+                    className="flex items-center justify-center w-9 h-9 bg-card border border-border rounded-lg hover:bg-muted/80 transition-colors shadow-md"
+                    title={t('pci.clearAllMarkersTip') || '清除所有标记（定位 + 测距）'}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
                 <OnlineMap
                   ref={mapRef}
                   mode="tac-check"
                   onSectorClick={handleMapSectorClick}
+                  measureMode={measureMode}
+                  onMeasureModeEnd={handleMeasureModeEnd}
                 />
                 <TACLegend
                   visible={isLegendVisible}
