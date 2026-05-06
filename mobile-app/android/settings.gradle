@@ -21,7 +21,7 @@ extensions.configure(com.facebook.react.ReactSettingsExtension) { ex ->
   }
 }
 
-rootProject.name = '网络规划工具'
+rootProject.name = '工参地图'
 
 dependencyResolutionManagement {
   versionCatalogs {

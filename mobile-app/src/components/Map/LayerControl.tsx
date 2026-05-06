@@ -14,7 +14,7 @@ const LayerControl = forwardRef<View, Props>(({ active, onPress }, ref) => {
         onPress={onPress}
         activeOpacity={0.8}
       >
-        <Text style={[styles.btnText, active && styles.btnTextActive]}>扇区</Text>
+        <Text style={[styles.btnText, active && styles.btnTextActive]}>图层</Text>
       </TouchableOpacity>
     </View>
   );

@@ -1,38 +1,38 @@
 {
-  "4ee2eedb-8141-47c5-83a1-0a00b20f2910": {
-    "id": "4ee2eedb-8141-47c5-83a1-0a00b20f2910",
+  "bbb0b288-3311-4ad7-828e-232b0c2db868": {
+    "id": "bbb0b288-3311-4ad7-828e-232b0c2db868",
     "name": "中兴工参-2026-4-21.xlsx",
     "type": "excel",
     "fileType": "geo_data",
     "geometryType": "sector",
     "sourceType": "excel",
     "size": 9594374,
-    "uploadDate": "2026-04-28T23:18:25.453917",
+    "uploadDate": "2026-05-06T00:47:04.728204",
     "status": "ready",
     "metadata": {
       "pointCount": 8008
     }
   },
-  "26719a3b-5b65-4f84-8b28-727d015ea6c0": {
-    "id": "26719a3b-5b65-4f84-8b28-727d015ea6c0",
+  "d2abd0d2-41b2-43f4-9b86-edfc8c9798d6": {
+    "id": "d2abd0d2-41b2-43f4-9b86-edfc8c9798d6",
     "name": "4G_TAC.zip",
     "type": "map",
     "subType": "mapinfo",
     "size": 30113,
     "originalPath": null,
-    "uploadDate": "2026-04-29T12:03:20.036740",
+    "uploadDate": "2026-05-06T08:41:56.096803",
     "status": "ready",
     "metadata": {
       "fileCount": 6,
       "layerCount": 1,
       "layers": [
         {
-          "id": "b023590e-6fcc-4b53-8ec5-7f681b071c31",
+          "id": "a030cd7d-739f-496c-9957-339bf238aaee",
           "name": "4G_TAC",
           "type": "polygon",
           "feature_count": 23,
           "metadata": {
-            "source_file": "D:\\mycode\\NetworkPlanningTooV3\\data\\26719a3b-5b65-4f84-8b28-727d015ea6c0\\4G_TAC.TAB",
+            "source_file": "D:\\mycode\\NetworkPlanningTooV3\\data\\d2abd0d2-41b2-43f4-9b86-edfc8c9798d6\\4G_TAC.TAB",
             "feature_count": 23,
             "name": "4G_TAC",
             "coord_sys": "unknown",
@@ -52,26 +52,26 @@
       ]
     }
   },
-  "16e23a4e-7b2a-45cb-a141-9b66a68db23d": {
-    "id": "16e23a4e-7b2a-45cb-a141-9b66a68db23d",
+  "7bef3f57-9cd6-4a7b-b646-d9de5fea72cb": {
+    "id": "7bef3f57-9cd6-4a7b-b646-d9de5fea72cb",
     "name": "5G TAC.zip",
     "type": "map",
     "subType": "mapinfo",
     "size": 9188,
     "originalPath": null,
-    "uploadDate": "2026-04-29T12:03:20.645809",
+    "uploadDate": "2026-05-06T08:41:56.505780",
     "status": "ready",
     "metadata": {
       "fileCount": 5,
       "layerCount": 1,
       "layers": [
         {
-          "id": "8817a52f-d83f-4856-ae5e-6f3e62a17333",
+          "id": "0a3f2c9f-25f0-46d5-a184-8a3589aaa6e2",
           "name": "河源5G-TAC",
           "type": "polygon",
           "feature_count": 51,
           "metadata": {
-            "source_file": "D:\\mycode\\NetworkPlanningTooV3\\data\\16e23a4e-7b2a-45cb-a141-9b66a68db23d\\河源5G-TAC.TAB",
+            "source_file": "D:\\mycode\\NetworkPlanningTooV3\\data\\7bef3f57-9cd6-4a7b-b646-d9de5fea72cb\\河源5G-TAC.TAB",
             "feature_count": 51,
             "name": "河源5G-TAC",
             "coord_sys": "unknown",
@@ -89,61 +89,20 @@
       ]
     }
   },
-  "86c7fd57-c082-4bed-b79b-f1eb4257d4e3": {
-    "id": "86c7fd57-c082-4bed-b79b-f1eb4257d4e3",
-    "name": "BaselineLab_172.16.34.163_1777518578_2210747.zip",
-    "type": "map",
-    "subType": "offline",
-    "size": 3928404,
-    "originalPath": null,
-    "uploadDate": "2026-04-30T11:19:10.027481",
-    "status": "ready",
-    "metadata": {
-      "fileCount": 10
-    }
-  },
-  "fb8076bd-37d8-40c8-a646-87f3507e97b6": {
-    "id": "fb8076bd-37d8-40c8-a646-87f3507e97b6",
-    "name": "东源追龙&和平村超保障站点清单-20260428.xlsx",
-    "type": "excel",
-    "fileType": "geo_data",
-    "geometryType": "point",
-    "sourceType": "excel",
-    "size": 22915,
-    "uploadDate": "2026-05-01T13:28:58.273147",
-    "status": "ready",
-    "metadata": {
-      "pointCount": 71
-    }
-  },
-  "db636f0e-2a19-4bd7-b86e-6eddbd56319c": {
-    "id": "db636f0e-2a19-4bd7-b86e-6eddbd56319c",
+  "10960881-7bd6-4c2f-9c7e-bf2794201de6": {
+    "id": "10960881-7bd6-4c2f-9c7e-bf2794201de6",
     "name": "ProjectParameter_mongoose河源电联20260430111956.xlsx",
     "type": "excel",
     "fileType": "full_params",
-    "size": 4644631,
+    "size": 4645336,
     "originalPath": null,
-    "uploadDate": "2026-05-01T14:53:03.043249",
+    "uploadDate": "2026-05-06T17:05:56.857938",
     "status": "ready",
     "metadata": {
-      "LTESiteCount": 4103,
-      "LTESectorCount": 18856,
+      "LTESiteCount": 4104,
+      "LTESectorCount": 18858,
       "NRSiteCount": 1409,
       "NRSectorCount": 15471
-    }
-  },
-  "95610d5c-c68d-4559-9f73-9ee514f57356": {
-    "id": "95610d5c-c68d-4559-9f73-9ee514f57356",
-    "name": "cell-tree-export-20260501144124.xlsx",
-    "type": "excel",
-    "fileType": "target_cells",
-    "size": 9707,
-    "originalPath": null,
-    "uploadDate": "2026-05-01T16:17:16.840568",
-    "status": "ready",
-    "metadata": {
-      "NRSiteCount": 4,
-      "NRSectorCount": 21
     }
   }
 }

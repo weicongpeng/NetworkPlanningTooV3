@@ -1,13 +1,14 @@
 """
 地图服务API端点
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.concurrency import run_in_threadpool
 from typing import Dict, Any, Optional, List
 from app.models.schemas import OnlineMapConfig, OfflineMapConfig, MapData
 from app.core.config import settings
 import json
 import time
+import httpx
 
 router = APIRouter()
 
@@ -310,3 +311,55 @@ async def update_offline_path(config: OfflineMapConfig) -> Dict[str, Any]:
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------- 导航路线规划代理 ----------
+
+AMAP_DIRECTION_API = "https://restapi.amap.com/v3/direction"
+
+MODE_MAP = {
+    "drive": "driving",
+    "walk": "walking",
+    "bicycling": "bicycling",
+}
+
+
+@router.get("/direction", response_model=Dict[str, Any])
+async def get_direction(
+    origin: str = Query(..., description="起点坐标 lng,lat（GCJ-02）"),
+    destination: str = Query(..., description="终点坐标 lng,lat（GCJ-02）"),
+    mode: str = Query("drive", description="出行方式: drive/walk/bicycling"),
+):
+    """代理高德路径规划API（避免在前端暴露Web Service Key）
+
+    参数必须使用 GCJ-02 坐标系（高德坐标系）。
+    起点/终点格式: "116.397428,39.90923"
+    """
+    api_mode = MODE_MAP.get(mode, "driving")
+    url = f"{AMAP_DIRECTION_API}/{api_mode}"
+
+    params = {
+        "key": settings.AMAP_API_KEY,
+        "origin": origin,
+        "destination": destination,
+        "strategy": "0",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.get(url, params=params)
+            data = resp.json()
+
+        if data.get("status") != "1":
+            info = data.get("info", "未知错误")
+            infocode = data.get("infocode", "")
+            detail = f"方向规划失败: {info}"
+            if infocode:
+                detail += f" (code: {infocode})"
+            return {"success": False, "error": detail}
+
+        return {"success": True, "data": data.get("route", {})}
+    except httpx.TimeoutException:
+        return {"success": False, "error": "请求高德API超时"}
+    except Exception as e:
+        return {"success": False, "error": f"请求高德API失败: {str(e)}"}

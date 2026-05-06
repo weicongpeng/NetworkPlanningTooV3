@@ -4,25 +4,21 @@ import {
   View, StyleSheet, SafeAreaView, Alert, TouchableOpacity, Text,
   Modal, FlatList, Switch, TextInput
 } from 'react-native';
-import MapViewComponent from '../../src/components/Map/MapView';
+import MapViewComponent, { MapViewRef } from '../../src/components/Map/MapView';
 import LayerControl from '../../src/components/Map/LayerControl';
 import SectorInfoPanel from '../../src/components/Map/SectorInfoPanel';
 import SearchBar, { SearchResult } from '../../src/components/Search/SearchBar';
 import NavControl from '../../src/components/Navigation/NavControl';
 import MarkerList from '../../src/components/Marker/MarkerList';
 import MeasureControl from '../../src/components/Measure/MeasureControl';
+import NavigationPanel from '../../src/components/Navigation/NavigationPanel';
 import { useMapStore, SectorData } from '../../src/store/mapStore';
 import { gcj02ToWgs84 } from '../../src/utils/coordinate';
 import { apiService } from '../../src/services/api';
 import { wgs84ToGcj02 } from '../../src/utils/coordinate';
+import { getCurrentPosition } from '../../src/services/navigationService';
 
 type SearchMode = 'place' | 'parameter' | 'coordinate';
-
-interface CoordinateHint {
-  lat: number;
-  lng: number;
-  visible: boolean;
-}
 
 export default function MapScreen() {
   const {
@@ -34,12 +30,12 @@ export default function MapScreen() {
     setSearchMarker, markers, coordinateMode, setCoordinateMode,
     clearMarkers, measurePoints,
     markerMode, toggleMarkerMode, setMarkerMode,
+    pendingNavi, setPendingNavi,
   } = useMapStore();
 
   const [selectedLocation, setSelectedLocation] = useState<{
     lat: number; lng: number; name: string;
   } | null>(null);
-  const [coordinateHint, setCoordinateHint] = useState<CoordinateHint | null>(null);
   const [mapCenter, setMapCenter] = useState<[number, number] | undefined>(undefined);
   const [searchMode, setSearchMode] = useState<SearchMode>('place');
   const [overlapSectors, setOverlapSectors] = useState<SectorData[]>([]);
@@ -47,6 +43,7 @@ export default function MapScreen() {
   const [showSectorMenu, setShowSectorMenu] = useState(false);
   const [sectorMenuPos, setSectorMenuPos] = useState({ x: 0, y: 0 });
   const sectorBtnRef = useRef<View>(null);
+  const mapRef = useRef<MapViewRef>(null);
 
   // 打点重命名弹框状态
   const [showMarkerNameModal, setShowMarkerNameModal] = useState(false);
@@ -54,6 +51,20 @@ export default function MapScreen() {
   const [markerNameInput, setMarkerNameInput] = useState('');
 
   const prevCenterRef = useRef<string | null>(null);
+  const [showNaviPanel, setShowNaviPanel] = useState(false);
+
+  // 图层菜单状态
+  const [showLayerMenu, setShowLayerMenu] = useState(false);
+  const [layerMenuType, setLayerMenuType] = useState<'tab' | 'geo'>('tab');
+  const [dataList, setDataList] = useState<any[]>([]);
+  const [loadingLayers, setLoadingLayers] = useState(false);
+
+  // 当 pendingNavi 被设置时，自动打开导航面板
+  useEffect(() => {
+    if (pendingNavi) {
+      setShowNaviPanel(true);
+    }
+  }, [pendingNavi]);
 
   useEffect(() => {
     connectToBackend();
@@ -70,6 +81,106 @@ export default function MapScreen() {
       setConnected(false);
     }
   };
+
+  // 加载图层数据列表
+  const loadDataList = async () => {
+    try {
+      setLoadingLayers(true);
+      const response = await apiService.getDataList();
+      if (response.success) {
+        setDataList(response.data || []);
+      }
+    } catch (error) {
+      console.error('Failed to load data list:', error);
+    } finally {
+      setLoadingLayers(false);
+    }
+  };
+
+  // 处理TAB图层点击
+  const handleTabLayerPress = () => {
+    setShowSectorMenu(false);
+    setLayerMenuType('tab');
+    loadDataList();
+    setShowLayerMenu(true);
+  };
+
+  // 处理地理化数据点击
+  const handleGeoDataPress = () => {
+    setShowSectorMenu(false);
+    setLayerMenuType('geo');
+    loadDataList();
+    setShowLayerMenu(true);
+  };
+
+  // 通过后端接口加载渲染数据（坐标已预处理为GCJ02）- 直接注入到WebView
+  const loadMobileRenderData = async (dataId: string, dataName?: string) => {
+    try {
+      const injectJS = (code: string) => mapRef.current?.injectJavaScript(code);
+
+      const response = await apiService.getMobileRenderData(dataId);
+      if (!response.success || !response.data) {
+        Alert.alert('错误', '无法获取渲染数据');
+        return;
+      }
+      const renderData = response.data;
+
+      if (renderData.dataType === 'tab') {
+        const layers = renderData.layers || [];
+        if (layers.length === 0) {
+          Alert.alert('提示', '该文件没有可用的图层');
+          return;
+        }
+        // 先注入一个测试点验证渲染管线正常
+        const testGeoJSON = {"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[114.7,23.74]},"properties":{"name":"test"}}]};
+        injectJS(`window.updateTabLayerGCJ('__test__', ${JSON.stringify(testGeoJSON)});`);
+        // 再渲染实际图层
+        if (layers.length === 1) {
+          const layerKey = dataId + '_' + layers[0].id;
+          injectJS(`window.updateTabLayerGCJ('${layerKey}', ${JSON.stringify(layers[0].geojson)});`);
+          Alert.alert('成功', `TAB图层 "${layers[0].name}" 已加载到地图`);
+        } else {
+          Alert.alert(
+            '选择图层',
+            `该文件包含 ${layers.length} 个图层`,
+            layers.slice(0, 5).map((l: any) => ({
+              text: l.name || l.id,
+              onPress: () => {
+                const layerKey = dataId + '_' + l.id;
+                injectJS(`window.updateTabLayerGCJ('${layerKey}', ${JSON.stringify(l.geojson)});`);
+                Alert.alert('成功', `TAB图层 "${l.name}" 已加载到地图`);
+              }
+            })).concat([{ text: '取消', style: 'cancel' as const }])
+          );
+        }
+      } else if (renderData.dataType === 'geo') {
+        const geometryType = renderData.geometryType || 'point';
+        const features = renderData.features || [];
+        if (features.length === 0) {
+          Alert.alert('提示', '该文件中没有数据');
+          return;
+        }
+        injectJS(`window.updateGeoDataLayer('${dataId}', '${geometryType}', ${JSON.stringify(features)});`);
+        Alert.alert('成功', `已加载 "${dataName || dataId}" (${features.length}条, ${geometryType})`);
+      } else {
+        Alert.alert('错误', '不支持的数据类型');
+      }
+    } catch (error) {
+      console.error('[MapScreen] 加载渲染数据失败:', error);
+      Alert.alert('错误', '加载渲染数据失败:' + String(error));
+    }
+  };
+
+  // 获取过滤后的数据列表（根据当前菜单类型）
+  const filteredDataList = dataList.filter(item => {
+    if (layerMenuType === 'tab') {
+      // TAB图层：MapInfo文件 (subType === 'mapinfo' 或 type === 'map')
+      return item.type === 'map' || item.subType === 'mapinfo';
+    } else {
+      // 地理化数据：Excel文件且包含地理化数据 (geometryType 或 fileType === 'geo_data')
+      return item.type === 'excel' && (item.geometryType != null || item.fileType === 'geo_data');
+    }
+  });
 
   const loadSectors = async () => {
     try {
@@ -186,10 +297,7 @@ export default function MapScreen() {
         setSelectedLocation({ lat: gcjLat, lng: gcjLng, name: result.name });
         setSearchMarker({ lat: gcjLat, lng: gcjLng, name: result.name });
         setMapCenter([gcjLat, gcjLng]);
-        if (searchMode === 'coordinate') {
-          // 坐标模式下显示原始 WGS84 坐标提示
-          setCoordinateHint({ lat, lng, visible: true });
-        }
+
       } else {
         // place 模式：高德 POI 接口返回的已是 GCJ-02，直接使用
         setSelectedLocation({ lat, lng, name: result.name });
@@ -206,15 +314,29 @@ export default function MapScreen() {
     setMapType(mapType === 'roadmap' ? 'satellite' : 'roadmap');
   };
 
+  // 定位到手机当前位置
+  const handleLocateMe = useCallback(async () => {
+    const pos = await getCurrentPosition();
+    if (pos && mapRef?.current) {
+      const [gcjLat, gcjLng] = wgs84ToGcj02(pos.lat, pos.lng);
+      mapRef.current.locateMe(gcjLat, gcjLng, 16);
+    } else {
+      Alert.alert('定位失败', '无法获取当前位置，请检查GPS权限');
+    }
+  }, []);
+
   const handleClear = () => {
     setShowSectorMenu(false);
     setMarkerMode(false);
     clearMeasure();
     clearMarkers();
     setSelectedLocation(null);
-    setCoordinateHint(null);
     setSearchMarker(null);
     setSelectedSector(null);
+    // 清除所有已加载的图层
+    const injectJS = (code: string) => mapRef.current?.injectJavaScript(code);
+    injectJS('Object.keys(tabLayerGroups).forEach(function(k) { window.removeTabLayer(k); });');
+    injectJS('Object.keys(geoDataLayerGroups).forEach(function(k) { window.removeGeoDataLayer(k); });');
   };
 
   const handleConfirmMarkerName = () => {
@@ -275,17 +397,6 @@ export default function MapScreen() {
     />
   );
 
-  const renderCoordinateHint = () => {
-    if (!coordinateHint || !coordinateHint.visible) return null;
-    return (
-      <View style={styles.coordinateHint}>
-        <Text style={styles.coordinateHintText}>
-          {coordinateHint.lat.toFixed(3)}, {coordinateHint.lng.toFixed(3)}
-        </Text>
-      </View>
-    );
-  };
-
   const renderOverlapModal = () => (
     <Modal
       animationType="slide"
@@ -339,6 +450,7 @@ export default function MapScreen() {
       </View>
       <View style={styles.mapContainer}>
         <MapViewComponent
+          ref={mapRef}
           initialCenter={mapCenter}
           showSatellite={mapType === 'satellite'}
           onMapPress={handleMapPress}
@@ -414,18 +526,35 @@ export default function MapScreen() {
                 style={{ transform: [{ scaleX: 0.55 }, { scaleY: 0.55 }] }}
               />
             </TouchableOpacity>
+            <View style={styles.dropdownDivider} />
+            <TouchableOpacity style={styles.sectorMenuItem} activeOpacity={1} onPress={handleTabLayerPress}>
+              <View style={styles.sectorLayerInfo}>
+                <View style={[styles.sectorColorDot, { backgroundColor: '#FF9800' }]} />
+                <Text style={styles.sectorLayerName}>TAB图层</Text>
+              </View>
+              <Text style={styles.dropdownArrow}>›</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.sectorMenuItem} activeOpacity={1} onPress={handleGeoDataPress}>
+              <View style={styles.sectorLayerInfo}>
+                <View style={[styles.sectorColorDot, { backgroundColor: '#9C27B0' }]} />
+                <Text style={styles.sectorLayerName}>地理化数据</Text>
+              </View>
+              <Text style={styles.dropdownArrow}>›</Text>
+            </TouchableOpacity>
           </View>
         )}
         <MeasureControl />
         <MarkerList />
-        {renderCoordinateHint()}
         <TouchableOpacity style={styles.mapTypeBtn} onPress={handleToggleMapType}>
           <Text style={styles.mapTypeBtnText}>
             {mapType === 'roadmap' ? '卫星' : '地图'}
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity style={styles.locateBtn} onPress={handleLocateMe}>
+          <Text style={styles.locateBtnText}>📍</Text>
+        </TouchableOpacity>
       </View>
-      {selectedLocation && !measureMode && !coordinateMode && !markerMode && (
+      {selectedLocation && !measureMode && !markerMode && (
         <NavControl
           latitude={selectedLocation.lat}
           longitude={selectedLocation.lng}
@@ -434,6 +563,17 @@ export default function MapScreen() {
       )}
       <SectorInfoPanel />
       {renderOverlapModal()}
+      <NavigationPanel
+        visible={showNaviPanel}
+        destLat={pendingNavi?.lat ?? 0}
+        destLng={pendingNavi?.lng ?? 0}
+        destName={pendingNavi?.name ?? '目的地'}
+        onClose={() => {
+          setShowNaviPanel(false);
+          setPendingNavi(null);
+        }}
+        mapRef={mapRef as any}
+      />
 
       {/* 打点重命名弹框 */}
       <Modal
@@ -461,6 +601,78 @@ export default function MapScreen() {
                 <Text style={[styles.markerNameModalBtnText, styles.markerNameModalBtnPrimaryText]}>确定</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 图层选择弹框 */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showLayerMenu}
+        onRequestClose={() => setShowLayerMenu(false)}
+        statusBarTranslucent={true}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.layerModalContent}>
+            <View style={styles.layerModalHeader}>
+              <Text style={styles.layerModalTitle}>
+                {layerMenuType === 'tab' ? 'TAB图层' : '地理化数据'}
+              </Text>
+              <TouchableOpacity onPress={() => setShowLayerMenu(false)}>
+                <Text style={styles.layerModalClose}>×</Text>
+              </TouchableOpacity>
+            </View>
+            {loadingLayers ? (
+              <View style={styles.layerModalLoading}>
+                <Text style={styles.layerModalLoadingText}>加载中...</Text>
+              </View>
+            ) : dataList.length === 0 ? (
+              <View style={styles.layerModalEmpty}>
+                <Text style={styles.layerModalEmptyText}>暂无可用图层</Text>
+                <Text style={styles.layerModalEmptyHint}>
+                  请在桌面端「数据管理」导入数据
+                </Text>
+              </View>
+            ) : filteredDataList.length === 0 ? (
+              <View style={styles.layerModalEmpty}>
+                <Text style={styles.layerModalEmptyText}>暂无可用图层</Text>
+                <Text style={styles.layerModalEmptyHint}>
+                  {layerMenuType === 'tab'
+                    ? '请在桌面端导入 MapInfo 格式的图层文件'
+                    : '请在桌面端导入带有经纬度坐标的Excel文件'}
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                data={filteredDataList}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item, index }) => (
+                  <TouchableOpacity
+                    style={styles.layerItem}
+                    onPress={() => {
+                      setShowLayerMenu(false);
+                      loadMobileRenderData(item.id, item.name);
+                    }}
+                  >
+                    <View style={styles.layerItemInfo}>
+                      <Text style={styles.layerItemName} numberOfLines={1}>
+                        {item.name || `文件 ${index + 1}`}
+                      </Text>
+                      <Text style={styles.layerItemType}>
+                        {item.metadata?.layerCount
+                          ? `${item.metadata.layerCount} 个图层`
+                          : item.geometryType
+                            ? `${item.geometryType} 要素`
+                            : item.type === 'map' ? 'MapInfo' : 'Excel'}
+                      </Text>
+                    </View>
+                    <Text style={styles.dropdownArrow}>›</Text>
+                  </TouchableOpacity>
+                )}
+                style={styles.layerList}
+              />
+            )}
           </View>
         </View>
       </Modal>
@@ -534,39 +746,44 @@ const styles = StyleSheet.create({
     position: 'absolute',
     backgroundColor: 'rgba(255,255,255,0.96)',
     borderRadius: 8,
-    paddingVertical: 2,
-    paddingHorizontal: 6,
-    width: 75,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    width: 140,
     shadowColor: '#000',
     shadowOffset: { width: 2, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 6,
     elevation: 8,
     zIndex: 200,
-    marginTop: -8,
   },
   sectorMenuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 1,
+    paddingVertical: 8,
   },
   sectorLayerInfo: { flexDirection: 'row', alignItems: 'center' },
-  sectorColorDot: { width: 8, height: 8, borderRadius: 4, marginRight: 4 },
+  sectorColorDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
   sectorLayerName: { fontSize: 12, color: '#333' },
-  coordinateHint: {
-    position: 'absolute',
-    bottom: 20,
-    alignSelf: 'center',
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
+  dropdownSection: {
+    paddingVertical: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    marginBottom: 4,
   },
-  coordinateHintText: {
-    color: '#fff',
+  dropdownSectionTitle: {
+    fontSize: 11,
+    color: '#888',
+    fontWeight: '600',
+  },
+  dropdownDivider: {
+    height: 1,
+    backgroundColor: '#eee',
+    marginVertical: 4,
+  },
+  dropdownArrow: {
     fontSize: 14,
-    fontFamily: 'monospace',
+    color: '#999',
   },
   modalOverlay: {
     flex: 1,
@@ -690,5 +907,98 @@ const styles = StyleSheet.create({
   },
   markerNameModalBtnPrimaryText: {
     color: '#fff',
+  },
+  locateBtn: {
+    position: 'absolute',
+    bottom: 20,
+    right: 10,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 6,
+    zIndex: 60,
+  },
+  locateBtnText: {
+    fontSize: 20,
+  },
+  // 图层选择弹框样式
+  layerModalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    padding: 16,
+    maxHeight: '70%',
+  },
+  layerModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  layerModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  layerModalClose: {
+    fontSize: 28,
+    color: '#999',
+    paddingHorizontal: 8,
+  },
+  layerModalLoading: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  layerModalLoadingText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  layerModalEmpty: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  layerModalEmptyText: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 8,
+  },
+  layerModalEmptyHint: {
+    fontSize: 12,
+    color: '#999',
+  },
+  layerList: {
+    maxHeight: 400,
+  },
+  layerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  layerItemInfo: {
+    flex: 1,
+  },
+  layerItemName: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 2,
+  },
+  layerItemType: {
+    fontSize: 12,
+    color: '#888',
   },
 });

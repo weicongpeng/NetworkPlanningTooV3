@@ -5639,5 +5639,153 @@
     "created_at": "2026-05-04T23:59:39.503756",
     "started_at": "2026-05-04T23:59:39.515916",
     "completed_at": null
+  },
+  "d3eb4c02-720d-40f4-8023-5a6ae2bf91c7": {
+    "task_id": "d3eb4c02-720d-40f4-8023-5a6ae2bf91c7",
+    "task_type": "tac",
+    "config": {
+      "networkType": "NR",
+      "enableSingularityCheck": true,
+      "singularityConfig": {
+        "searchRadius": 1500,
+        "singularityThreshold": 0.5
+      },
+      "selectedCellIds": null
+    },
+    "status": "pending",
+    "progress": 0.0,
+    "result": null,
+    "error": null,
+    "created_at": "2026-05-06T08:41:36.648898",
+    "started_at": null,
+    "completed_at": null
+  },
+  "01d3f1ba-7feb-4cf0-bdbc-97916dcf170c": {
+    "task_id": "01d3f1ba-7feb-4cf0-bdbc-97916dcf170c",
+    "task_type": "tac",
+    "config": {
+      "networkType": "NR",
+      "enableSingularityCheck": true,
+      "singularityConfig": {
+        "searchRadius": 1500,
+        "singularityThreshold": 0.5
+      },
+      "selectedCellIds": null
+    },
+    "status": "completed",
+    "progress": 98.52216748768473,
+    "result": null,
+    "error": null,
+    "created_at": "2026-05-06T08:42:01.385631",
+    "started_at": "2026-05-06T08:42:01.395617",
+    "completed_at": null
+  },
+  "1534649d-fa46-421b-a501-85ceb02db222": {
+    "task_id": "1534649d-fa46-421b-a501-85ceb02db222",
+    "task_type": "pci",
+    "config": {
+      "networkType": "LTE",
+      "distanceThreshold": 10.0,
+      "pciModulus": 3,
+      "inheritModulus": false,
+      "pciRange": {
+        "min": 0,
+        "max": 503
+      },
+      "enableTACPlanning": true,
+      "selectedCellIds": [
+        "541778_50",
+        "53190_132",
+        "53190_131",
+        "53190_151",
+        "428664_32",
+        "53190_141",
+        "428664_22"
+      ],
+      "customRules": null
+    },
+    "status": "completed",
+    "progress": 100.0,
+    "result": null,
+    "error": null,
+    "created_at": "2026-05-06T08:42:50.983659",
+    "started_at": "2026-05-06T08:42:50.993588",
+    "completed_at": null
+  },
+  "5596642e-b2ca-4e34-a7d5-ad0ae21301e4": {
+    "task_id": "5596642e-b2ca-4e34-a7d5-ad0ae21301e4",
+    "task_type": "neighbor",
+    "config": {
+      "planningType": "LTE-LTE",
+      "maxDistance": 3.0,
+      "maxNeighbors": 64,
+      "coverageDistanceFactor": 1.0,
+      "coverageRadiusFactor": 1.0,
+      "customRules": null,
+      "selectedCellIds": [
+        "541778_50"
+      ]
+    },
+    "status": "completed",
+    "progress": 100.0,
+    "result": null,
+    "error": null,
+    "created_at": "2026-05-06T08:43:18.938818",
+    "started_at": "2026-05-06T08:43:18.945229",
+    "completed_at": null
+  },
+  "bf7aa88b-8519-4caa-97d4-7669bf512ac1": {
+    "task_id": "bf7aa88b-8519-4caa-97d4-7669bf512ac1",
+    "task_type": "pci",
+    "config": {
+      "networkType": "LTE",
+      "distanceThreshold": 10.0,
+      "pciModulus": 3,
+      "inheritModulus": false,
+      "pciRange": {
+        "min": 0,
+        "max": 503
+      },
+      "enableTACPlanning": true,
+      "selectedCellIds": [
+        "777777_1",
+        "777777_2"
+      ],
+      "customRules": null
+    },
+    "status": "completed",
+    "progress": 100.0,
+    "result": null,
+    "error": null,
+    "created_at": "2026-05-06T17:07:38.118896",
+    "started_at": "2026-05-06T17:07:38.132368",
+    "completed_at": null
+  },
+  "a6178730-621f-454b-8338-db5d2f5b9ad9": {
+    "task_id": "a6178730-621f-454b-8338-db5d2f5b9ad9",
+    "task_type": "pci",
+    "config": {
+      "networkType": "LTE",
+      "distanceThreshold": 15.0,
+      "pciModulus": 3,
+      "inheritModulus": false,
+      "pciRange": {
+        "min": 0,
+        "max": 503
+      },
+      "enableTACPlanning": true,
+      "selectedCellIds": [
+        "777777_1",
+        "777777_2"
+      ],
+      "customRules": null
+    },
+    "status": "completed",
+    "progress": 100.0,
+    "result": null,
+    "error": null,
+    "created_at": "2026-05-06T17:08:05.134130",
+    "started_at": "2026-05-06T17:08:05.141223",
+    "completed_at": null
   }
 }

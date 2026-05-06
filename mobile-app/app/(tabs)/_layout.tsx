@@ -4,6 +4,7 @@ import { Text, View, StyleSheet, Platform, TouchableOpacity } from 'react-native
 import MapScreen from './index';
 import DataScreen from './data';
 import FavoritesScreen from './favorites';
+import SettingsScreen from './settings';
 
 const Tab = createBottomTabNavigator();
 const BOTTOM_PADDING = Platform.OS === 'ios' ? 8 : 0;
@@ -13,6 +14,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
     { name: 'map', label: '地图工具', icon: '🗺️' },
     { name: 'data', label: '数据管理', icon: '📊' },
     { name: 'favorites', label: '收藏', icon: '⭐' },
+    { name: 'settings', label: '设置', icon: '⚙️' },
   ];
 
   return (
@@ -48,6 +50,7 @@ export default function TabsLayout() {
       <Tab.Screen name="map" component={MapScreen} />
       <Tab.Screen name="data" component={DataScreen} />
       <Tab.Screen name="favorites" component={FavoritesScreen} />
+      <Tab.Screen name="settings" component={SettingsScreen} />
     </Tab.Navigator>
   );
 }

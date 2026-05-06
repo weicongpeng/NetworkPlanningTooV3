@@ -11,7 +11,6 @@ import {
   RefreshControl,
 } from 'react-native';
 import { apiService } from '../../src/services/api';
-import { BACKEND_CONFIG } from '../../src/utils/config';
 
 interface DataItem {
   id: string;
@@ -49,7 +48,7 @@ export default function DataScreen() {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     try {
-      console.log('[DataScreen] 后端地址:', BACKEND_CONFIG.baseUrl + BACKEND_CONFIG.apiPrefix);
+      console.log('[DataScreen] 后端地址:', await apiService.getCurrentBaseUrl());
       const response = await apiService.getDataList();
       console.log('[DataScreen] 数据列表响应:', JSON.stringify(response, null, 2)?.substring(0, 500));
       if (response.success && response.data) {
@@ -64,7 +63,7 @@ export default function DataScreen() {
       const msg = error?.message || '无法连接到服务器，请检查网络';
       setErrorMsg(msg);
       if (!isRefresh) {
-        Alert.alert('连接失败', `地址: ${BACKEND_CONFIG.baseUrl}\n${msg}`);
+        Alert.alert('连接失败', `请检查网络`);
       }
     } finally {
       setLoading(false);

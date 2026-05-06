@@ -108,7 +108,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins,
-        allow_origin_regex=f"http://.*:({5173|8000})",
+        allow_origin_regex=r"(http://.*:(5173|8000))|(https://.*\.pengwc\.asia)|(null)|(file://.*)",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

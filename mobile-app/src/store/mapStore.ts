@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface SectorData {
   id: string;
@@ -109,87 +111,101 @@ interface MapState {
   setSearchMarker: (marker: SearchMarker | null) => void;
   focusLocation: { lat: number; lng: number } | null;
   setFocusLocation: (loc: { lat: number; lng: number } | null) => void;
+  // 全局导航触发（从标记列表/收藏页面唤起导航面板）
+  pendingNavi: { lat: number; lng: number; name: string } | null;
+  setPendingNavi: (navi: { lat: number; lng: number; name: string } | null) => void;
 }
 
-export const useMapStore = create<MapState>((set) => ({
-  backendIp: '',
-  backendPort: 8000,
-  isConnected: false,
-  mapType: 'roadmap',
-  layers: {
-    lte: { visible: false },
-    nr: { visible: false },
-  },
-  lteSectors: [],
-  nrSectors: [],
-  selectedSector: null,
-  markers: [],
-  favorites: [],
-  measurePoints: [],
-  measureMode: false,
-  measureFinished: false,
-  totalDistance: null,
-  searchMarker: null,
-  focusLocation: null,
-  markerMode: false,
-  coordinateMode: false,
-  markerCoordinateMode: false,
-  editingMarker: null,
-  addMarker: (lat, lng, name = '') => set((state) => ({
-    markers: [...state.markers, { id: `marker-${Date.now()}`, lat, lng, name, createdAt: Date.now() }]
-  })),
-  removeMarker: (id) => set((state) => ({
-    markers: state.markers.filter(m => m.id !== id)
-  })),
-  clearMarkers: () => set({ markers: [] }),
-  updateMarkerName: (id, name) => set((state) => ({
-    markers: state.markers.map(m => m.id === id ? { ...m, name } : m),
-    favorites: state.favorites.map(m => m.id === id ? { ...m, name } : m),
-  })),
-  addFavorite: (marker) => set((state) => {
-    if (state.favorites.some(f => f.id === marker.id)) return state;
-    return { favorites: [...state.favorites, { ...marker, createdAt: Date.now() }] };
-  }),
-  removeFavorite: (id) => set((state) => ({
-    favorites: state.favorites.filter(m => m.id !== id)
-  })),
-  clearFavorites: () => set({ favorites: [] }),
-  setEditingMarker: (marker) => set({ editingMarker: marker }),
-  addMeasurePoint: (lat, lng) => set((state) => {
-    const newPoints = [...state.measurePoints, { lat, lng }];
-    const distance = calculateTotalDistance(newPoints);
-    return { measurePoints: newPoints, totalDistance: distance, measureFinished: false };
-  }),
-  removeLastMeasurePoint: () => set((state) => {
-    const newPoints = state.measurePoints.slice(0, -1);
-    return { measurePoints: newPoints, totalDistance: newPoints.length > 1 ? calculateTotalDistance(newPoints) : null };
-  }),
-  clearMeasure: () => set({ measurePoints: [], totalDistance: null, measureFinished: false }),
-  toggleMeasureMode: () => set((state) => {
-    if (state.markerMode) {
-      return { measureMode: true, markerMode: false, measurePoints: [], totalDistance: null, measureFinished: false };
+export const useMapStore = create<MapState>()(
+  persist(
+    (set) => ({
+      backendIp: '',
+      backendPort: 8000,
+      isConnected: false,
+      mapType: 'roadmap',
+      layers: {
+        lte: { visible: false },
+        nr: { visible: false },
+      },
+      lteSectors: [],
+      nrSectors: [],
+      selectedSector: null,
+      markers: [],
+      favorites: [],
+      measurePoints: [],
+      measureMode: false,
+      measureFinished: false,
+      totalDistance: null,
+      searchMarker: null,
+      focusLocation: null,
+      markerMode: false,
+      coordinateMode: false,
+      markerCoordinateMode: false,
+      editingMarker: null,
+      pendingNavi: null,
+      addMarker: (lat, lng, name = '') => set((state) => ({
+        markers: [...state.markers, { id: `marker-${Date.now()}`, lat, lng, name, createdAt: Date.now() }]
+      })),
+      removeMarker: (id) => set((state) => ({
+        markers: state.markers.filter(m => m.id !== id)
+      })),
+      clearMarkers: () => set({ markers: [] }),
+      updateMarkerName: (id, name) => set((state) => ({
+        markers: state.markers.map(m => m.id === id ? { ...m, name } : m),
+        favorites: state.favorites.map(m => m.id === id ? { ...m, name } : m),
+      })),
+      addFavorite: (marker) => set((state) => {
+        if (state.favorites.some(f => f.id === marker.id)) return state;
+        return { favorites: [...state.favorites, { ...marker, createdAt: Date.now() }] };
+      }),
+      removeFavorite: (id) => set((state) => ({
+        favorites: state.favorites.filter(m => m.id !== id)
+      })),
+      clearFavorites: () => set({ favorites: [] }),
+      setEditingMarker: (marker) => set({ editingMarker: marker }),
+      addMeasurePoint: (lat, lng) => set((state) => {
+        const newPoints = [...state.measurePoints, { lat, lng }];
+        const distance = calculateTotalDistance(newPoints);
+        return { measurePoints: newPoints, totalDistance: distance, measureFinished: false };
+      }),
+      removeLastMeasurePoint: () => set((state) => {
+        const newPoints = state.measurePoints.slice(0, -1);
+        return { measurePoints: newPoints, totalDistance: newPoints.length > 1 ? calculateTotalDistance(newPoints) : null };
+      }),
+      clearMeasure: () => set({ measurePoints: [], totalDistance: null, measureFinished: false }),
+      toggleMeasureMode: () => set((state) => {
+        if (state.markerMode) {
+          return { measureMode: true, markerMode: false, measurePoints: [], totalDistance: null, measureFinished: false };
+        }
+        return { measureMode: !state.measureMode, measurePoints: state.measureMode ? state.measurePoints : [], measureFinished: false };
+      }),
+      finishMeasure: () => set({ measureMode: false, measureFinished: true }),
+      toggleMarkerMode: () => set((state) => {
+        const newMarkerMode = !state.markerMode;
+        if (state.measureMode && newMarkerMode) {
+          return { markerMode: newMarkerMode, measureMode: false, measurePoints: [], totalDistance: null, measureFinished: false };
+        }
+        return { markerMode: newMarkerMode };
+      }),
+      setMarkerMode: (mode) => set({ markerMode: mode }),
+      setCoordinateMode: (mode) => set({ coordinateMode: mode }),
+      setBackendInfo: (ip, port) => set({ backendIp: ip, backendPort: port }),
+      setConnected: (connected) => set({ isConnected: connected }),
+      setMapType: (type) => set({ mapType: type }),
+      toggleLayer: (type) =>
+        set((state) => ({
+          layers: { ...state.layers, [type]: { visible: !state.layers[type].visible } },
+        })),
+      setSectors: (lte, nr) => set({ lteSectors: lte, nrSectors: nr }),
+      setSelectedSector: (sector) => set({ selectedSector: sector }),
+      setSearchMarker: (marker) => set({ searchMarker: marker }),
+      setFocusLocation: (loc) => set({ focusLocation: loc }),
+      setPendingNavi: (navi) => set({ pendingNavi: navi }),
+    }),
+    {
+      name: 'map-store-favorites',
+      storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({ favorites: state.favorites }),
     }
-    return { measureMode: !state.measureMode, measurePoints: state.measureMode ? state.measurePoints : [], measureFinished: false };
-  }),
-  finishMeasure: () => set({ measureMode: false, measureFinished: true }),
-  toggleMarkerMode: () => set((state) => {
-    const newMarkerMode = !state.markerMode;
-    if (state.measureMode && newMarkerMode) {
-      return { markerMode: newMarkerMode, measureMode: false, measurePoints: [], totalDistance: null, measureFinished: false };
-    }
-    return { markerMode: newMarkerMode };
-  }),
-  setMarkerMode: (mode) => set({ markerMode: mode }),
-  setCoordinateMode: (mode) => set({ coordinateMode: mode }),
-  setBackendInfo: (ip, port) => set({ backendIp: ip, backendPort: port }),
-  setConnected: (connected) => set({ isConnected: connected }),
-  setMapType: (type) => set({ mapType: type }),
-  toggleLayer: (type) =>
-    set((state) => ({
-      layers: { ...state.layers, [type]: { visible: !state.layers[type].visible } },
-    })),
-  setSectors: (lte, nr) => set({ lteSectors: lte, nrSectors: nr }),
-  setSelectedSector: (sector) => set({ selectedSector: sector }),
-  setSearchMarker: (marker) => set({ searchMarker: marker }),
-  setFocusLocation: (loc) => set({ focusLocation: loc }),
-}));
+  )
+);

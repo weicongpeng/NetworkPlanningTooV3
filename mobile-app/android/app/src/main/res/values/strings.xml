@@ -1,3 +1,4 @@
 <resources>
-  <string name="app_name">网络规划工具</string>
+  <string name="app_name">工参地图</string>
+  <string name="expo_runtime_version">1.0.0</string>
 </resources>

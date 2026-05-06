@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Clipboard, M
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useMapStore, MarkerPoint } from '../../src/store/mapStore';
-import { startNaviToCoord } from '../../src/services/navi';
 import { wgs84ToGcj02 } from '../../src/utils/coordinate';
 
 export default function FavoritesScreen() {
@@ -39,23 +38,29 @@ export default function FavoritesScreen() {
     );
   };
 
+  const setPendingNavi = useMapStore(s => s.setPendingNavi);
+
   const handleNavigate = (item: MarkerPoint) => {
-    // favorites 存储为 WGS84，导航时传入 isWgs84=true
-    startNaviToCoord(item.lat, item.lng, item.name, true);
+    // 设置导航触发状态，然后跳转到地图页面
+    setPendingNavi({ lat: item.lat, lng: item.lng, name: item.name || '收藏点' });
+    // 跳转到地图页面（navigation 已通过 useNavigation 获取）
+    if (navigation) {
+      navigation.navigate('map');
+    }
+  };
+
+  const handleLocation = (item: MarkerPoint) => {
+    // 收藏点存储为 WGS84，转换为 GCJ-02 用于高德地图定位
+    const [gcjLat, gcjLng] = wgs84ToGcj02(item.lat, item.lng);
+    setFocusLocation({ lat: gcjLat, lng: gcjLng });
+    setSearchMarker({ lat: gcjLat, lng: gcjLng, name: item.name || '收藏点' });
+    navigation.navigate('map');
   };
 
   const handleCopy = (item: MarkerPoint) => {
     const text = `名称: ${item.name || '未命名'}\n坐标: ${item.lat.toFixed(6)}, ${item.lng.toFixed(6)}\n时间: ${new Date(item.createdAt).toLocaleString()}`;
     Clipboard.setString(text);
     Alert.alert('已复制', '标记点信息已复制到剪贴板');
-  };
-
-  const handleLocation = (item: MarkerPoint) => {
-    // 收藏点存储为 WGS84，跳转高德地图前转换为 GCJ-02
-    const [gcjLat, gcjLng] = wgs84ToGcj02(item.lat, item.lng);
-    setFocusLocation({ lat: gcjLat, lng: gcjLng });
-    setSearchMarker({ lat: gcjLat, lng: gcjLng, name: item.name || '收藏点' });
-    navigation.navigate('map');
   };
 
   const handleEditPress = (item: MarkerPoint) => {

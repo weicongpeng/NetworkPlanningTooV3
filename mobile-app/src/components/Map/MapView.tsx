@@ -5,6 +5,15 @@ import { useMapStore } from '../../store/mapStore';
 
 export interface MapViewRef {
   moveCamera: (lat: number, lng: number, zoom?: number) => void;
+  addRoute: (polyline: [number, number][]) => void;
+  clearRoute: () => void;
+  updateUserLocation: (lat: number, lng: number, heading?: number) => void;
+  clearUserLocation: () => void;
+  fitRouteBounds: (polyline: [number, number][]) => void;
+  locateMe: (lat: number, lng: number, zoom?: number) => void;
+  startAutoFit: () => void;
+  stopAutoFit: () => void;
+  injectJavaScript: (script: string) => void;
 }
 
 interface Props {
@@ -108,6 +117,8 @@ const HTML_TEMPLATE = `
       var sectorOverlayGroup = null;
       var markerOverlayGroup = null;
       var measureOverlayGroup = null;
+      var routeOverlayGroup = null;
+      var userLocationMarker = null;
       var searchMarkerObj = null;
       var currentSectorData = '';
       var currentMarkerData = '';
@@ -123,6 +134,12 @@ const HTML_TEMPLATE = `
       var touchStartTime = 0;
       var lastTapTime = 0;
       var touchHandled = false;
+
+      // Auto-fit variables: 5秒无操作自动恢复实时定位导航视图
+      var _autoFitTimer = null;
+      var _autoFitEnabled = false;
+      var _currentUserPos = null;         // [lat, lng] from updateUserLocation
+      var _programmaticMove = false;      // 防止程序移动触发 auto-fit 循环
 
       function log(msg) {
         if (window.ReactNativeWebView) {
@@ -268,6 +285,8 @@ const HTML_TEMPLATE = `
           markerOverlayGroup.setMap(map);
           measureOverlayGroup = new AMap.OverlayGroup();
           measureOverlayGroup.setMap(map);
+          routeOverlayGroup = new AMap.OverlayGroup();
+          routeOverlayGroup.setMap(map);
 
           // Resize on window resize
           window.addEventListener('resize', function() {
@@ -297,6 +316,16 @@ const HTML_TEMPLATE = `
                 lng: e.lnglat.getLng()
               }));
             }
+          });
+
+          // Auto-fit: 用户拖拽/缩放时清除计时器，操作结束后重新计时
+          // 程序性移动（moveCamera/fitRouteBounds）不触发电火
+          map.on('dragstart', function() { _programmaticMove = false; clearAutoFitTimer(); });
+          map.on('dragend', function() { startAutoFitTimer(); });
+          map.on('zoomstart', clearAutoFitTimer);
+          map.on('zoomend', function() {
+            if (_programmaticMove) { _programmaticMove = false; return; }
+            startAutoFitTimer();
           });
 
           // ---- RELIABLE TAP DETECTION ----
@@ -885,8 +914,472 @@ const HTML_TEMPLATE = `
 
       window.moveCamera = function(lat, lng, zoom) {
         if (!map) return;
+        _programmaticMove = true;
         map.setZoomAndCenter(zoom || 16, [lng, lat]);
       };
+
+      // === 导航路线显示 ===
+      window.addRoute = function(polyline) {
+        if (!map || !routeOverlayGroup) return;
+        routeOverlayGroup.clearOverlays();
+        // polyline: [[lng, lat], ...] in GCJ-02
+        var path = polyline.map(function(p) { return [p[0], p[1]]; });
+        var routeLine = new AMap.Polyline({
+          path: path,
+          strokeColor: '#007AFF',
+          strokeWeight: 6,
+          strokeStyle: 'solid',
+          lineJoin: 'round',
+          lineCap: 'round',
+          zIndex: 80
+        });
+        routeOverlayGroup.addOverlay(routeLine);
+        // 确保路线在最上层
+        routeOverlayGroup.setMap(map);
+      };
+
+      window.clearRoute = function() {
+        if (routeOverlayGroup) {
+          routeOverlayGroup.clearOverlays();
+        }
+        if (_autoFitTimer) { clearTimeout(_autoFitTimer); _autoFitTimer = null; }
+      };
+
+      window.updateUserLocation = function(lat, lng, heading) {
+        if (!map) return;
+        _currentUserPos = [lat, lng]; // 存储当前位置用于 auto-fit
+        var rot = (heading !== undefined && heading !== null) ? heading : 0;
+        var arrowContent = '<div style="position:relative;width:30px;height:40px;">' +
+          '<div style="position:absolute;top:0;left:0;width:30px;height:40px;' +
+          'transition:transform 0.3s ease;' +
+          'transform:rotate(' + rot + 'deg);transform-origin:15px 22px;">' +
+          /* 三角箭头（位于圆上方） */
+          '<div style="position:absolute;top:0;left:50%;margin-left:-7px;' +
+          'width:0;height:0;' +
+          'border-left:7px solid transparent;border-right:7px solid transparent;' +
+          'border-bottom:12px solid #007AFF;"></div>' +
+          /* 蓝色圆形主体 */
+          '<div style="position:absolute;top:10px;left:3px;width:24px;height:24px;' +
+          'background:#007AFF;border:3px solid #fff;border-radius:50%;' +
+          'box-shadow:0 2px 8px rgba(0,0,0,0.35);">' +
+          /* 中心白点 */
+          '<div style="position:absolute;top:50%;left:50%;margin:-3px 0 0 -3px;' +
+          'width:6px;height:6px;background:#fff;border-radius:50%;"></div>' +
+          '</div>' +
+          '</div>' +
+          '</div>';
+        if (!userLocationMarker) {
+          var marker = new AMap.Marker({
+            position: [lng, lat],
+            content: arrowContent,
+            offset: new AMap.Pixel(-15, -22),
+            zIndex: 120,
+          });
+          map.add(marker);
+          userLocationMarker = marker;
+        } else {
+          userLocationMarker.setPosition([lng, lat]);
+          userLocationMarker.setContent(arrowContent);
+        }
+      };
+
+      window.clearUserLocation = function() {
+        if (userLocationMarker) {
+          map.remove(userLocationMarker);
+          userLocationMarker = null;
+        }
+        _currentUserPos = null;
+      };
+
+      // Auto-fit: 用户拖拽/缩放后5秒无操作 → 恢复实时定位导航视图
+      function clearAutoFitTimer() {
+        if (_autoFitTimer) {
+          clearTimeout(_autoFitTimer);
+          _autoFitTimer = null;
+        }
+      }
+      function startAutoFitTimer() {
+        if (!_autoFitEnabled) return;
+        clearAutoFitTimer();
+        _autoFitTimer = setTimeout(function() {
+          if (_autoFitEnabled && _currentUserPos && map) {
+            _programmaticMove = true;
+            map.setZoomAndCenter(15, [_currentUserPos[1], _currentUserPos[0]]);
+          }
+          _autoFitTimer = null;
+        }, 5000);
+      }
+
+      window.enableAutoFit = function() { _autoFitEnabled = true; };
+      window.disableAutoFit = function() {
+        _autoFitEnabled = false;
+        clearAutoFitTimer();
+      };
+
+      // fitRouteBounds：展示路线全局视野，标记为程序移动避免触发 auto-fit 循环
+      window.fitRouteBounds = function(polyline) {
+        if (!map || !polyline || polyline.length === 0) return;
+        _programmaticMove = true;
+        var bounds = new AMap.Bounds();
+        for (var i = 0; i < polyline.length; i++) {
+          bounds.extend(new AMap.LngLat(polyline[i][0], polyline[i][1]));
+        }
+        map.setBounds(bounds, null, false, [80, 80, 80, 80]);
+      };
+
+      // ==================== TAB 图层渲染 ====================
+      var tabLayerGroups = {};  // { layerId: OverlayGroup }
+      window.tabLayerGroups = tabLayerGroups;  // 供 injectJavaScript 全局访问
+
+      window.removeTabLayer = function(layerId) {
+        if (tabLayerGroups[layerId]) {
+          map.remove(tabLayerGroups[layerId]);
+          delete tabLayerGroups[layerId];
+        }
+      };
+
+      function createGeoJSONOverlay(geometry, props, isGCJ02) {
+        var type = geometry.type;
+        var coordinates = geometry.coordinates;
+        try {
+          if (type === 'Point') {
+            var lng = coordinates[0], lat = coordinates[1];
+            if (!isGCJ02) { var g = wgs84ToGcj02(lat, lng); lat = g[0]; lng = g[1]; }
+            var marker = new AMap.CircleMarker({
+              center: [lng, lat],
+              radius: 6,
+              fillColor: '#ffffff',
+              fillOpacity: 1,
+              strokeColor: '#000000',
+              strokeWeight: 2,
+              extData: props
+            });
+            return marker;
+          } else if (type === 'MultiPoint') {
+            var mg = new AMap.OverlayGroup();
+            for (var p = 0; p < coordinates.length; p++) {
+              var lng2 = coordinates[p][0], lat2 = coordinates[p][1];
+              if (!isGCJ02) { var g2 = wgs84ToGcj02(lat2, lng2); lat2 = g2[0]; lng2 = g2[1]; }
+              mg.addOverlay(new AMap.CircleMarker({
+                center: [lng2, lat2], radius: 6,
+                fillColor: '#ffffff', fillOpacity: 1,
+                strokeColor: '#000000', strokeWeight: 2
+              }));
+            }
+            return mg;
+          } else if (type === 'LineString') {
+            var path = [];
+            for (var k = 0; k < coordinates.length; k++) {
+              var lng3 = coordinates[k][0], lat3 = coordinates[k][1];
+              if (!isGCJ02) { var g3 = wgs84ToGcj02(lat3, lng3); lat3 = g3[0]; lng3 = g3[1]; }
+              path.push([lng3, lat3]);
+            }
+            return new AMap.Polyline({ path: path, strokeColor: '#3b82f6', strokeWeight: 2, strokeOpacity: 0.8 });
+          } else if (type === 'MultiLineString') {
+            var mg2 = new AMap.OverlayGroup();
+            for (var m = 0; m < coordinates.length; m++) {
+              var linePath = [];
+              for (var n = 0; n < coordinates[m].length; n++) {
+                var lng4 = coordinates[m][n][0], lat4 = coordinates[m][n][1];
+                if (!isGCJ02) { var g4 = wgs84ToGcj02(lat4, lng4); lat4 = g4[0]; lng4 = g4[1]; }
+                linePath.push([lng4, lat4]);
+              }
+              mg2.addOverlay(new AMap.Polyline({ path: linePath, strokeColor: '#3b82f6', strokeWeight: 2, strokeOpacity: 0.8 }));
+            }
+            return mg2;
+          } else if (type === 'Polygon') {
+            var polyPath = [];
+            var ring = coordinates[0];
+            for (var r = 0; r < ring.length; r++) {
+              var lng5 = ring[r][0], lat5 = ring[r][1];
+              if (!isGCJ02) { var g5 = wgs84ToGcj02(lat5, lng5); lat5 = g5[0]; lng5 = g5[1]; }
+              polyPath.push([lng5, lat5]);
+            }
+            return new AMap.Polygon({
+              path: polyPath, fillColor: 'rgba(59,130,246,0.3)',
+              fillOpacity: 0.5, strokeColor: '#3b82f6', strokeWeight: 2
+            });
+          } else if (type === 'MultiPolygon') {
+            var mg3 = new AMap.OverlayGroup();
+            for (var mp = 0; mp < coordinates.length; mp++) {
+              var mpRing = coordinates[mp][0], mpPath = [];
+              for (var mr = 0; mr < mpRing.length; mr++) {
+                var lng6 = mpRing[mr][0], lat6 = mpRing[mr][1];
+                if (!isGCJ02) { var g6 = wgs84ToGcj02(lat6, lng6); lat6 = g6[0]; lng6 = g6[1]; }
+                mpPath.push([lng6, lat6]);
+              }
+              mg3.addOverlay(new AMap.Polygon({
+                path: mpPath, fillColor: 'rgba(59,130,246,0.3)',
+                fillOpacity: 0.5, strokeColor: '#3b82f6', strokeWeight: 2
+              }));
+            }
+            return mg3;
+          }
+        } catch (e) {
+          log('createGeoJSONOverlay error: ' + (e.message || e));
+        }
+        return null;
+      }
+
+      window.updateTabLayer = function(layerId, geojson) {
+        window._updateTabLayerWithConv(layerId, geojson, false);
+      };
+
+      // 后端预处理版 - 坐标已为GCJ02
+      window.updateTabLayerGCJ = function(layerId, geojson) {
+        log('updateTabLayerGCJ called: layerId=' + layerId + ' hasFeatures=' + (geojson && geojson.features ? geojson.features.length : 0));
+        window._updateTabLayerWithConv(layerId, geojson, true);
+      };
+
+      window._updateTabLayerWithConv = function(layerId, geojson, isGCJ02) {
+        try {
+          if (!map || !geojson) return;
+          if (tabLayerGroups[layerId]) {
+            map.remove(tabLayerGroups[layerId]);
+          }
+          if (!geojson.features || geojson.features.length === 0) return;
+          var group = new AMap.OverlayGroup();
+          var features = geojson.features;
+          for (var i = 0; i < features.length; i++) {
+            var feat = features[i];
+            if (!feat.geometry || !feat.geometry.type) continue;
+            var props = feat.properties || {};
+            var overlay = createGeoJSONOverlay(feat.geometry, props, isGCJ02);
+            if (overlay) group.addOverlay(overlay);
+          }
+          group.setMap(map);
+          tabLayerGroups[layerId] = group;
+          fitLayerBounds(group);
+        } catch(e) { log('_updateTabLayerWithConv error: ' + (e.message || e)); }
+      };
+
+      // ==================== 地理化数据渲染 ====================
+      var geoDataLayerGroups = {};  // { dataId: OverlayGroup }
+      window.geoDataLayerGroups = geoDataLayerGroups;  // 供 injectJavaScript 全局访问
+
+      window.updateGeoDataLayer = function(dataId, geometryType, data) {
+        try {
+          if (!map || !data) return;
+          if (geoDataLayerGroups[dataId]) {
+            map.remove(geoDataLayerGroups[dataId]);
+          }
+          if (data.length === 0) return;
+          var group = new AMap.OverlayGroup();
+          for (var i = 0; i < data.length; i++) {
+            var item = data[i];
+            var overlay = null;
+            if (geometryType === 'sector') {
+              overlay = createSectorOverlay(item);
+            } else if (geometryType === 'polygon') {
+              overlay = createPolygonOverlay(item);
+            } else {
+              overlay = createPointOverlay(item);
+            }
+            if (overlay) group.addOverlay(overlay);
+          }
+          group.setMap(map);
+          geoDataLayerGroups[dataId] = group;
+          fitLayerBounds(group);
+        } catch(e) { log('updateGeoDataLayer error: ' + (e.message || e)); }
+      };
+
+      window.removeGeoDataLayer = function(dataId) {
+        if (geoDataLayerGroups[dataId]) {
+          map.remove(geoDataLayerGroups[dataId]);
+          delete geoDataLayerGroups[dataId];
+        }
+      };
+
+      function fitLayerBounds(group) {
+        if (!map || !group) return;
+        var overlays = group.getOverlays();
+        if (overlays.length === 0) return;
+        var bounds = new AMap.Bounds();
+        var hasBounds = false;
+        for (var i = 0; i < overlays.length; i++) {
+          try {
+            var o = overlays[i];
+            if (o.getCenter) { bounds.extend(o.getCenter()); hasBounds = true; }
+            else if (o.getPath) {
+              o.getPath().forEach(function(p) { bounds.extend(p); });
+              hasBounds = true;
+            }
+          } catch(e) {}
+        }
+        if (hasBounds) map.setBounds(bounds, null, false, [40,40,40,40]);
+      }
+
+      // ==================== 通过HTTP获取数据并渲染 ====================
+      // 直接从后端API获取数据，避免桥接数据大小限制
+
+      window.loadTabLayerFromAPI = function(apiUrl, dataId, layerId) {
+        if (!map) return;
+        var url = apiUrl + '/data/' + encodeURIComponent(dataId) + '/render-mobile';
+        log('loadTabLayerFromAPI: fetching ' + url);
+        fetch(url)
+          .then(function(r) { return r.json(); })
+          .then(function(resp) {
+            log('loadTabLayerFromAPI: response success=' + resp.success);
+            if (!resp.success || !resp.data || resp.data.dataType !== 'tab') {
+              log('loadTabLayerFromAPI: invalid response');
+              return;
+            }
+            var layers = resp.data.layers || [];
+            log('loadTabLayerFromAPI: ' + layers.length + ' layers');
+            var target = null;
+            if (layerId) {
+              for (var i = 0; i < layers.length; i++) {
+                if (layers[i].id === layerId) { target = layers[i]; break; }
+              }
+            }
+            if (!target && layers.length > 0) target = layers[0];
+            if (!target) { log('loadTabLayerFromAPI: no layer found'); return; }
+            log('loadTabLayerFromAPI: layer=' + target.name + ' features=' +
+                (target.geojson && target.geojson.features ? target.geojson.features.length : 0));
+            var layerKey = dataId + '_' + target.id;
+            window._updateTabLayerWithConv(layerKey, target.geojson, true);
+          })
+          .catch(function(err) { log('loadTabLayerFromAPI fetch error: ' + (err.message || err)); });
+      };
+
+      window.loadGeoDataFromAPI = function(apiUrl, dataId) {
+        if (!map) return;
+        var url = apiUrl + '/data/' + encodeURIComponent(dataId) + '/render-mobile';
+        log('loadGeoDataFromAPI: fetching ' + url);
+        fetch(url)
+          .then(function(r) { return r.json(); })
+          .then(function(resp) {
+            log('loadGeoDataFromAPI: response success=' + resp.success);
+            if (!resp.success || !resp.data || resp.data.dataType !== 'geo') {
+              log('loadGeoDataFromAPI: invalid response');
+              return;
+            }
+            var geometryType = resp.data.geometryType || 'point';
+            var features = resp.data.features || [];
+            log('loadGeoDataFromAPI: ' + features.length + ' features, type=' + geometryType);
+            if (features.length > 0) {
+              log('loadGeoDataFromAPI: first item keys=' + Object.keys(features[0]).join(','));
+            }
+            window.updateGeoDataLayer(dataId, geometryType, features);
+          })
+          .catch(function(err) { log('loadGeoDataFromAPI fetch error: ' + (err.message || err)); });
+      };
+
+      // 测试函数：在地图中心添加一个红色测试标记
+      window.testInject = function() {
+        if (!map) return;
+        try {
+          var center = map.getCenter();
+          var marker = new AMap.CircleMarker({
+            center: [center.lng, center.lat],
+            radius: 20,
+            fillColor: '#FF0000',
+            fillOpacity: 0.8,
+            strokeColor: '#fff',
+            strokeWeight: 3
+          });
+          map.add(marker);
+          log('testInject: marker added at ' + center.lng + ',' + center.lat);
+        } catch(e) { log('testInject error: ' + e); }
+      };
+
+      // 全局错误捕获：将所有未捕获的错误报告给 React Native
+      window.onerror = function(msg, url, line, col, err) {
+        log('GLOBAL_ERROR: ' + msg + ' at ' + line + ':' + col);
+      };
+
+      log('TAB/GeoData layer rendering functions initialized');
+
+      function createPointOverlay(item) {
+        var lat = item.displayLat !== undefined ? item.displayLat : (item.latitude || 0);
+        var lng = item.displayLng !== undefined ? item.displayLng : (item.longitude || 0);
+        if (!lat || !lng) return null;
+        // 如果坐标是 WGS84，需要转换
+        var gcj;
+        if (item.displayLat !== undefined) {
+          gcj = [lat, lng]; // 已是 GCJ02
+        } else {
+          gcj = wgs84ToGcj02(lat, lng);
+        }
+        return new AMap.CircleMarker({
+          center: [gcj[1], gcj[0]],
+          radius: 8,
+          fillColor: '#ffffff',
+          fillOpacity: 1,
+          strokeColor: '#000000',
+          strokeWeight: 2
+        });
+      }
+
+      function createSectorOverlay(item) {
+        var lat = item.displayLat !== undefined ? item.displayLat : (item.latitude || 0);
+        var lng = item.displayLng !== undefined ? item.displayLng : (item.longitude || 0);
+        if (!lat || !lng) return null;
+        var gcj;
+        if (item.displayLat !== undefined) {
+          gcj = [lat, lng];
+        } else {
+          gcj = wgs84ToGcj02(lat, lng);
+        }
+        var azimuth = item.azimuth || 0;
+        var beamwidth = item.beamwidth || 65;
+        var radius = item.cell_cover_type === 4 ? 30 : 80;
+        var is360 = Math.abs(azimuth - 360) < 0.1;
+        if (is360 || item.cell_cover_type === 4) {
+          return new AMap.Circle({
+            center: [gcj[1], gcj[0]],
+            radius: radius,
+            fillColor: '#ffffff',
+            fillOpacity: 0.4,
+            strokeColor: '#000000',
+            strokeWeight: 2
+          });
+        }
+        var path = calculateSectorPoints(gcj[0], gcj[1], azimuth, beamwidth, radius);
+        return new AMap.Polygon({
+          path: path,
+          fillColor: '#ffffff',
+          fillOpacity: 0.4,
+          strokeColor: '#000000',
+          strokeWeight: 2
+        });
+      }
+
+      function calculateSectorPoints(lat, lng, azimuth, beamwidth, radius) {
+        var points = [];
+        var halfBeam = (beamwidth / 2) * (Math.PI / 180);
+        var aziRad = azimuth * (Math.PI / 180);
+        var startAngle = aziRad - halfBeam;
+        var endAngle = aziRad + halfBeam;
+        var numPoints = Math.max(6, Math.ceil(beamwidth / 5));
+        points.push([lng, lat]);
+        for (var i = 0; i <= numPoints; i++) {
+          var angle = startAngle + (endAngle - startAngle) * (i / numPoints);
+          var latDeg = radius / 111320;
+          var lngDeg = radius / (111320 * Math.cos(lat * Math.PI / 180));
+          var x = lng + lngDeg * Math.sin(angle);
+          var y = lat + latDeg * Math.cos(angle);
+          points.push([x, y]);
+        }
+        points.push([lng, lat]);
+        return points;
+      }
+
+      function createPolygonOverlay(item) {
+        if (!item.path || item.path.length < 3) return null;
+        // path 格式: [lat, lng] in GCJ02
+        var amapPath = [];
+        for (var i = 0; i < item.path.length; i++) {
+          amapPath.push([item.path[i][1], item.path[i][0]]);
+        }
+        return new AMap.Polygon({
+          path: amapPath,
+          fillColor: 'rgba(59,130,246,0.3)',
+          fillOpacity: 0.5,
+          strokeColor: '#3b82f6',
+          strokeWeight: 2
+        });
+      }
     })();
   </script>
 </body>
@@ -1037,6 +1530,13 @@ export default forwardRef<MapViewRef, Props>(function MapView(props, ref) {
           break;
         case 'log':
           console.log('[MapView Web]', data.message);
+          // 全局错误以 GLOBAL_ERROR 开头，打印到控制台
+          if (data.message && data.message.indexOf('GLOBAL_ERROR') >= 0) {
+            console.error('[MapView Web ERROR]', data.message);
+          }
+          break;
+        case 'renderError':
+          console.error('[MapView Render ERROR]', data.message);
           break;
         case 'measureClear':
           onMeasureClear?.();
@@ -1053,6 +1553,34 @@ export default forwardRef<MapViewRef, Props>(function MapView(props, ref) {
   useImperativeHandle(ref, () => ({
     moveCamera: (lat: number, lng: number, zoom?: number) => {
       injectJS(`window.moveCamera(${lat}, ${lng}, ${zoom || 16});`);
+    },
+    addRoute: (polyline: [number, number][]) => {
+      injectJS(`window.addRoute(${JSON.stringify(polyline)});`);
+    },
+    clearRoute: () => {
+      injectJS('window.clearRoute();');
+    },
+    updateUserLocation: (lat: number, lng: number, heading?: number) => {
+      injectJS(`window.updateUserLocation(${lat}, ${lng}, ${heading || 0});`);
+    },
+    clearUserLocation: () => {
+      injectJS('window.clearUserLocation();');
+    },
+    fitRouteBounds: (polyline: [number, number][]) => {
+      injectJS(`window.fitRouteBounds(${JSON.stringify(polyline)});`);
+    },
+    locateMe: (lat: number, lng: number, zoom?: number) => {
+      injectJS(`window.moveCamera(${lat}, ${lng}, ${zoom || 16});`);
+      injectJS(`window.updateUserLocation(${lat}, ${lng}, 0);`);
+    },
+    startAutoFit: () => {
+      injectJS('window.enableAutoFit();');
+    },
+    stopAutoFit: () => {
+      injectJS('window.disableAutoFit();');
+    },
+    injectJavaScript: (script: string) => {
+      injectJS(script);
     },
   }));
 

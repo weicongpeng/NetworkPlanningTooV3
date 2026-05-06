@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
 import { useMapStore, MarkerPoint } from '../../store/mapStore';
-import { startNaviToCoord } from '../../services/navi';
 
 interface MarkerListProps {
   onMarkerSelect?: (marker: MarkerPoint) => void;
@@ -9,6 +8,7 @@ interface MarkerListProps {
 
 export default function MarkerList({ onMarkerSelect }: MarkerListProps) {
   const { markers, favorites, removeMarker, addFavorite, measureMode, markerMode, setEditingMarker } = useMapStore();
+  const setPendingNavi = useMapStore(s => s.setPendingNavi);
 
   if (markers.length === 0 || measureMode) return null;
 
@@ -22,8 +22,7 @@ export default function MarkerList({ onMarkerSelect }: MarkerListProps) {
   };
 
   const handleNavigate = (marker: MarkerPoint) => {
-    // markers 存储为 WGS84，导航时传入 isWgs84=true
-    startNaviToCoord(marker.lat, marker.lng, marker.name, true);
+    setPendingNavi({ lat: marker.lat, lng: marker.lng, name: marker.name || '标记点' });
   };
 
   const handleEdit = (marker: MarkerPoint) => {

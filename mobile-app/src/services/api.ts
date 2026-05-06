@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
-import { BACKEND_CONFIG } from '../utils/config';
+import { getEffectiveApiUrl, getEffectiveApiBaseUrl, setCustomApiUrl, resetCustomApiUrl, testApiConnection } from '../utils/config';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
@@ -8,10 +8,53 @@ class ApiService {
 
   constructor() {
     this.client = axios.create({
-      baseURL: BACKEND_CONFIG.baseUrl + BACKEND_CONFIG.apiPrefix,
       timeout: 30000,
     });
+
+    // 请求拦截器：每次请求前动态获取当前生效的 API 地址
+    // 这样在 App 设置页修改后端地址后，后续所有请求自动使用新地址
+    this.client.interceptors.request.use(async (config) => {
+      config.baseURL = await getEffectiveApiUrl();
+      return config;
+    });
   }
+
+  // ==================== 运行时地址切换 ====================
+
+  /**
+   * 更新后端 API 地址（立即生效，无需重装 App）
+   * @param url 完整的后端基础地址，如 https://apk.pengwc.asia
+   */
+  async updateApiUrl(url: string): Promise<void> {
+    await setCustomApiUrl(url);
+  }
+
+  /**
+   * 切换回自动发现模式（LAN IP / localhost）
+   */
+  async resetApiUrl(): Promise<void> {
+    await resetCustomApiUrl();
+  }
+
+  /**
+   * 获取当前生效的后端基础地址
+   */
+  async getCurrentBaseUrl(): Promise<string> {
+    return getEffectiveApiBaseUrl();
+  }
+
+  async getFullApiUrl(): Promise<string> {
+    return getEffectiveApiUrl();
+  }
+
+  /**
+   * 测试指定的后端地址是否可达
+   */
+  async testConnection(url: string): Promise<{ ok: boolean; message: string }> {
+    return testApiConnection(url);
+  }
+
+  // ==================== API 方法 ====================
 
   async getSystemInfo() {
     const response = await this.client.get('/system/info');
@@ -24,7 +67,18 @@ class ApiService {
   }
 
   async getLayers(dataId: string) {
-    const response = await this.client.get(`/geo-data/layers/${dataId}`);
+    const response = await this.client.get(`/data/${dataId}/layers`);
+    return response.data;
+  }
+
+  async getLayerData(dataId: string, layerId: string) {
+    const response = await this.client.get(`/data/${dataId}/layers/${layerId}/data`);
+    return response.data;
+  }
+
+  // 获取移动端渲染数据（坐标已转换GCJ02，可直接渲染）
+  async getMobileRenderData(dataId: string) {
+    const response = await this.client.get(`/data/${dataId}/render-mobile`);
     return response.data;
   }
 
@@ -79,8 +133,9 @@ class ApiService {
 
   async downloadData(dataId: string, filename: string): Promise<{ success: boolean; message: string }> {
     try {
-      // 使用 axios 的 baseURL 保持一致
-      const url = `${BACKEND_CONFIG.baseUrl}${BACKEND_CONFIG.apiPrefix}/data/${dataId}/download`;
+      // 每次下载前获取最新的 API 地址
+      const currentUrl = await getEffectiveApiUrl();
+      const url = `${currentUrl}/data/${dataId}/download`;
       
       // 构建本地文件路径
       const localUri = `${FileSystem.cacheDirectory}${filename}`;

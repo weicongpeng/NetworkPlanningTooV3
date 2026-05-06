@@ -549,6 +549,93 @@ async def get_layer_columns(data_id: str, layer_id: str) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=safe_detail)
 
 
+
+@router.get("/{data_id}/render-mobile", response_model=Dict[str, Any])
+async def render_mobile_data(data_id: str) -> Dict[str, Any]:
+    """移动端数据渲染接口 - 返回可直接渲染的数据（坐标已转换GCJ02）
+    
+    根据数据类型自动处理：
+    - MapInfo文件：返回 GeoJSON，坐标已转为 GCJ02
+    - 地理化数据(Excel)：返回 features 数组 + geometryType
+    """
+    try:
+        if data_id not in data_service.index:
+            raise HTTPException(status_code=404, detail="数据不存在")
+        
+        data_info = data_service.index[data_id]
+        data_type = data_info.get("type", "")
+        
+        if data_type == "map":
+            # MapInfo 文件：获取所有图层的 GeoJSON 数据（坐标转换 GCJ02）
+            from app.services.mapinfo_service import get_layer_data as get_mapinfo_layer_data
+            from app.utils.coordinate_transformer import CoordinateTransformer
+            
+            layers_meta = data_info.get("metadata", {}).get("layers", [])
+            data_dir = settings.DATA_DIR / data_id
+            
+            layers_result = []
+            for layer_meta in layers_meta:
+                try:
+                    layer_id = layer_meta.get("id", "")
+                    geojson = get_mapinfo_layer_data(data_id, layer_id, data_dir)
+                    if geojson and "features" in geojson:
+                        # 转换坐标 WGS84 → GCJ02
+                        for feature in geojson["features"]:
+                            if feature.get("geometry") and feature["geometry"].get("coordinates"):
+                                feature["geometry"]["coordinates"] = \
+                                    CoordinateTransformer.transform_geojson_coordinates(
+                                        feature["geometry"]["coordinates"], from_wgs84=True
+                                    )
+                        layers_result.append({
+                            "id": layer_id,
+                            "name": layer_meta.get("name", layer_id),
+                            "type": layer_meta.get("type", "polygon"),
+                            "geojson": geojson
+                        })
+                except Exception as e:
+                    print(f"[render_mobile] MapInfo 图层 {layer_meta.get('name','')} 处理失败: {e}")
+            
+            return {
+                "success": True,
+                "data": {
+                    "dataType": "tab",
+                    "layers": layers_result
+                }
+            }
+            
+        elif data_type == "excel":
+            # 地理化数据：获取 features 数组与 geometryType
+            geometry_type = data_info.get("geometryType", "point")
+            
+            import json
+            data_dir = settings.DATA_DIR / data_id
+            data_file = data_dir / "default.json"
+            
+            features = []
+            if data_file.exists():
+                with open(data_file, "r", encoding="utf-8") as f:
+                    features = json.load(f)
+            
+            return {
+                "success": True,
+                "data": {
+                    "dataType": "geo",
+                    "geometryType": geometry_type,
+                    "features": features,
+                    "pointCount": len(features)
+                }
+            }
+        else:
+            raise HTTPException(status_code=400, detail=f"不支持的数据类型: {data_type}")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/cleanup/index", response_model=Dict[str, Any])
 async def cleanup_index() -> Dict[str, Any]:
     """清理无效索引项（文件不存在但索引中存在的项）"""
