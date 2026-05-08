@@ -12,6 +12,8 @@ const BOTTOM_PADDING = Platform.OS === 'ios' ? 8 : 0;
 
 function CustomTabBar({ state, descriptors, navigation }: any) {
   const navUiHidden = useMapStore((s) => s.navUiHidden);
+  const isMapTab = state.routes[state.index]?.name === 'map';
+  const shouldHide = navUiHidden && isMapTab;
 
   const tabs = [
     { name: 'map', label: '地图', icon: '🗺️' },
@@ -21,7 +23,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
   ];
 
   return (
-    <View style={[styles.tabBar, navUiHidden && styles.tabBarHidden]}>
+    <View style={[styles.tabBar, shouldHide && styles.tabBarHidden]}>
       {tabs.map((tab, index) => {
         const route = state.routes[index];
         const isFocused = state.index === index;
@@ -32,7 +34,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
             style={styles.tabItem}
             onPress={() => navigation.navigate(route.name)}
             activeOpacity={1}
-            pointerEvents={navUiHidden ? 'none' : 'auto'}
+            pointerEvents={shouldHide ? 'none' : 'auto'}
           >
             <Text style={[styles.tabIcon, isFocused && styles.tabIconActive]}>{tab.icon}</Text>
             <Text style={[styles.tabLabel, isFocused && styles.tabLabelActive]} numberOfLines={1}>{tab.label}</Text>

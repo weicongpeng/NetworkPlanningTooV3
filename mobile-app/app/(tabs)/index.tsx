@@ -18,7 +18,7 @@ import { useMapStore, SectorData } from '../../src/store/mapStore';
 import { gcj02ToWgs84 } from '../../src/utils/coordinate';
 import { apiService } from '../../src/services/api';
 import { wgs84ToGcj02 } from '../../src/utils/coordinate';
-import { getCurrentPosition } from '../../src/services/navigationService';
+import { getCurrentPosition, isNavigating as checkIsNavigating, stopNavigation } from '../../src/services/navigationService';
 
 type SearchMode = 'place' | 'parameter' | 'coordinate';
 

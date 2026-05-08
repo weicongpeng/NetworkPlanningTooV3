@@ -180,6 +180,9 @@ export const useMapStore = create<MapState>()(
       }),
       clearMeasure: () => set({ measurePoints: [], totalDistance: null, measureFinished: false }),
       toggleMeasureMode: () => set((state) => {
+        if (state.isNavigating) {
+          return state;
+        }
         if (state.markerMode) {
           return { measureMode: true, markerMode: false, measurePoints: [], totalDistance: null, measureFinished: false };
         }
@@ -187,6 +190,9 @@ export const useMapStore = create<MapState>()(
       }),
       finishMeasure: () => set({ measureMode: false, measureFinished: true }),
       toggleMarkerMode: () => set((state) => {
+        if (state.isNavigating) {
+          return state;
+        }
         const newMarkerMode = !state.markerMode;
         if (state.measureMode && newMarkerMode) {
           return { markerMode: newMarkerMode, measureMode: false, measurePoints: [], totalDistance: null, measureFinished: false };

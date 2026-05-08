@@ -266,6 +266,10 @@ export async function startNavigation(
   _isNavigating = true;
   useMapStore.getState().setIsNavigating(true);
   useMapStore.getState().setNavUiHidden(false);
+  useMapStore.getState().setMarkerMode(false);
+  if (useMapStore.getState().measureMode) {
+    useMapStore.getState().clearMeasure();
+  }
 
   notify();
 
