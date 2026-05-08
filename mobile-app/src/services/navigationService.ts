@@ -8,6 +8,7 @@ import axios from 'axios';
 import { Platform } from 'react-native';
 import { wgs84ToGcj02 } from '../utils/coordinate';
 import { getEffectiveApiUrl } from '../utils/config';
+import { useMapStore } from '../store/mapStore';
 
 /** 获取方向代理地址（动态，每次调用时读取当前 API 地址） */
 async function getDirectionProxyUrl(): Promise<string> {
@@ -73,6 +74,7 @@ let _callbacks: NaviCallback[] = [];
 let _arrivalCallback: (() => void) | null = null;
 let _elapsedTimer: ReturnType<typeof setInterval> | null = null;
 let _startTime = 0;
+let _autoHideTimer: ReturnType<typeof setTimeout> | null = null;
 
 // 已说过的靠近提醒（防止重复）
 let _approachingSpoken: Set<number> = new Set();
@@ -86,6 +88,20 @@ export function onNaviStateChange(cb: NaviCallback): () => void {
 /** 设置到达回调 */
 export function onArrival(cb: () => void): void {
   _arrivalCallback = cb;
+}
+
+/** 用户操作地图时重置自动隐藏计时器，恢复UI显示并重新计时3秒 */
+export function resetNavUiAutoHide(): void {
+  if (!_isNavigating) return;
+  useMapStore.getState().setNavUiHidden(false);
+  if (_autoHideTimer) {
+    clearTimeout(_autoHideTimer);
+  }
+  _autoHideTimer = setTimeout(() => {
+    if (_isNavigating) {
+      useMapStore.getState().setNavUiHidden(true);
+    }
+  }, 3000);
 }
 
 function notify() {
@@ -248,6 +264,8 @@ export async function startNavigation(
   _elapsedSec = 0;
   _startTime = Date.now();
   _isNavigating = true;
+  useMapStore.getState().setIsNavigating(true);
+  useMapStore.getState().setNavUiHidden(false);
 
   notify();
 
@@ -263,15 +281,25 @@ export async function startNavigation(
   // 6. 播报首条指令
   speakStep(0);
 
+  // 7. 3秒后自动隐藏不相关UI
+  _autoHideTimer = setTimeout(() => {
+    if (_isNavigating) {
+      useMapStore.getState().setNavUiHidden(true);
+    }
+  }, 3000);
+
   return true;
 }
 
 /** 停止导航 */
 export function stopNavigation(): void {
   _isNavigating = false;
+  useMapStore.getState().setIsNavigating(false);
+  useMapStore.getState().setNavUiHidden(false);
   stopLocationTracking();
   if (_elapsedTimer) { clearInterval(_elapsedTimer); _elapsedTimer = null; }
   if (_timerInterval) { clearInterval(_timerInterval); _timerInterval = null; }
+  if (_autoHideTimer) { clearTimeout(_autoHideTimer); _autoHideTimer = null; }
   _routeData = null;
   _currentStepIndex = 0;
   _currentPosition = null;
@@ -284,9 +312,9 @@ function startLocationTracking() {
   stopLocationTracking();
   Location.watchPositionAsync(
     {
-      accuracy: Location.Accuracy.High,
-      distanceInterval: 5,  // 5米更新一次
-      timeInterval: 3000,   // 最多3秒更新一次
+      accuracy: Location.Accuracy.BestForNavigation,
+      distanceInterval: 1,
+      timeInterval: 500,
     },
     (loc) => {
       if (!_isNavigating) return;
@@ -295,13 +323,9 @@ function startLocationTracking() {
       _currentPositionGcj = wgs84ToGcj02(latitude, longitude);
       _currentHeading = (heading !== null && heading !== undefined && !isNaN(heading)) ? heading : _currentHeading;
 
-      // 更新路线进度
       updateStepProgress();
-
-      // 发送位置到地图（GCJ-02）
       notify();
 
-      // 检查是否到达目的地
       if (checkArrival()) {
         handleArrival();
       }

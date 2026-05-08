@@ -2,8 +2,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, StyleSheet, SafeAreaView, Alert, TouchableOpacity, Text,
-  Modal, FlatList, Switch, TextInput
+  Modal, FlatList, Switch, TextInput, Platform, StatusBar as RNStatusBar
 } from 'react-native';
+import { StatusBar } from 'expo';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MapViewComponent, { MapViewRef } from '../../src/components/Map/MapView';
 import LayerControl from '../../src/components/Map/LayerControl';
 import SectorInfoPanel from '../../src/components/Map/SectorInfoPanel';
@@ -21,6 +23,7 @@ import { getCurrentPosition } from '../../src/services/navigationService';
 type SearchMode = 'place' | 'parameter' | 'coordinate';
 
 export default function MapScreen() {
+  const insets = useSafeAreaInsets();
   const {
     mapType, setMapType, setBackendInfo, setConnected,
     measureMode, measureFinished, addMarker, addMeasurePoint,
@@ -31,6 +34,7 @@ export default function MapScreen() {
     clearMarkers, measurePoints,
     markerMode, toggleMarkerMode, setMarkerMode,
     pendingNavi, setPendingNavi,
+    navUiHidden,
   } = useMapStore();
 
   const [selectedLocation, setSelectedLocation] = useState<{
@@ -444,10 +448,14 @@ export default function MapScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.searchContainer}>
-        {renderSearchBar()}
-      </View>
+    <View style={styles.container}>
+      <StatusBar style="light" />
+      <View style={[styles.statusBarOverlay, { height: insets.top || (Platform.OS === 'android' ? RNStatusBar.currentHeight || 24 : 44) }]} />
+      {!navUiHidden && (
+        <View style={styles.searchContainer}>
+          {renderSearchBar()}
+        </View>
+      )}
       <View style={styles.mapContainer}>
         <MapViewComponent
           ref={mapRef}
@@ -459,7 +467,7 @@ export default function MapScreen() {
           onMeasureFinish={finishMeasure}
           onMeasureClear={clearMeasure}
         />
-        <View style={styles.toolBar}>
+        <View style={[styles.toolBar, navUiHidden && styles.toolBarHidden]}>
           <TouchableOpacity
             style={[styles.toolBtn, measureMode && styles.toolBtnActive]}
             onPress={() => {
@@ -676,7 +684,7 @@ export default function MapScreen() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -685,8 +693,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
+  statusBarOverlay: {
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
   searchContainer: {
     zIndex: 10,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    paddingHorizontal: 8,
+    paddingBottom: 6,
   },
   mapContainer: {
     flex: 1,
@@ -714,6 +728,13 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 8,
     zIndex: 60,
+    transitionProperty: 'opacity, transform',
+    transitionDuration: 200,
+  },
+  toolBarHidden: {
+    opacity: 0,
+    transform: [{ translateY: -20 }],
+    pointerEvents: 'none',
   },
   toolBtn: {
     backgroundColor: 'rgba(255,255,255,0.9)',

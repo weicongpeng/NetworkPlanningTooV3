@@ -114,6 +114,10 @@ interface MapState {
   // 全局导航触发（从标记列表/收藏页面唤起导航面板）
   pendingNavi: { lat: number; lng: number; name: string } | null;
   setPendingNavi: (navi: { lat: number; lng: number; name: string } | null) => void;
+  isNavigating: boolean;
+  setIsNavigating: (navigating: boolean) => void;
+  navUiHidden: boolean;
+  setNavUiHidden: (hidden: boolean) => void;
 }
 
 export const useMapStore = create<MapState>()(
@@ -143,6 +147,8 @@ export const useMapStore = create<MapState>()(
       markerCoordinateMode: false,
       editingMarker: null,
       pendingNavi: null,
+      isNavigating: false,
+      navUiHidden: false,
       addMarker: (lat, lng, name = '') => set((state) => ({
         markers: [...state.markers, { id: `marker-${Date.now()}`, lat, lng, name, createdAt: Date.now() }]
       })),
@@ -201,11 +207,21 @@ export const useMapStore = create<MapState>()(
       setSearchMarker: (marker) => set({ searchMarker: marker }),
       setFocusLocation: (loc) => set({ focusLocation: loc }),
       setPendingNavi: (navi) => set({ pendingNavi: navi }),
+      setIsNavigating: (navigating) => set({ isNavigating: navigating }),
+      setNavUiHidden: (hidden) => set({ navUiHidden: hidden }),
     }),
     {
       name: 'map-store-favorites',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({ favorites: state.favorites }),
+      merge: (persistedState, currentState) => {
+        // 只恢复favorites，其他状态保持当前值
+        const persisted = persistedState as any;
+        return {
+          ...currentState,
+          favorites: persisted?.favorites || currentState.favorites,
+        };
+      },
     }
   )
 );

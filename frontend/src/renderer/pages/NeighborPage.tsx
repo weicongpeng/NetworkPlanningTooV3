@@ -14,7 +14,7 @@ import { NeighborLegend } from '../components/Map/NeighborLegend'
 import { MapTypeSwitch } from '../components/Map/MapTypeSwitch'
 import { neighborDataSyncService } from '../services/neighborDataSyncService'
 import type { RenderSectorData, CellListItem } from '../services/mapDataService'
-import { getCellList } from '../services/mapDataService'
+import { getCellList, clearCellListCache } from '../services/mapDataService'
 import { DATA_REFRESH_EVENT } from '../store/dataStore'
 import { CellSelectionTable } from '../components/CellSelectionTable'
 
@@ -364,9 +364,10 @@ export function NeighborPage() {
     const handleDataRefresh = async () => {
       console.log('[NeighborPage] 收到数据刷新事件，正在重新初始化...')
       try {
-        // 清除地图数据缓存
+        // 清除地图数据和小区列表缓存
         mapDataService.clearCache()
-        console.log('[NeighborPage] 已清除地图数据缓存')
+        clearCellListCache()
+        console.log('[NeighborPage] 已清除地图数据和小区列表缓存')
 
         // 重新初始化邻区数据同步服务
         await initSyncService()

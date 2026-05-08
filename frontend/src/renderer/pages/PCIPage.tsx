@@ -7,7 +7,7 @@ import { OnlineMap, type OnlineMapRef } from '../components/Map/OnlineMap'
 import { PCILegend } from '../components/Map/PCILegend'
 import { MapTypeSwitch } from '../components/Map/MapTypeSwitch'
 import { pciDataSyncService } from '../services/pciDataSyncService'
-import { mapDataService, getCellList } from '../services/mapDataService'
+import { mapDataService, getCellList, clearCellListCache } from '../services/mapDataService'
 import { CoordinateTransformer } from '../utils/coordinate'
 import type { RenderSectorData, CellListItem } from '../services/mapDataService'
 import { triggerDataRefresh, DATA_REFRESH_EVENT } from '../store/dataStore'
@@ -333,9 +333,10 @@ export function PCIPage() {
     const handleDataRefresh = async () => {
       console.log('[PCIPage] 收到数据刷新事件，正在重新初始化...')
       try {
-        // 清除地图数据缓存
+        // 清除地图数据和小区列表缓存
         mapDataService.clearCache()
-        console.log('[PCIPage] 已清除地图数据缓存')
+        clearCellListCache()
+        console.log('[PCIPage] 已清除地图数据和小区列表缓存')
 
         // 重新初始化PCI数据同步服务
         await initSyncService()

@@ -1,24 +1,27 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Text, View, StyleSheet, Platform, TouchableOpacity } from 'react-native';
+import { Text, View, StyleSheet, Platform, TouchableOpacity, Animated } from 'react-native';
 import MapScreen from './index';
 import DataScreen from './data';
 import FavoritesScreen from './favorites';
 import SettingsScreen from './settings';
+import { useMapStore } from '../../src/store/mapStore';
 
 const Tab = createBottomTabNavigator();
 const BOTTOM_PADDING = Platform.OS === 'ios' ? 8 : 0;
 
 function CustomTabBar({ state, descriptors, navigation }: any) {
+  const navUiHidden = useMapStore((s) => s.navUiHidden);
+
   const tabs = [
-    { name: 'map', label: '地图工具', icon: '🗺️' },
-    { name: 'data', label: '数据管理', icon: '📊' },
+    { name: 'map', label: '地图', icon: '🗺️' },
+    { name: 'data', label: '数据', icon: '📊' },
     { name: 'favorites', label: '收藏', icon: '⭐' },
     { name: 'settings', label: '设置', icon: '⚙️' },
   ];
 
   return (
-    <View style={styles.tabBar}>
+    <View style={[styles.tabBar, navUiHidden && styles.tabBarHidden]}>
       {tabs.map((tab, index) => {
         const route = state.routes[index];
         const isFocused = state.index === index;
@@ -29,6 +32,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
             style={styles.tabItem}
             onPress={() => navigation.navigate(route.name)}
             activeOpacity={1}
+            pointerEvents={navUiHidden ? 'none' : 'auto'}
           >
             <Text style={[styles.tabIcon, isFocused && styles.tabIconActive]}>{tab.icon}</Text>
             <Text style={[styles.tabLabel, isFocused && styles.tabLabelActive]} numberOfLines={1}>{tab.label}</Text>
@@ -65,6 +69,15 @@ const styles = StyleSheet.create({
     paddingBottom: BOTTOM_PADDING,
     paddingTop: 6,
     elevation: 8,
+    transitionProperty: 'opacity, transform',
+    transitionDuration: 200,
+  },
+  tabBarHidden: {
+    opacity: 0,
+    transform: [{ translateY: 20 }],
+    pointerEvents: 'none',
+    height: 0,
+    overflow: 'hidden',
   },
   tabItem: {
     flex: 1,

@@ -89,20 +89,49 @@
       ]
     }
   },
-  "10960881-7bd6-4c2f-9c7e-bf2794201de6": {
-    "id": "10960881-7bd6-4c2f-9c7e-bf2794201de6",
-    "name": "ProjectParameter_mongoose河源电联20260430111956.xlsx",
-    "type": "excel",
-    "fileType": "full_params",
-    "size": 4645336,
+  "73821eb5-d0dd-4603-8532-884540eb0fab": {
+    "id": "73821eb5-d0dd-4603-8532-884540eb0fab",
+    "name": "BaselineLab_172.16.34.163_1778122194_9488594.zip",
+    "type": "map",
+    "subType": "offline",
+    "size": 3963417,
     "originalPath": null,
-    "uploadDate": "2026-05-06T17:05:56.857938",
+    "uploadDate": "2026-05-07T11:17:14.318011",
     "status": "ready",
     "metadata": {
-      "LTESiteCount": 4104,
-      "LTESectorCount": 18858,
-      "NRSiteCount": 1409,
-      "NRSectorCount": 15471
+      "fileCount": 10
+    }
+  },
+  "826fa0d3-9910-4e81-a562-6af39e68e212": {
+    "id": "826fa0d3-9910-4e81-a562-6af39e68e212",
+    "name": "cell-tree-export.xlsx",
+    "type": "excel",
+    "fileType": "target_cells",
+    "size": 14731,
+    "originalPath": null,
+    "uploadDate": "2026-05-07T15:15:10.200613",
+    "status": "ready",
+    "metadata": {
+      "LTESiteCount": 58,
+      "LTESectorCount": 206,
+      "NRSiteCount": 1,
+      "NRSectorCount": 1
+    }
+  },
+  "0dacc675-c481-4cf9-805a-fb99505a22d8": {
+    "id": "0dacc675-c481-4cf9-805a-fb99505a22d8",
+    "name": "ProjectParameter_mongoose河源电联20260507143241.xlsx",
+    "type": "excel",
+    "fileType": "full_params",
+    "size": 4651948,
+    "originalPath": null,
+    "uploadDate": "2026-05-07T15:30:01.421039",
+    "status": "ready",
+    "metadata": {
+      "LTESiteCount": 4107,
+      "LTESectorCount": 18880,
+      "NRSiteCount": 1413,
+      "NRSectorCount": 15510
     }
   }
 }

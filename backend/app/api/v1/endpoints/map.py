@@ -102,8 +102,8 @@ def _load_map_data_from_files(data_service) -> Dict[str, Any]:
         if data_info.get("type") != "excel":
             continue
         
-        # 关键：只读取最新的全量工参，忽略备份文件
-        if data_file_type not in ["full_params", "target_cells"]:
+        # 关键：只读取全量工参数据，忽略待规划小区等辅助文件
+        if data_file_type != "full_params":
             continue
 
         # 读取解析后的数据

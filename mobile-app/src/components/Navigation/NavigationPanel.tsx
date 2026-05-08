@@ -111,15 +111,16 @@ export default function NavigationPanel({
           setStatusText(step.instruction || '导航中...');
         }
       }
-      // 导航中更新地图上的用户位置（不强制移动视野，交由 auto-fit 5秒无操作后恢复定位视图）
+      // 导航中更新地图上的用户位置（含方向角）
       if (state.isNavigating && state.currentPosition && mapRef?.current) {
         const [gcjLat, gcjLng] = wgs84ToGcj02(
           state.currentPosition[0],
           state.currentPosition[1],
         );
-        mapRef.current.updateUserLocation(gcjLat, gcjLng, state.heading || undefined);
-        // 不再调用 moveCamera，避免强制覆盖用户的手动缩放/拖拽
-        // auto-fit 计时器会在用户停止操作 5 秒后自动恢复实时定位视图
+        const heading = state.heading !== null && state.heading !== undefined ? state.heading : undefined;
+        mapRef.current.updateUserLocation(gcjLat, gcjLng, heading);
+        // 启动 auto-fit：用户 5 秒无操作后自动恢复定位视图
+        mapRef.current.startAutoFit();
       }
     });
     return unsub;
@@ -225,6 +226,10 @@ export default function NavigationPanel({
     setIsLoading(false);
     if (success) {
       setSetupMode(false);
+      // 启动 auto-fit：用户5秒无操作自动恢复定位视图
+      if (mapRef?.current) {
+        mapRef.current.startAutoFit();
+      }
       // 触发 naviRouteKey 变化，让 useEffect 绘制路线（延迟确保 setupMode cleanup 先运行）
       setTimeout(() => setNaviRouteKey(k => k + 1), 50);
     } else {

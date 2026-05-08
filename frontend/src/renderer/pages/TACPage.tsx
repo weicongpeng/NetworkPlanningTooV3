@@ -9,7 +9,7 @@ import { tacDataSyncService } from '../services/tacDataSyncService'
 import { tacColorMapper } from '../utils/tacColors'
 import type { OnlineMapRef } from '../components/Map/OnlineMap'
 import type { RenderSectorData, CellListItem } from '../services/mapDataService'
-import { getCellList } from '../services/mapDataService'
+import { getCellList, clearCellListCache } from '../services/mapDataService'
 import { DATA_REFRESH_EVENT } from '../store/dataStore'
 import { useTranslation } from 'react-i18next'
 import { CellSelectionTable } from '../components/CellSelectionTable'
@@ -206,9 +206,10 @@ export function TACPage() {
     const handleDataRefresh = async () => {
       console.log('[TACPage] 收到数据刷新事件，正在重新初始化...')
       try {
-        // 1. 清除前端地图数据缓存
+        // 1. 清除前端地图数据和小区列表缓存
         mapDataService.clearCache()
-        console.log('[TACPage] 已清除前端地图数据缓存')
+        clearCellListCache()
+        console.log('[TACPage] 已清除前端地图数据和小区列表缓存')
 
         // 2. 清除后端地图数据缓存
         await mapApi.clearCache()

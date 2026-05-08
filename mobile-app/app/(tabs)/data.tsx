@@ -3,6 +3,8 @@ import {
   View,
   Text,
   StyleSheet,
+} from 'react-native';
+import { StatusBar } from 'expo';
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
@@ -254,8 +256,9 @@ export default function DataScreen() {
 
   return (
     <View style={styles.container}>
+      <StatusBar style="dark" />
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>数据管理</Text>
+        <Text style={styles.headerTitle}>数据</Text>
         <Text style={styles.headerSubtitle}>共 {items.length} 个数据文件</Text>
       </View>
 

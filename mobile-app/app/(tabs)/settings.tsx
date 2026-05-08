@@ -11,6 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo';
 import { apiService } from '../../src/services/api';
 
 const STATUS = {
@@ -99,6 +100,7 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <StatusBar style="dark" />
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
         {/* 标题 */}
         <Text style={styles.title}>设置</Text>

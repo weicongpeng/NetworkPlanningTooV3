@@ -1,9 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView, Clipboard, Alert } from 'react-native';
 import { useMapStore } from '../../store/mapStore';
+import { wgs84ToGcj02 } from '../../utils/coordinate';
 
 export default function SectorInfoPanel() {
-  const { selectedSector, setSelectedSector } = useMapStore();
+  const { selectedSector, setSelectedSector, setPendingNavi } = useMapStore();
 
   if (!selectedSector) return null;
 
@@ -36,6 +37,17 @@ export default function SectorInfoPanel() {
       .join('\n');
     Clipboard.setString(text);
     Alert.alert('复制成功', '扇区属性信息已复制到剪贴板');
+  };
+
+  const handleNavigate = () => {
+    if (!selectedSector) return;
+    const gcj = wgs84ToGcj02(selectedSector.latitude, selectedSector.longitude);
+    setPendingNavi({
+      lat: gcj[0],
+      lng: gcj[1],
+      name: selectedSector.name || '扇区位置',
+    });
+    setSelectedSector(null);
   };
 
   const renderField = (label: string, value: any) => {
@@ -92,12 +104,14 @@ export default function SectorInfoPanel() {
             {renderField('是否共享', selectedSector.is_shared)}
           </ScrollView>
 
-          <TouchableOpacity
-            style={styles.copyBtn}
-            onPress={handleCopy}
-          >
-            <Text style={styles.copyBtnText}>复制</Text>
-          </TouchableOpacity>
+          <View style={styles.buttonRow}>
+            <TouchableOpacity style={[styles.copyBtn, styles.copyBtnFull]} onPress={handleCopy}>
+              <Text style={styles.copyBtnText}>复制</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.navigateBtn} onPress={handleNavigate}>
+              <Text style={styles.navigateBtnText}>导航</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </Modal>
@@ -177,15 +191,36 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   copyBtn: {
+    flex: 1,
     backgroundColor: '#4CAF50',
-    padding: 12,
+    paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 12,
+  },
+  copyBtnFull: {
+    flex: 1,
+  },
+  navigateBtn: {
+    flex: 1,
+    backgroundColor: '#007AFF',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginLeft: 8,
   },
   copyBtnText: {
     color: '#fff',
     fontSize: 15,
     fontWeight: '600',
+  },
+  navigateBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
   },
 });

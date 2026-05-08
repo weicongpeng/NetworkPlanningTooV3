@@ -2,6 +2,7 @@ import React, { forwardRef, useImperativeHandle, useRef, useEffect, useCallback,
 import { View, StyleSheet, Text, ActivityIndicator } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { useMapStore } from '../../store/mapStore';
+import { resetNavUiAutoHide } from '../../services/navigationService';
 
 export interface MapViewRef {
   moveCamera: (lat: number, lng: number, zoom?: number) => void;
@@ -319,10 +320,21 @@ const HTML_TEMPLATE = `
           });
 
           // Auto-fit: 用户拖拽/缩放时清除计时器，操作结束后重新计时
-          // 程序性移动（moveCamera/fitRouteBounds）不触发电火
-          map.on('dragstart', function() { _programmaticMove = false; clearAutoFitTimer(); });
+          // 程序性移动（moveCamera/fitRouteBounds）不触发UI恢复
+          map.on('dragstart', function() {
+            _programmaticMove = false;
+            clearAutoFitTimer();
+            if (!_programmaticMove && window.ReactNativeWebView) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'mapInteraction' }));
+            }
+          });
           map.on('dragend', function() { startAutoFitTimer(); });
-          map.on('zoomstart', clearAutoFitTimer);
+          map.on('zoomstart', function() {
+            clearAutoFitTimer();
+            if (!_programmaticMove && window.ReactNativeWebView) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'mapInteraction' }));
+            }
+          });
           map.on('zoomend', function() {
             if (_programmaticMove) { _programmaticMove = false; return; }
             startAutoFitTimer();
@@ -1345,25 +1357,8 @@ const HTML_TEMPLATE = `
         });
       }
 
-      function calculateSectorPoints(lat, lng, azimuth, beamwidth, radius) {
-        var points = [];
-        var halfBeam = (beamwidth / 2) * (Math.PI / 180);
-        var aziRad = azimuth * (Math.PI / 180);
-        var startAngle = aziRad - halfBeam;
-        var endAngle = aziRad + halfBeam;
-        var numPoints = Math.max(6, Math.ceil(beamwidth / 5));
-        points.push([lng, lat]);
-        for (var i = 0; i <= numPoints; i++) {
-          var angle = startAngle + (endAngle - startAngle) * (i / numPoints);
-          var latDeg = radius / 111320;
-          var lngDeg = radius / (111320 * Math.cos(lat * Math.PI / 180));
-          var x = lng + lngDeg * Math.sin(angle);
-          var y = lat + latDeg * Math.cos(angle);
-          points.push([x, y]);
-        }
-        points.push([lng, lat]);
-        return points;
-      }
+      // Note: calculateSectorPoints is defined above at line 244, used for sector overlay rendering
+      // and hit-testing. The second definition has been removed to avoid overwriting the correct version.
 
       function createPolygonOverlay(item) {
         if (!item.path || item.path.length < 3) return null;
@@ -1512,21 +1507,26 @@ export default forwardRef<MapViewRef, Props>(function MapView(props, ref) {
         case 'mapClick':
           console.log('[MapView] mapClick:', data.lat, data.lng);
           onMapPress?.(data.lat, data.lng);
+          resetNavUiAutoHide();
           break;
         case 'mapLongPress':
           onLongPress?.(data.lat, data.lng);
+          resetNavUiAutoHide();
           break;
         case 'markerClick':
           if (data.marker) {
             onMarkerClick?.(data.marker);
           }
+          resetNavUiAutoHide();
           break;
         case 'sectorClick':
           console.log('[MapView] sectorClick:', data.sector?.id, data.sector?.name, 'lat:', data.sector?.latitude, 'lng:', data.sector?.longitude);
           setSelectedSector(data.sector);
+          resetNavUiAutoHide();
           break;
         case 'sectorOverlap':
           onSectorOverlap?.(data.sectors, data.lat, data.lng);
+          resetNavUiAutoHide();
           break;
         case 'log':
           console.log('[MapView Web]', data.message);
@@ -1543,6 +1543,9 @@ export default forwardRef<MapViewRef, Props>(function MapView(props, ref) {
           break;
         case 'measureFinish':
           onMeasureFinish?.();
+          break;
+        case 'mapInteraction':
+          resetNavUiAutoHide();
           break;
       }
     } catch (err) {
