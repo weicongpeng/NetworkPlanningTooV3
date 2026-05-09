@@ -41,10 +41,9 @@ export default function SectorInfoPanel() {
 
   const handleNavigate = () => {
     if (!selectedSector) return;
-    const gcj = wgs84ToGcj02(selectedSector.latitude, selectedSector.longitude);
     setPendingNavi({
-      lat: gcj[0],
-      lng: gcj[1],
+      lat: selectedSector.latitude,
+      lng: selectedSector.longitude,
       name: selectedSector.name || '扇区位置',
     });
     setSelectedSector(null);

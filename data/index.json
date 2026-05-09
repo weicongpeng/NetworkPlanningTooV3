@@ -118,20 +118,20 @@
       "NRSectorCount": 1
     }
   },
-  "0dacc675-c481-4cf9-805a-fb99505a22d8": {
-    "id": "0dacc675-c481-4cf9-805a-fb99505a22d8",
+  "2e4a7e7c-7ba9-4c42-874e-e6e1f51c9746": {
+    "id": "2e4a7e7c-7ba9-4c42-874e-e6e1f51c9746",
     "name": "ProjectParameter_mongoose河源电联20260507143241.xlsx",
     "type": "excel",
     "fileType": "full_params",
-    "size": 4651948,
+    "size": 4677885,
     "originalPath": null,
-    "uploadDate": "2026-05-07T15:30:01.421039",
+    "uploadDate": "2026-05-08T11:32:46.519893",
     "status": "ready",
     "metadata": {
-      "LTESiteCount": 4107,
-      "LTESectorCount": 18880,
-      "NRSiteCount": 1413,
-      "NRSectorCount": 15510
+      "LTESiteCount": 4108,
+      "LTESectorCount": 18882,
+      "NRSiteCount": 1414,
+      "NRSectorCount": 15513
     }
   }
 }

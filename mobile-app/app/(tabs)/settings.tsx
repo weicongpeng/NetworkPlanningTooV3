@@ -11,7 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo';
+import { StatusBar } from 'expo-status-bar';
 import { apiService } from '../../src/services/api';
 
 const STATUS = {

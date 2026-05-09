@@ -75,10 +75,15 @@ export const CellSelectionTable = ({
     )
   }, [sectors, searchValue])
 
-  // 虚拟滚动计算
+  // 虚拟滚动计算 —— 当过滤后结果能完全显示时，直接渲染全部（无需滚动）
   const { visibleData, totalHeight, offsetY } = useMemo(() => {
     if (filtered.length === 0) return { visibleData: [] as CellSector[], totalHeight: 0, offsetY: 0 }
     const containerHeight = containerRef.current?.clientHeight || 600
+    const totalH = filtered.length * ITEM_HEIGHT
+    // 内容高度 ≤ 容器高度：渲染全部，无需虚拟滚动
+    if (totalH <= containerHeight) {
+      return { visibleData: filtered, totalHeight: totalH, offsetY: 0 }
+    }
     const startIdx = Math.max(0, Math.floor(scrollTop / ITEM_HEIGHT) - OVERSCAN)
     const endIdx = Math.min(
       filtered.length,
@@ -86,7 +91,7 @@ export const CellSelectionTable = ({
     )
     return {
       visibleData: filtered.slice(startIdx, endIdx),
-      totalHeight: filtered.length * ITEM_HEIGHT,
+      totalHeight: totalH,
       offsetY: startIdx * ITEM_HEIGHT
     }
   }, [filtered, scrollTop])

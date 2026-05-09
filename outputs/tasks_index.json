@@ -5991,5 +5991,97 @@
     "created_at": "2026-05-07T17:07:20.050313",
     "started_at": "2026-05-07T17:07:20.058199",
     "completed_at": null
+  },
+  "a5432798-ec01-4676-9341-d5740cabc6ec": {
+    "task_id": "a5432798-ec01-4676-9341-d5740cabc6ec",
+    "task_type": "pci",
+    "config": {
+      "networkType": "LTE",
+      "distanceThreshold": 10.0,
+      "pciModulus": 3,
+      "inheritModulus": false,
+      "pciRange": {
+        "min": 0,
+        "max": 503
+      },
+      "enableTACPlanning": true,
+      "selectedCellIds": [
+        "541097_53",
+        "541097_52",
+        "540939_56",
+        "540939_55",
+        "540939_54",
+        "541070_53",
+        "541070_54"
+      ],
+      "customRules": null
+    },
+    "status": "completed",
+    "progress": 100.0,
+    "result": null,
+    "error": null,
+    "created_at": "2026-05-08T11:34:37.216171",
+    "started_at": "2026-05-08T11:34:37.239355",
+    "completed_at": null
+  },
+  "36102392-80ac-470a-bf51-597f23e04cc8": {
+    "task_id": "36102392-80ac-470a-bf51-597f23e04cc8",
+    "task_type": "pci",
+    "config": {
+      "networkType": "LTE",
+      "distanceThreshold": 10.0,
+      "pciModulus": 3,
+      "inheritModulus": false,
+      "pciRange": {
+        "min": 0,
+        "max": 503
+      },
+      "enableTACPlanning": true,
+      "selectedCellIds": [
+        "999999_2",
+        "999999_1",
+        "541097_53",
+        "541097_52",
+        "540939_56",
+        "540939_55",
+        "540939_54"
+      ],
+      "customRules": null
+    },
+    "status": "completed",
+    "progress": 100.0,
+    "result": null,
+    "error": null,
+    "created_at": "2026-05-08T11:45:54.439262",
+    "started_at": "2026-05-08T11:45:54.447471",
+    "completed_at": null
+  },
+  "27c335e6-f12d-4d32-91f7-6e45f0f5f2b0": {
+    "task_id": "27c335e6-f12d-4d32-91f7-6e45f0f5f2b0",
+    "task_type": "pci",
+    "config": {
+      "networkType": "NR",
+      "distanceThreshold": 10.0,
+      "pciModulus": 30,
+      "inheritModulus": false,
+      "pciRange": {
+        "min": 0,
+        "max": 1007
+      },
+      "enableTACPlanning": true,
+      "selectedCellIds": [
+        "9999999_1",
+        "9999999_2",
+        "9999999_3"
+      ],
+      "customRules": null
+    },
+    "status": "completed",
+    "progress": 100.0,
+    "result": null,
+    "error": null,
+    "created_at": "2026-05-08T11:46:47.480997",
+    "started_at": "2026-05-08T11:46:47.489365",
+    "completed_at": null
   }
 }

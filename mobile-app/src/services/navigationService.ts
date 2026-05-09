@@ -79,6 +79,23 @@ let _autoHideTimer: ReturnType<typeof setTimeout> | null = null;
 // 已说过的靠近提醒（防止重复）
 let _approachingSpoken: Set<number> = new Set();
 
+// 偏航检测状态
+let _lastDeviateCheckTime = 0;
+let _deviateAlertGiven = false;
+let _routeStartIdx = 0;
+let _isRerouting = false;
+
+// 路线缓存（避免重复规划）
+const _routeCache = new Map<string, { data: RouteData; timestamp: number }>();
+const ROUTE_CACHE_TTL = 5 * 60 * 1000; // 5分钟缓存
+const DEVIATE_THRESHOLD_METERS = 100; // 偏航阈值（米）
+const DEVIATE_CHECK_INTERVAL = 3000; // 偏航检测间隔（毫秒）
+const REROUTE_COOLDOWN = 10000; // 重新规划冷却时间（毫秒）
+
+function getRouteCacheKey(origin: [number, number], dest: [number, number], mode: NaviMode): string {
+  return `${origin[0].toFixed(5)},${origin[1].toFixed(5)}_${dest[0].toFixed(5)},${dest[1].toFixed(5)}_${mode}`;
+}
+
 /** 注册状态回调 */
 export function onNaviStateChange(cb: NaviCallback): () => void {
   _callbacks.push(cb);
@@ -156,7 +173,7 @@ function parseAmapPolyline(polylineStr: string): [number, number][] {
   });
 }
 
-/** 通过后端代理调用高德路径规划API */
+/** 通过后端代理调用高德路径规划API（带缓存） */
 export async function planRoute(
   originWgs: [number, number],
   destWgs: [number, number],
@@ -166,6 +183,14 @@ export async function planRoute(
   const [dLat, dLng] = wgs84ToGcj02(destWgs[0], destWgs[1]);
   const originStr = `${oLng},${oLat}`;
   const destStr = `${dLng},${dLat}`;
+
+  // 检查缓存
+  const cacheKey = getRouteCacheKey([oLat, oLng], [dLat, dLng], mode);
+  const cached = _routeCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < ROUTE_CACHE_TTL) {
+    console.log('[NaviService] planRoute: 使用缓存路线');
+    return cached.data;
+  }
 
   try {
     const directionUrl = await getDirectionProxyUrl();
@@ -197,12 +222,13 @@ export async function planRoute(
       road: step.road || '',
     }));
 
-    const flatPolyline: [number, number][] = [];
-    for (const s of steps) {
-      flatPolyline.push(...s.polyline);
-    }
+    // 简化路线点以加速后续处理
+    const flatPolyline = simplifyPolyline(
+      steps.flatMap(s => s.polyline),
+      mode === 'walk' ? 10 : 5 // 步行保留更多点，驾车简化更多
+    );
 
-    return {
+    const route: RouteData = {
       steps,
       totalDistance: parseFloat(path.distance) || 0,
       totalDuration: parseFloat(path.duration) || 0,
@@ -210,10 +236,48 @@ export async function planRoute(
       origin: [oLat, oLng],
       destination: [dLat, dLng],
     };
+
+    // 缓存结果
+    _routeCache.set(cacheKey, { data: route, timestamp: Date.now() });
+    // 限制缓存大小
+    if (_routeCache.size > 20) {
+      const oldest = Array.from(_routeCache.entries())
+        .sort((a, b) => a[1].timestamp - b[1].timestamp)[0];
+      _routeCache.delete(oldest[0]);
+    }
+
+    return route;
   } catch (e: any) {
     console.error('[NaviService] planRoute error:', e.message || e);
     return null;
   }
+}
+
+/** 简化路线点（Douglas-Peucker算法变体）以提高匹配效率 */
+function simplifyPolyline(points: [number, number][], tolerance: number): [number, number][] {
+  if (points.length <= 2) return points;
+  
+  // 计算总长度
+  let totalLength = 0;
+  for (let i = 1; i < points.length; i++) {
+    totalLength += haversine(points[i-1][1], points[i-1][0], points[i][1], points[i][0]);
+  }
+  
+  // 如果路线太短，直接返回
+  if (totalLength < 500) return points;
+  
+  // 按间隔采样
+  const simplified: [number, number][] = [points[0]];
+  const targetCount = Math.max(50, Math.min(points.length, Math.floor(totalLength / tolerance)));
+  const step = (points.length - 1) / targetCount;
+  
+  for (let i = 1; i < targetCount; i++) {
+    const idx = Math.round(i * step);
+    simplified.push(points[idx]);
+  }
+  simplified.push(points[points.length - 1]);
+  
+  return simplified;
 }
 
 // ========== 导航生命周期 ==========
@@ -264,6 +328,9 @@ export async function startNavigation(
   _elapsedSec = 0;
   _startTime = Date.now();
   _isNavigating = true;
+  _lastDeviateCheckTime = 0;
+  _deviateAlertGiven = false;
+  _isRerouting = false;
   useMapStore.getState().setIsNavigating(true);
   useMapStore.getState().setNavUiHidden(false);
   useMapStore.getState().setMarkerMode(false);
@@ -397,6 +464,15 @@ function updateStepProgress() {
 
   // 找到路线上最近点
   const nearestIdx = findNearestPointOnPolyline(gcjLat, gcjLng, flat);
+  const nearestPoint = flat[nearestIdx];
+  const distToRoute = haversine(gcjLat, gcjLng, nearestPoint[1], nearestPoint[0]);
+
+  // 偏航检测（限制检测频率）
+  const now = Date.now();
+  if (now - _lastDeviateCheckTime > DEVIATE_CHECK_INTERVAL) {
+    _lastDeviateCheckTime = now;
+    checkAndHandleDeviation(distToRoute, nearestIdx);
+  }
 
   // 确定当前处于哪个步骤
   let cumulativeLen = 0;
@@ -429,6 +505,58 @@ function updateStepProgress() {
   }
 }
 
+/** 偏航检测与处理 */
+function checkAndHandleDeviation(distToRoute: number, _nearestIdx: number) {
+  if (!_routeData || _isRerouting || !_currentPositionGcj) return;
+
+  // 严重偏航：距离路线超过阈值
+  if (distToRoute > DEVIATE_THRESHOLD_METERS) {
+    if (!_deviateAlertGiven) {
+      _deviateAlertGiven = true;
+      Speech.speak('您已偏离路线，正在重新规划路线', { language: 'zh-CN', rate: 0.9 });
+      
+      // 触发重新规划
+      reroute();
+    }
+  } else {
+    // 回到路线上，重置偏航状态
+    if (_deviateAlertGiven) {
+      _deviateAlertGiven = false;
+    }
+  }
+}
+
+/** 重新规划路线 */
+async function reroute() {
+  if (_isRerouting || !_currentPositionGcj || !_routeData) return;
+  if (!_isNavigating) return;
+
+  _isRerouting = true;
+  console.log('[NaviService] reroute: 重新规划路线...');
+
+  try {
+    const newRoute = await planRoute(
+      _currentPosition,
+      [_destLat, _destLng],
+      _mode,
+    );
+
+    if (newRoute && _isNavigating) {
+      _routeData = newRoute;
+      _routeStartIdx = 0;
+      _deviateAlertGiven = false;
+      console.log('[NaviService] reroute: 路线重新规划成功');
+      Speech.speak('已重新规划路线，请沿新路线行驶', { language: 'zh-CN' });
+      notify();
+    }
+  } catch (e) {
+    console.error('[NaviService] reroute error:', e);
+    Speech.speak('路线重新规划失败，请手动选择路线', { language: 'zh-CN' });
+  } finally {
+    _isRerouting = false;
+  }
+}
+
 function checkArrival(): boolean {
   if (!_routeData || !_currentPositionGcj) return false;
   const [gcjLat, gcjLng] = _currentPositionGcj;
@@ -438,10 +566,78 @@ function checkArrival(): boolean {
 }
 
 function handleArrival() {
-  Speech.speak('您已到达目的地，导航结束', { language: 'zh-CN' });
+  if (!_currentPositionGcj || !_routeData) {
+    Speech.speak('您已到达目的地，导航结束', { language: 'zh-CN' });
+    _arrivalCallback?.();
+    setTimeout(() => stopNavigation(), 3000);
+    return;
+  }
+
+  // 计算目的地方位信息
+  const [gcjLat, gcjLng] = _currentPositionGcj;
+  const [destLat, destLng] = _routeData.destination;
+  const azimuth = calculateAzimuth(gcjLat, gcjLng, destLat, destLng);
+  const orientation = getOrientationDescription(azimuth);
+  const distToDest = haversine(gcjLat, gcjLng, destLat, destLng);
+
+  // 构建详细的到达播报信息
+  let arrivalMessage = `您已到达目的地：${_destName || '终点'}`;
+  if (distToDest > 10) {
+    arrivalMessage += `，距离终点约${Math.round(distToDest)}米`;
+  }
+  arrivalMessage += `。终点在您的${orientation}`;
+  
+  Speech.speak(arrivalMessage, { language: 'zh-CN', rate: 0.85 });
+  
+  // 播报方位细节
+  setTimeout(() => {
+    if (azimuth >= 337.5 || azimuth < 22.5) {
+      Speech.speak('终点位于正北方', { language: 'zh-CN' });
+    } else if (azimuth >= 22.5 && azimuth < 67.5) {
+      Speech.speak('终点位于东北方向', { language: 'zh-CN' });
+    } else if (azimuth >= 67.5 && azimuth < 112.5) {
+      Speech.speak('终点位于正东方向', { language: 'zh-CN' });
+    } else if (azimuth >= 112.5 && azimuth < 157.5) {
+      Speech.speak('终点位于东南方向', { language: 'zh-CN' });
+    } else if (azimuth >= 157.5 && azimuth < 202.5) {
+      Speech.speak('终点位于正南方向', { language: 'zh-CN' });
+    } else if (azimuth >= 202.5 && azimuth < 247.5) {
+      Speech.speak('终点位于西南方向', { language: 'zh-CN' });
+    } else if (azimuth >= 247.5 && azimuth < 292.5) {
+      Speech.speak('终点位于正西方向', { language: 'zh-CN' });
+    } else {
+      Speech.speak('终点位于西北方向', { language: 'zh-CN' });
+    }
+  }, 1500);
+
   _arrivalCallback?.();
-  // 自动结束
-  setTimeout(() => stopNavigation(), 3000);
+  setTimeout(() => stopNavigation(), 5000);
+}
+
+/** 计算方位角（从点1到点2的方位角，单位：度） */
+function calculateAzimuth(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const radLat1 = lat1 * Math.PI / 180;
+  const radLat2 = lat2 * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+
+  const y = Math.sin(dLng) * Math.cos(radLat2);
+  const x = Math.cos(radLat1) * Math.sin(radLat2) - Math.sin(radLat1) * Math.cos(radLat2) * Math.cos(dLng);
+  
+  let azimuth = Math.atan2(y, x) * 180 / Math.PI;
+  azimuth = (azimuth + 360) % 360;
+  return azimuth;
+}
+
+/** 根据方位角获取中文方位描述 */
+function getOrientationDescription(azimuth: number): string {
+  if (azimuth >= 337.5 || azimuth < 22.5) return '北侧';
+  if (azimuth >= 22.5 && azimuth < 67.5) return '东北方向';
+  if (azimuth >= 67.5 && azimuth < 112.5) return '东侧';
+  if (azimuth >= 112.5 && azimuth < 157.5) return '东南方向';
+  if (azimuth >= 157.5 && azimuth < 202.5) return '南侧';
+  if (azimuth >= 202.5 && azimuth < 247.5) return '西南方向';
+  if (azimuth >= 247.5 && azimuth < 292.5) return '西侧';
+  return '西北方向';
 }
 
 // ========== TTS 语音 ==========

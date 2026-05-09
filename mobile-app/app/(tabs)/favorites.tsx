@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Clipboard, Modal, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { StatusBar } from 'expo';
+import { StatusBar } from 'expo-status-bar';
 import { useMapStore, MarkerPoint } from '../../src/store/mapStore';
 import { wgs84ToGcj02 } from '../../src/utils/coordinate';
 

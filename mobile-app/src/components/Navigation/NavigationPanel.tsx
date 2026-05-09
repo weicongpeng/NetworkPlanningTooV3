@@ -226,6 +226,11 @@ export default function NavigationPanel({
     setIsLoading(false);
     if (success) {
       setSetupMode(false);
+      // 在地图上显示目的地标记（带小区名称标签）
+      if (mapRef?.current) {
+        const [gcjLat, gcjLng] = wgs84ToGcj02(destLat, destLng);
+        mapRef.current.showDestinationMarker(gcjLat, gcjLng, destName);
+      }
       // 启动 auto-fit：用户5秒无操作自动恢复定位视图
       if (mapRef?.current) {
         mapRef.current.startAutoFit();
@@ -242,6 +247,7 @@ export default function NavigationPanel({
     stopNavigation();
     if (mapRef?.current) {
       mapRef.current.clearRoute();
+      mapRef.current.hideDestinationMarker();
       mapRef.current.clearUserLocation();
       mapRef.current.stopAutoFit();
     }
@@ -253,6 +259,7 @@ export default function NavigationPanel({
     if (isNavigating()) return; // 导航中不能关闭
     if (mapRef?.current) {
       mapRef.current.clearRoute();
+      mapRef.current.hideDestinationMarker();
       mapRef.current.clearUserLocation();
     }
     onClose();
@@ -411,9 +418,9 @@ export default function NavigationPanel({
     <View style={styles.overlayContainer} pointerEvents="box-none">
       {visible && (
         <>
-          {/* 设置模式：显示遮罩层点击关闭；导航中：无遮罩，地图可交互 */}
+          {/* 遮罩层：阻止点击地图区域（不可关闭面板，仅阻挡触摸穿透） */}
           {setupMode && (
-            <TouchableOpacity style={styles.overlayBackdrop} activeOpacity={1} onPress={handleClose} />
+            <View style={styles.overlayBackdrop} pointerEvents="auto" />
           )}
           {/* 底部面板 */}
           <View style={styles.container}>

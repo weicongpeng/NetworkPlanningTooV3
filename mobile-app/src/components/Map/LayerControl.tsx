@@ -23,9 +23,9 @@ const LayerControl = forwardRef<View, Props>(({ active, onPress }, ref) => {
 const styles = StyleSheet.create({
   btn: {
     backgroundColor: 'rgba(255,255,255,0.9)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: '#ddd',
   },
@@ -34,7 +34,7 @@ const styles = StyleSheet.create({
     borderColor: '#007AFF',
   },
   btnText: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#333',
   },
   btnTextActive: {

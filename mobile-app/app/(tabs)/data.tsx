@@ -3,8 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-} from 'react-native';
-import { StatusBar } from 'expo';
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
@@ -12,6 +10,7 @@ import { StatusBar } from 'expo';
   ScrollView,
   RefreshControl,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { apiService } from '../../src/services/api';
 
 interface DataItem {

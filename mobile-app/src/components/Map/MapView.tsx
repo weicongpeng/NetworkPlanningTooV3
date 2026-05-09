@@ -8,6 +8,8 @@ export interface MapViewRef {
   moveCamera: (lat: number, lng: number, zoom?: number) => void;
   addRoute: (polyline: [number, number][]) => void;
   clearRoute: () => void;
+  showDestinationMarker: (lat: number, lng: number, name: string) => void;
+  hideDestinationMarker: () => void;
   updateUserLocation: (lat: number, lng: number, heading?: number) => void;
   clearUserLocation: () => void;
   fitRouteBounds: (polyline: [number, number][]) => void;
@@ -26,6 +28,7 @@ interface Props {
   onMeasureFinish?: () => void;
   onMeasureClear?: () => void;
   onSectorOverlap?: (sectors: any[], lat: number, lng: number) => void;
+  onMapInteraction?: () => void;
 }
 
 const AMAP_KEY = '9fa8b08372c3c764fd14d0bc74862ad1';
@@ -49,22 +52,18 @@ const HTML_TEMPLATE = `
       white-space: nowrap;
     }
     .search-label {
-      background: rgba(255,255,255,0.9);
       color: #333;
-      padding: 2px 8px;
-      border-radius: 4px;
       font-size: 12px;
+      font-weight: bold;
       white-space: nowrap;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+      text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
     }
     .marker-label {
-      background: rgba(229,57,53,0.85);
-      color: #fff;
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-size: 11px;
+      color: #333;
+      font-size: 12px;
+      font-weight: bold;
       white-space: nowrap;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+      text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
     }
     .measure-panel {
       background: rgba(255,255,255,0.95);
@@ -301,6 +300,10 @@ const HTML_TEMPLATE = `
               clearTimeout(mapMoveResetTimer);
             }
             mapRecentlyMoved = true;
+            // Notify RN to close menus when map moves
+            if (window.ReactNativeWebView) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'mapInteraction' }));
+            }
             mapMoveResetTimer = setTimeout(function() {
               mapRecentlyMoved = false;
               mapMoveResetTimer = null;
@@ -863,33 +866,37 @@ const HTML_TEMPLATE = `
       window.updateSearchMarker = function(marker) {
         if (!map) return;
         if (searchMarkerObj) {
-          map.remove(searchMarkerObj);
+          if (searchMarkerObj.marker) {
+            map.remove(searchMarkerObj.marker);
+          } else {
+            map.remove(searchMarkerObj);
+          }
           if (searchMarkerObj.label) {
             map.remove(searchMarkerObj.label);
           }
           searchMarkerObj = null;
         }
         if (!marker) return;
-        searchMarkerObj = new AMap.CircleMarker({
-          center: [marker.lng, marker.lat],
-          radius: 8,
-          fillColor: '#E53935',
-          fillOpacity: 1,
-          strokeColor: '#fff',
-          strokeWeight: 2,
-          zIndex: 100,
-        });
-        map.add(searchMarkerObj);
-
-        var label = new AMap.Marker({
-          position: [marker.lng, marker.lat],
-          offset: new AMap.Pixel(0, -22),
-          content: '<div class="marker-label">' + (marker.name || '搜索结果') + '</div>',
-          clickable: false,
-          zIndex: 101
-        });
-        map.add(label);
-        searchMarkerObj.label = label;
+        searchMarkerObj = {
+          marker: new AMap.CircleMarker({
+            center: [marker.lng, marker.lat],
+            radius: 8,
+            fillColor: '#E53935',
+            fillOpacity: 1,
+            strokeColor: '#fff',
+            strokeWeight: 2,
+            zIndex: 100,
+          }),
+          label: new AMap.Marker({
+            position: [marker.lng, marker.lat],
+            offset: new AMap.Pixel(0, -22),
+            content: '<div class="search-label">' + (marker.name || '搜索结果') + '</div>',
+            clickable: false,
+            zIndex: 101
+          })
+        };
+        map.add(searchMarkerObj.marker);
+        map.add(searchMarkerObj.label);
       };
 
       var satelliteLayer = null;
@@ -931,21 +938,80 @@ const HTML_TEMPLATE = `
       };
 
       // === 导航路线显示 ===
+      var _routeArrowMarkers = [];
+
+      function getRouteBearing(p1, p2) {
+        var lng1 = p1[0] * Math.PI / 180;
+        var lat1 = p1[1] * Math.PI / 180;
+        var lng2 = p2[0] * Math.PI / 180;
+        var lat2 = p2[1] * Math.PI / 180;
+        var dLng = lng2 - lng1;
+        var y = Math.sin(dLng) * Math.cos(lat2);
+        var x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+        var bearing = Math.atan2(y, x) * 180 / Math.PI;
+        return (bearing + 360) % 360;
+      }
+
       window.addRoute = function(polyline) {
         if (!map || !routeOverlayGroup) return;
         routeOverlayGroup.clearOverlays();
+        for (var a = 0; a < _routeArrowMarkers.length; a++) {
+          map.remove(_routeArrowMarkers[a]);
+        }
+        _routeArrowMarkers = [];
+
         // polyline: [[lng, lat], ...] in GCJ-02
         var path = polyline.map(function(p) { return [p[0], p[1]]; });
         var routeLine = new AMap.Polyline({
           path: path,
           strokeColor: '#007AFF',
-          strokeWeight: 6,
+          strokeWeight: 8,
           strokeStyle: 'solid',
           lineJoin: 'round',
           lineCap: 'round',
           zIndex: 80
         });
         routeOverlayGroup.addOverlay(routeLine);
+
+        // 添加方向箭头标记，每隔约300米一个
+        if (polyline.length >= 2) {
+          var arrowInterval = 300; // 米
+          var accumulatedDist = 0;
+          var nextArrowDist = arrowInterval;
+
+          for (var i = 0; i < polyline.length - 1; i++) {
+            var p1 = polyline[i];
+            var p2 = polyline[i + 1];
+            var segDist = getHaversineDistance(p1[1], p1[0], p2[1], p2[0]);
+            var bearing = getRouteBearing(p1, p2);
+
+            // 检查这段路是否包含下一个箭头位置
+            while (accumulatedDist + segDist >= nextArrowDist && nextArrowDist < accumulatedDist + segDist + 1) {
+              // 计算箭头在这段路上的位置比例
+              var ratio = (nextArrowDist - accumulatedDist) / segDist;
+              var arrowLng = p1[0] + (p2[0] - p1[0]) * ratio;
+              var arrowLat = p1[1] + (p2[1] - p1[1]) * ratio;
+
+              var arrowContent = '<div style="color:#fff;font-size:14px;font-weight:bold;' +
+                'text-shadow:0 0 3px #007AFF,0 0 3px #007AFF,0 0 3px #007AFF;' +
+                'transform:translate(-50%,-50%) rotate(' + (bearing - 90) + 'deg);">' + '>' + '</div>';
+
+              var arrowMarker = new AMap.Marker({
+                position: [arrowLng, arrowLat],
+                content: arrowContent,
+                offset: new AMap.Pixel(0, 0),
+                clickable: false,
+                zIndex: 85
+              });
+              map.add(arrowMarker);
+              _routeArrowMarkers.push(arrowMarker);
+
+              nextArrowDist += arrowInterval;
+            }
+            accumulatedDist += segDist;
+          }
+        }
+
         // 确保路线在最上层
         routeOverlayGroup.setMap(map);
       };
@@ -954,7 +1020,61 @@ const HTML_TEMPLATE = `
         if (routeOverlayGroup) {
           routeOverlayGroup.clearOverlays();
         }
+        for (var i = 0; i < _routeArrowMarkers.length; i++) {
+          map.remove(_routeArrowMarkers[i]);
+        }
+        _routeArrowMarkers = [];
         if (_autoFitTimer) { clearTimeout(_autoFitTimer); _autoFitTimer = null; }
+      };
+
+      // 目的地标记（带小区名称标签）
+      var _destMarker = null;
+
+      window.showDestinationMarker = function(lat, lng, name) {
+        if (!map) return;
+        if (_destMarker) {
+          map.remove(_destMarker);
+          if (_destMarker.label) {
+            map.remove(_destMarker.label);
+          }
+          _destMarker = null;
+        }
+        var markerContent = '<div style="width:16px;height:16px;border-radius:50%;background:#E53935;' +
+          'border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>';
+        var marker = new AMap.CircleMarker({
+          center: [lng, lat],
+          radius: 8,
+          fillColor: '#E53935',
+          fillOpacity: 1,
+          strokeColor: '#fff',
+          strokeWeight: 2,
+          zIndex: 110,
+        });
+        map.add(marker);
+
+        var label = new AMap.Marker({
+          position: [lng, lat],
+          offset: new AMap.Pixel(0, -22),
+          content: '<div class="marker-label">' + (name || '目的地') + '</div>',
+          clickable: false,
+          zIndex: 111
+        });
+        map.add(label);
+        _destMarker = { marker: marker, label: label };
+      };
+
+      window.hideDestinationMarker = function() {
+        if (_destMarker) {
+          if (_destMarker.marker) {
+            map.remove(_destMarker.marker);
+          } else {
+            map.remove(_destMarker);
+          }
+          if (_destMarker.label) {
+            map.remove(_destMarker.label);
+          }
+          _destMarker = null;
+        }
       };
 
       window.updateUserLocation = function(lat, lng, heading) {
@@ -1206,19 +1326,43 @@ const HTML_TEMPLATE = `
         if (!map || !group) return;
         var overlays = group.getOverlays();
         if (overlays.length === 0) return;
-        var bounds = new AMap.Bounds();
-        var hasBounds = false;
+        var minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
+        var hasValid = false;
+        function extendBounds(lng, lat) {
+          if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+            if (lat < minLat) minLat = lat;
+            if (lat > maxLat) maxLat = lat;
+            if (lng < minLng) minLng = lng;
+            if (lng > maxLng) maxLng = lng;
+            hasValid = true;
+          }
+        }
         for (var i = 0; i < overlays.length; i++) {
           try {
             var o = overlays[i];
-            if (o.getCenter) { bounds.extend(o.getCenter()); hasBounds = true; }
-            else if (o.getPath) {
-              o.getPath().forEach(function(p) { bounds.extend(p); });
-              hasBounds = true;
+            if (o.getPath) {
+              var pts = o.getPath();
+              for (var j = 0; j < pts.length; j++) {
+                extendBounds(pts[j].getLng(), pts[j].getLat());
+              }
+            } else if (o.getCenter) {
+              var c = o.getCenter();
+              if (c) extendBounds(c.getLng(), c.getLat());
             }
           } catch(e) {}
         }
-        if (hasBounds) map.setBounds(bounds, null, false, [40,40,40,40]);
+        if (hasValid) {
+          var centerLat = (minLat + maxLat) / 2;
+          var centerLng = (minLng + maxLng) / 2;
+          var latSpan = maxLat - minLat;
+          var lngSpan = maxLng - minLng;
+          var zoom = 15;
+          if (latSpan > 5 || lngSpan > 5) zoom = 5;
+          else if (latSpan > 1 || lngSpan > 1) zoom = 8;
+          else if (latSpan > 0.1 || lngSpan > 0.1) zoom = 12;
+          else if (latSpan > 0.01 || lngSpan > 0.01) zoom = 14;
+          map.setZoomAndCenter(zoom, [centerLng, centerLat], false);
+        }
       }
 
       // ==================== 通过HTTP获取数据并渲染 ====================
@@ -1249,7 +1393,8 @@ const HTML_TEMPLATE = `
             log('loadTabLayerFromAPI: layer=' + target.name + ' features=' +
                 (target.geojson && target.geojson.features ? target.geojson.features.length : 0));
             var layerKey = dataId + '_' + target.id;
-            window._updateTabLayerWithConv(layerKey, target.geojson, true);
+            // 后端已经转换为 GCJ02，不需要再次转换
+            window._updateTabLayerWithConv(layerKey, target.geojson, false);
           })
           .catch(function(err) { log('loadTabLayerFromAPI fetch error: ' + (err.message || err)); });
       };
@@ -1401,7 +1546,7 @@ export default forwardRef<MapViewRef, Props>(function MapView(props, ref) {
     focusLocation,
     setFocusLocation,
   } = useMapStore();
-  const { onMapPress, onLongPress, onMarkerClick, onMeasureFinish, onMeasureClear, onSectorOverlap } = props;
+  const { onMapPress, onLongPress, onMarkerClick, onMeasureFinish, onMeasureClear, onSectorOverlap, onMapInteraction } = props;
   const showSatellite = props.showSatellite;
 
   const injectJS = useCallback((code: string) => {
@@ -1545,6 +1690,7 @@ export default forwardRef<MapViewRef, Props>(function MapView(props, ref) {
           onMeasureFinish?.();
           break;
         case 'mapInteraction':
+          onMapInteraction?.();
           resetNavUiAutoHide();
           break;
       }
@@ -1562,6 +1708,12 @@ export default forwardRef<MapViewRef, Props>(function MapView(props, ref) {
     },
     clearRoute: () => {
       injectJS('window.clearRoute();');
+    },
+    showDestinationMarker: (lat: number, lng: number, name: string) => {
+      injectJS(`window.showDestinationMarker(${lat}, ${lng}, ${JSON.stringify(name)});`);
+    },
+    hideDestinationMarker: () => {
+      injectJS('window.hideDestinationMarker();');
     },
     updateUserLocation: (lat: number, lng: number, heading?: number) => {
       injectJS(`window.updateUserLocation(${lat}, ${lng}, ${heading || 0});`);

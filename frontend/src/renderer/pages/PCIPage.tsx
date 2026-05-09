@@ -1424,7 +1424,7 @@ export function PCIPage() {
           </div>
 
           {/* 小区选择与结果面板（页签切换） */}
-          <div className="bg-card p-3 rounded-lg border border-border flex flex-col min-h-0 overflow-hidden">
+          <div className="bg-card p-3 rounded-lg border border-border flex flex-col flex-1 min-h-0 overflow-hidden">
             {/* 页签切换栏 */}
             <div className="flex items-center gap-1 mb-3 border-b border-border shrink-0">
               <button
