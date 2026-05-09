@@ -6,6 +6,7 @@ from fastapi.concurrency import run_in_threadpool
 from typing import Dict, Any, Optional, List
 from app.models.schemas import OnlineMapConfig, OfflineMapConfig, MapData
 from app.core.config import settings
+import logging
 import json
 import time
 import httpx
@@ -342,8 +343,10 @@ async def get_direction(
         "key": settings.AMAP_API_KEY,
         "origin": origin,
         "destination": destination,
-        "strategy": "0",
     }
+    # 仅驾车模式添加 strategy 参数（步行/骑行不支持）
+    if api_mode == "driving":
+        params["strategy"] = "0"
 
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:

@@ -89,49 +89,86 @@
       ]
     }
   },
-  "73821eb5-d0dd-4603-8532-884540eb0fab": {
-    "id": "73821eb5-d0dd-4603-8532-884540eb0fab",
-    "name": "BaselineLab_172.16.34.163_1778122194_9488594.zip",
+  "672cdae9-0f8d-407a-abed-cd7b7edd8953": {
+    "id": "672cdae9-0f8d-407a-abed-cd7b7edd8953",
+    "name": "cell-tree-export.xlsx",
+    "type": "excel",
+    "fileType": "target_cells",
+    "size": 14827,
+    "originalPath": null,
+    "uploadDate": "2026-05-09T08:53:01.715610",
+    "status": "ready",
+    "metadata": {
+      "LTESiteCount": 56,
+      "LTESectorCount": 201,
+      "NRSiteCount": 0,
+      "NRSectorCount": 0
+    }
+  },
+  "72e908e6-91eb-4532-9157-1aa73e378678": {
+    "id": "72e908e6-91eb-4532-9157-1aa73e378678",
+    "name": "BaselineLab_172.16.34.163_1778290813_6891959.zip",
     "type": "map",
     "subType": "offline",
-    "size": 3963417,
+    "size": 3974361,
     "originalPath": null,
-    "uploadDate": "2026-05-07T11:17:14.318011",
+    "uploadDate": "2026-05-09T09:51:14.427767",
     "status": "ready",
     "metadata": {
       "fileCount": 10
     }
   },
-  "826fa0d3-9910-4e81-a562-6af39e68e212": {
-    "id": "826fa0d3-9910-4e81-a562-6af39e68e212",
-    "name": "cell-tree-export.xlsx",
-    "type": "excel",
-    "fileType": "target_cells",
-    "size": 14731,
-    "originalPath": null,
-    "uploadDate": "2026-05-07T15:15:10.200613",
-    "status": "ready",
-    "metadata": {
-      "LTESiteCount": 58,
-      "LTESectorCount": 206,
-      "NRSiteCount": 1,
-      "NRSectorCount": 1
-    }
-  },
-  "2e4a7e7c-7ba9-4c42-874e-e6e1f51c9746": {
-    "id": "2e4a7e7c-7ba9-4c42-874e-e6e1f51c9746",
-    "name": "ProjectParameter_mongoose河源电联20260507143241.xlsx",
+  "44e0e035-21ac-4e01-957c-81e7b7f68a55": {
+    "id": "44e0e035-21ac-4e01-957c-81e7b7f68a55",
+    "name": "ProjectParameter_mongoose河源电联20260509095124.xlsx",
     "type": "excel",
     "fileType": "full_params",
-    "size": 4677885,
+    "size": 5127964,
     "originalPath": null,
-    "uploadDate": "2026-05-08T11:32:46.519893",
+    "uploadDate": "2026-05-09T15:16:47.493787",
     "status": "ready",
     "metadata": {
-      "LTESiteCount": 4108,
-      "LTESectorCount": 18882,
-      "NRSiteCount": 1414,
-      "NRSectorCount": 15513
+      "LTESiteCount": 4065,
+      "LTESectorCount": 18788,
+      "NRSiteCount": 1413,
+      "NRSectorCount": 15499
+    }
+  },
+  "041c8639-f5aa-4c94-b2c9-48bcb811dec8": {
+    "id": "041c8639-f5aa-4c94-b2c9-48bcb811dec8",
+    "name": "赣深高铁线路.zip",
+    "type": "map",
+    "subType": "mapinfo",
+    "size": 2663,
+    "originalPath": null,
+    "uploadDate": "2026-05-09T16:28:14.739928",
+    "status": "ready",
+    "metadata": {
+      "fileCount": 5,
+      "layerCount": 1,
+      "layers": [
+        {
+          "id": "f52b8a72-24d4-4dba-96c0-4e99e60d3754",
+          "name": "赣深高铁路线图",
+          "type": "point",
+          "feature_count": 3,
+          "metadata": {
+            "source_file": "D:\\mycode\\NetworkPlanningTooV3\\data\\041c8639-f5aa-4c94-b2c9-48bcb811dec8\\赣深高铁路线图.TAB",
+            "feature_count": 3,
+            "name": "赣深高铁路线图",
+            "coord_sys": "unknown",
+            "fields": [
+              "WindowsSimpChinese",
+              "\\IsReadOnly",
+              "FALSE",
+              "\\MapInfo",
+              "\\MapInfo\\TableID",
+              "1aa45dc1-becd-480f-8692-f91f54a8075b"
+            ],
+            "description": ""
+          }
+        }
+      ]
     }
   }
 }

@@ -76,6 +76,10 @@ let _elapsedTimer: ReturnType<typeof setInterval> | null = null;
 let _startTime = 0;
 let _autoHideTimer: ReturnType<typeof setTimeout> | null = null;
 
+// GPS位置缓存（避免重复获取）
+let _cachedPosition: { lat: number; lng: number; timestamp: number } | null = null;
+const POSITION_CACHE_TTL = 5 * 60 * 1000; // 5分钟
+
 // 已说过的靠近提醒（防止重复）
 let _approachingSpoken: Set<number> = new Set();
 
@@ -149,19 +153,117 @@ export async function requestLocationPermission(): Promise<boolean> {
   return status === 'granted';
 }
 
-/** 获取当前位置（WGS84），自动处理权限请求 */
+/** 带超时的 getCurrentPositionAsync 封装 */
+function getCurrentPositionWithTimeout(
+  options: { accuracy: Location.Accuracy },
+  timeoutMs: number,
+): Promise<Location.LocationObject> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('GPS定位超时')), timeoutMs);
+    Location.getCurrentPositionAsync(options)
+      .then((pos) => { clearTimeout(timer); resolve(pos); })
+      .catch((err) => { clearTimeout(timer); reject(err); });
+  });
+}
+
+/**
+ * 获取当前位置（WGS84），多级快速定位策略
+ * 
+ * 定位策略（Android）：
+ * 1. 5分钟内缓存（最快）
+ * 2. 系统最后已知位置（读取缓存，支持WiFi/基站/GPS）
+ * 3. 启用网络定位服务（WiFi/基站定位，适合室内）
+ * 4. Lowest精度实时定位（≤10秒）
+ * 5. Balanced精度实时定位（≤15秒）
+ * 6. High精度实时定位（≤20秒，GPS）
+ * 7. 过期缓存兜底（1分钟内）
+ * 
+ * 定位策略（iOS）：
+ * iOS 不区分精度等级，系统总是使用最佳可用位置源
+ * 室内主要依赖 WiFi 定位和网络位置缓存
+ */
 export async function getCurrentPosition(): Promise<{ lat: number; lng: number } | null> {
+  console.log('[NaviService] getCurrentPosition: 开始获取位置');
+
+  // 1. 检查缓存（5分钟内有效）
+  if (_cachedPosition && Date.now() - _cachedPosition.timestamp < POSITION_CACHE_TTL) {
+    const age = Date.now() - _cachedPosition.timestamp;
+    console.log(`[NaviService] getCurrentPosition: 使用缓存位置(${Math.round(age / 1000)}秒前)`);
+    return { lat: _cachedPosition.lat, lng: _cachedPosition.lng };
+  }
+
+  // 2. 权限检查
   const ok = await requestLocationPermission();
-  if (!ok) return null;
-  try {
-    const pos = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.High,
-    });
-    return { lat: pos.coords.latitude, lng: pos.coords.longitude };
-  } catch (e) {
-    console.error('[NaviService] getCurrentPosition error:', e);
+  if (!ok) {
+    console.log('[NaviService] getCurrentPosition: 位置权限被拒绝');
     return null;
   }
+
+  // 3. Android: 启用网络定位服务（WiFi/基站）
+  if (Platform.OS === 'android') {
+    try {
+      console.log('[NaviService] getCurrentPosition: 启用网络定位服务(WiFi/基站)...');
+      await Location.enableNetworkProviderAsync();
+      console.log('[NaviService] getCurrentPosition: 网络定位服务已启用');
+    } catch (e: any) {
+      console.log('[NaviService] getCurrentPosition: 网络定位服务启用失败:', e.message);
+      // 继续尝试定位，不阻断流程
+    }
+  }
+
+  // 4. 首先尝试 getLastKnownPosition（最快，读取系统缓存，支持WiFi/基站/GPS）
+  try {
+    console.log('[NaviService] getCurrentPosition: 尝试获取最后已知位置...');
+    const lastPos = await Location.getLastKnownPositionAsync({});
+    if (lastPos && lastPos.coords) {
+      const age = Date.now() - lastPos.timestamp;
+      if (age < 5 * 60 * 1000) {
+        const result = { lat: lastPos.coords.latitude, lng: lastPos.coords.longitude };
+        _cachedPosition = { ...result, timestamp: Date.now() };
+        console.log(`[NaviService] getCurrentPosition: 使用最后已知位置(缓存${Math.round(age / 1000)}秒)`);
+        return result;
+      }
+      console.log(`[NaviService] getCurrentPosition: 最后已知位置已过时(${Math.round(age / 1000)}秒)`);
+    } else {
+      console.log('[NaviService] getCurrentPosition: 无最后已知位置');
+    }
+  } catch (e: any) {
+    console.log('[NaviService] getCurrentPosition: getLastKnownPosition不可用:', e.message);
+  }
+
+  // 5. 尝试获取实时定位，逐步提高精度和超时时间
+  // 注意：室内定位可能需要更长时间获取 WiFi/基站信号
+  const strategies = [
+    { accuracy: Location.Accuracy.Lowest, timeout: 10000, label: 'Lowest(WiFi/基站)' },
+    { accuracy: Location.Accuracy.Balanced, timeout: 15000, label: 'Balanced(混合)' },
+    { accuracy: Location.Accuracy.High, timeout: 20000, label: 'High(GPS)' },
+  ];
+
+  for (const strategy of strategies) {
+    try {
+      console.log(`[NaviService] getCurrentPosition: 尝试${strategy.label}定位(${strategy.timeout / 1000}秒超时)...`);
+      const pos = await getCurrentPositionWithTimeout(
+        { accuracy: strategy.accuracy },
+        strategy.timeout,
+      );
+      const result = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      _cachedPosition = { ...result, timestamp: Date.now() };
+      console.log(`[NaviService] getCurrentPosition: ${strategy.label}定位成功`);
+      return result;
+    } catch (e: any) {
+      console.log(`[NaviService] getCurrentPosition: ${strategy.label}定位失败:`, e.message);
+      // 继续尝试下一个策略
+    }
+  }
+
+  // 6. 兜底：返回过期缓存（1分钟内）
+  if (_cachedPosition && Date.now() - _cachedPosition.timestamp < 60000) {
+    console.log('[NaviService] getCurrentPosition: 使用过期缓存兜底(1分钟内)');
+    return { lat: _cachedPosition.lat, lng: _cachedPosition.lng };
+  }
+
+  console.error('[NaviService] getCurrentPosition: 所有定位方式均失败');
+  return null;
 }
 
 // ========== 路径规划（高德 REST API）==========
@@ -291,14 +393,22 @@ export async function startNavigation(
 ): Promise<boolean> {
   // 1. 权限检查
   const ok = await requestLocationPermission();
-  if (!ok) return false;
+  if (!ok) {
+    console.log('[NaviService] startNavigation: 位置权限被拒绝');
+    return false;
+  }
 
   // 2. 获取起点
   let origin = originWgs;
   if (!origin) {
+    console.log('[NaviService] startNavigation: 开始获取当前位置...');
     const pos = await getCurrentPosition();
-    if (!pos) return false;
+    if (!pos) {
+      console.log('[NaviService] startNavigation: 无法获取当前位置');
+      return false;
+    }
     origin = pos;
+    console.log(`[NaviService] startNavigation: 获取起点 [${origin.lat.toFixed(6)}, ${origin.lng.toFixed(6)}]`);
   }
 
   _currentPosition = [origin.lat, origin.lng];
@@ -381,18 +491,40 @@ export function stopNavigation(): void {
 
 function startLocationTracking() {
   stopLocationTracking();
+  
+  console.log(`[NaviService] startLocationTracking: 开始导航跟踪(模式:${_mode})`);
+  
+  // 根据导航模式选择合适的精度策略
+  // 室内导航使用 Balanced 精度（WiFi/基站+GPS混合），避免强制使用 GPS
+  const accuracy = _mode === 'drive' 
+    ? Location.Accuracy.BestForNavigation  // 驾车：最佳精度，优先 GPS
+    : Location.Accuracy.Balanced;           // 步行/骑行：混合定位，适合室内/室外
+  
+  const watchOptions: Location.LocationOptions = {
+    accuracy,
+    distanceInterval: 1,
+    timeInterval: 500,
+  };
+  
+  console.log(`[NaviService] startLocationTracking: 使用精度策略 ${accuracy === Location.Accuracy.BestForNavigation ? 'BestForNavigation' : 'Balanced'}`);
+  
   Location.watchPositionAsync(
-    {
-      accuracy: Location.Accuracy.BestForNavigation,
-      distanceInterval: 1,
-      timeInterval: 500,
-    },
+    watchOptions,
     (loc) => {
       if (!_isNavigating) return;
-      const { latitude, longitude, heading } = loc.coords;
+      const { latitude, longitude, heading, accuracy: locAccuracy } = loc.coords;
       _currentPosition = [latitude, longitude];
       _currentPositionGcj = wgs84ToGcj02(latitude, longitude);
       _currentHeading = (heading !== null && heading !== undefined && !isNaN(heading)) ? heading : _currentHeading;
+      
+      // 更新位置缓存（用于后续 getCurrentPosition 快速返回）
+      _cachedPosition = { 
+        lat: latitude, 
+        lng: longitude, 
+        timestamp: Date.now() 
+      };
+      
+      console.log(`[NaviService] 跟踪位置更新: [${latitude.toFixed(6)}, ${longitude.toFixed(6)}], 精度: ${Math.round(locAccuracy || 0)}m`);
 
       updateStepProgress();
       notify();
@@ -401,7 +533,12 @@ function startLocationTracking() {
         handleArrival();
       }
     },
-  ).then(sub => { _locationSub = sub; });
+  ).then(sub => { 
+    _locationSub = sub; 
+    console.log('[NaviService] startLocationTracking: 跟踪已启动');
+  }).catch(e => {
+    console.error('[NaviService] startLocationTracking: 启动失败:', e.message);
+  });
 }
 
 function stopLocationTracking() {
@@ -536,7 +673,7 @@ async function reroute() {
 
   try {
     const newRoute = await planRoute(
-      _currentPosition,
+      _currentPosition!,
       [_destLat, _destLng],
       _mode,
     );
@@ -677,6 +814,7 @@ export function getNaviState(): NaviStateSnapshot {
     destName: _destName,
     mode: _mode,
     routeData: _routeData,
+    heading: _currentHeading,
   };
 }
 
