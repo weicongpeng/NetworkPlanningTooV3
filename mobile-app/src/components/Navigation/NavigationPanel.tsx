@@ -6,10 +6,11 @@
  * 2. 导航中：显示实时导航信息（剩余距离、时间、下一指令）
  * 3. 结束：导航完成摘要
  */
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
   LayoutAnimation, Platform, UIManager,
+  Animated, PanResponder,
 } from 'react-native';
 
 // Android 需要启用 LayoutAnimation
@@ -78,11 +79,63 @@ export default function NavigationPanel({
   // 用于在导航模式下重新绘制路线（解决setupMode cleanup时序问题）
   const [naviRouteKey, setNaviRouteKey] = useState(0);
 
-  // 切换展开/折叠
+  // 面板滑动动画
+  const slideAnim = useRef(new Animated.Value(1)).current;
+  const panY = useRef(0);
+
+  // 切换展开/折叠（带动画）
+  const animatePanel = useCallback((expanded: boolean) => {
+    setPanelExpanded(expanded);
+    Animated.timing(slideAnim, {
+      toValue: expanded ? 1 : 0,
+      duration: 250,
+      useNativeDriver: false, // height动画不支持native driver
+    }).start();
+  }, [slideAnim]);
+
   const togglePanel = useCallback(() => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setPanelExpanded(prev => !prev);
-  }, []);
+    animatePanel(!panelExpanded);
+  }, [panelExpanded, animatePanel]);
+
+  // 滑动手势 - 整个面板可上下滑动
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        // 只响应垂直滑动
+        return Math.abs(gestureState.dy) > 5 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
+      },
+      onPanResponderMove: (_, gestureState) => {
+        // 根据滑动方向实时更新动画值
+        if (panelExpanded) {
+          // 展开状态：向下滑动收起
+          const newValue = Math.max(0, 1 - gestureState.dy / 100);
+          slideAnim.setValue(Math.min(1, newValue));
+        } else {
+          // 收起状态：向上滑动展开
+          const newValue = Math.min(1, -gestureState.dy / 100);
+          slideAnim.setValue(Math.max(0, newValue));
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (panelExpanded) {
+          // 展开状态：向下滑动超过阈值则收起
+          if (gestureState.dy > 30) {
+            animatePanel(false);
+          } else {
+            animatePanel(true);
+          }
+        } else {
+          // 收起状态：向上滑动超过阈值则展开
+          if (gestureState.dy < -30) {
+            animatePanel(true);
+          } else {
+            animatePanel(false);
+          }
+        }
+      },
+    })
+  ).current;
 
   // 重置状态
   const resetState = useCallback(() => {
@@ -104,6 +157,10 @@ export default function NavigationPanel({
   // 监听导航状态
   useEffect(() => {
     const unsub = onNaviStateChange((state) => {
+      // 如果导航已结束，忽略状态更新（避免停止后的延迟刷新）
+      if (!state.isNavigating) {
+        return;
+      }
       setNavState(state);
       if (state.isNavigating && state.routeData) {
         const step = state.routeData.steps[state.currentStepIndex];
@@ -119,7 +176,7 @@ export default function NavigationPanel({
         );
         const heading = state.heading !== null && state.heading !== undefined ? state.heading : undefined;
         mapRef.current.updateUserLocation(gcjLat, gcjLng, heading);
-        // 启动 auto-fit：用户 5 秒无操作后自动恢复定位视图
+        // 启动 auto-fit：用户 3 秒无操作后自动恢复到当前位置+zoom=18
         mapRef.current.startAutoFit();
       }
     });
@@ -139,11 +196,10 @@ export default function NavigationPanel({
       if (cancelled || !route || !mapRef?.current) return;
       mapRef.current.clearRoute();
       mapRef.current.addRoute(route.flatPolyline);
-      mapRef.current.fitRouteBounds(route.flatPolyline);
+      mapRef.current.fitRouteBounds(route.flatPolyline, route.totalDistance);
       const [gcjLat, gcjLng] = wgs84ToGcj02(startPos.lat, startPos.lng);
       mapRef.current.updateUserLocation(gcjLat, gcjLng);
-      mapRef.current.moveCamera(gcjLat, gcjLng, 15);
-      // 启用 auto-fit: 用户5秒无操作自动恢复路线全局视野
+      // 启用 auto-fit: 用户3秒无操作自动恢复到当前位置+zoom=18
       mapRef.current.startAutoFit();
     })();
     return () => { cancelled = true; };
@@ -184,7 +240,7 @@ export default function NavigationPanel({
           if (mapRef?.current) {
             mapRef.current.clearRoute();
             mapRef.current.addRoute(route.flatPolyline);
-            mapRef.current.fitRouteBounds(route.flatPolyline);
+            mapRef.current.fitRouteBounds(route.flatPolyline, route.totalDistance);
             // 如果有起点坐标，也移动视野到起点附近作为兜底
             if (origin) {
               const [gcjLat, gcjLng] = wgs84ToGcj02(origin.lat, origin.lng);
@@ -231,7 +287,7 @@ export default function NavigationPanel({
         const [gcjLat, gcjLng] = wgs84ToGcj02(destLat, destLng);
         mapRef.current.showDestinationMarker(gcjLat, gcjLng, destName);
       }
-      // 启动 auto-fit：用户5秒无操作自动恢复定位视图
+      // 启动 auto-fit：用户3秒无操作自动恢复到当前位置+zoom=18
       if (mapRef?.current) {
         mapRef.current.startAutoFit();
       }
@@ -243,7 +299,7 @@ export default function NavigationPanel({
   };
 
   // 结束导航
-  const handleStopNavi = () => {
+  const handleStopNavi = useCallback(() => {
     stopNavigation();
     if (mapRef?.current) {
       mapRef.current.clearRoute();
@@ -251,8 +307,12 @@ export default function NavigationPanel({
       mapRef.current.clearUserLocation();
       mapRef.current.stopAutoFit();
     }
+    // 立即重置面板状态，避免延迟
+    setSetupMode(true);
+    setNavState(null);
+    setStatusText('准备导航...');
     onClose();
-  };
+  }, [mapRef, onClose]);
 
   // 关闭（非导航状态）
   const handleClose = () => {
@@ -346,27 +406,27 @@ export default function NavigationPanel({
   const renderNavigating = () => {
     const state = navState;
 
-    return (
-      <View style={styles.panel}>
-        {/* 折叠/展开手柄 */}
-        <TouchableOpacity
-          style={styles.collapseHandle}
-          onPress={togglePanel}
-          activeOpacity={0.6}
-        >
-          <View style={styles.handleBar} />
-          <Text style={styles.handleArrow}>{panelExpanded ? '﹀' : '︿'}</Text>
-        </TouchableOpacity>
+    // 面板容器高度动画：收起时只保留顶部信息条高度，展开时刚好包裹内容无留白
+    const containerHeight = slideAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [72, 196], // 收起时72px(只显示信息条)，展开时196px(刚好容纳内容)
+    });
 
-        {/* 精简信息条（折叠时始终显示） */}
+    return (
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={[
+          styles.panel,
+          { height: containerHeight, overflow: 'hidden' }
+        ]}
+      >
+        {/* 精简信息条（始终可见） */}
         <View style={styles.collapsedBar}>
+          <Text style={styles.collapsedMode}>
+            {state?.mode === 'drive' ? '🚗' : state?.mode === 'walk' ? '🚶' : '🚲'}
+          </Text>
           <Text style={styles.collapsedDest} numberOfLines={1}>
             → {destName || '目的地'}
-          </Text>
-          <Text style={styles.collapsedStats}>
-            {state ? formatDist(state.remainingDistance) : '--'}
-            {' | '}
-            {state ? formatDuration(state.elapsedSec) : '--'}
           </Text>
           <TouchableOpacity onPress={handleStopNavi} style={styles.exitBtnSmall}>
             <Text style={styles.exitBtnSmallText}>结束</Text>
@@ -374,43 +434,32 @@ export default function NavigationPanel({
         </View>
 
         {/* 展开内容 */}
-        {panelExpanded && (
-          <>
-            {/* 下一路口指示 */}
-            <View style={styles.instructionRow}>
-              <Text style={styles.instructionText} numberOfLines={2}>
-                {statusText}
-              </Text>
-            </View>
+        <View style={styles.expandedContent}>
+          {/* 下一路口指示 */}
+          <View style={styles.instructionRow}>
+            <Text style={styles.instructionText} numberOfLines={2}>
+              {statusText}
+            </Text>
+          </View>
 
-            {/* 距离/时间信息 */}
-            <View style={styles.naviStats}>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>
-                  {state ? formatDist(state.remainingDistance) : '--'}
-                </Text>
-                <Text style={styles.statLabel}>剩余距离</Text>
-              </View>
-              <View style={styles.statDivider} />
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>
-                  {state ? formatDuration(state.elapsedSec) : '--'}
-                </Text>
-                <Text style={styles.statLabel}>已用时间</Text>
-              </View>
-              <View style={styles.statDivider} />
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>
-                  {state && state.routeData
-                    ? formatDuration(Math.max(0, state.routeData.totalDuration - state.elapsedSec))
-                    : '--'}
-                </Text>
-                <Text style={styles.statLabel}>预计剩余</Text>
-              </View>
+          {/* 距离/时间信息 */}
+          <View style={styles.naviStats}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>
+                {state ? formatDist(state.remainingDistance) : '--'}
+              </Text>
+              <Text style={styles.statLabel}>剩余距离</Text>
             </View>
-          </>
-        )}
-      </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>
+                {state ? formatDuration(state.remainingDuration) : '--'}
+              </Text>
+              <Text style={styles.statLabel}>预计剩余</Text>
+            </View>
+          </View>
+        </View>
+      </Animated.View>
     );
   };
 
@@ -458,7 +507,9 @@ const styles = StyleSheet.create({
 
   // 通用面板
   panel: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
   },
 
   // 头部
@@ -623,7 +674,11 @@ const styles = StyleSheet.create({
   collapsedBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingBottom: 16,
+    paddingBottom: 12,
+  },
+  collapsedMode: {
+    fontSize: 16,
+    marginRight: 6,
   },
   collapsedDest: {
     flex: 1,
@@ -648,11 +703,14 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
+  expandedContent: {
+    // 展开内容的容器样式
+  },
   instructionRow: {
     backgroundColor: '#F0F8FF',
     borderRadius: 8,
-    padding: 12,
-    marginBottom: 10,
+    padding: 10,
+    marginBottom: 8,
   },
   instructionText: {
     fontSize: 16,
@@ -665,7 +723,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#f9f9f9',
     borderRadius: 8,
-    padding: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
   },
   statItem: {
     flex: 1,

@@ -18,7 +18,7 @@ import { useMapStore, SectorData } from '../../src/store/mapStore';
 import { gcj02ToWgs84 } from '../../src/utils/coordinate';
 import { apiService } from '../../src/services/api';
 import { wgs84ToGcj02 } from '../../src/utils/coordinate';
-import { getCurrentPosition, isNavigating as checkIsNavigating, stopNavigation } from '../../src/services/navigationService';
+import { getCurrentPosition, isNavigating as checkIsNavigating, stopNavigation, setAmapPositionGetter } from '../../src/services/navigationService';
 
 type SearchMode = 'place' | 'parameter' | 'coordinate';
 
@@ -400,6 +400,21 @@ export default function MapScreen() {
     }
   }, [mapCenter]);
 
+  // 注册 AMap 定位回调（当地图准备好后）
+  const handleMapReady = useCallback(() => {
+    if (mapRef.current?.amapGetPosition) {
+      console.log('[MapScreen] 注册 AMap 定位回调');
+      setAmapPositionGetter(async () => {
+        try {
+          return await mapRef.current!.amapGetPosition();
+        } catch (e: any) {
+          console.error('[MapScreen] AMap 定位调用失败:', e.message);
+          return null;
+        }
+      });
+    }
+  }, []);
+
   const handleSearch = useCallback(() => {}, []);
 
   const renderSearchBar = () => (
@@ -475,6 +490,7 @@ export default function MapScreen() {
           onMeasureFinish={finishMeasure}
           onMeasureClear={clearMeasure}
           onMapInteraction={handleMapInteraction}
+          onMapReady={handleMapReady}
         />
         {!navUiHidden && (
           <View style={[styles.topControls, { top: insets.top + 4 }]}>

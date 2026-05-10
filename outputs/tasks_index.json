@@ -6107,5 +6107,89 @@
     "created_at": "2026-05-09T13:25:43.578789",
     "started_at": "2026-05-09T13:25:43.600296",
     "completed_at": null
+  },
+  "8efd18aa-a5a7-4246-b2db-5f35f1ed95d8": {
+    "task_id": "8efd18aa-a5a7-4246-b2db-5f35f1ed95d8",
+    "task_type": "tac",
+    "config": {
+      "networkType": "LTE",
+      "enableSingularityCheck": true,
+      "singularityConfig": {
+        "searchRadius": 1500,
+        "singularityThreshold": 0.5
+      },
+      "selectedCellIds": null
+    },
+    "status": "completed",
+    "progress": 95,
+    "result": null,
+    "error": null,
+    "created_at": "2026-05-10T02:01:21.551077",
+    "started_at": "2026-05-10T02:01:21.565699",
+    "completed_at": null
+  },
+  "6436393b-fa9c-4036-a9e8-4f6b04430eed": {
+    "task_id": "6436393b-fa9c-4036-a9e8-4f6b04430eed",
+    "task_type": "tac_planning",
+    "config": {
+      "networkType": "NR",
+      "enableSingularityCheck": true,
+      "singularityConfig": {
+        "search_radius": 1500,
+        "azimuth_tolerance": 60,
+        "singularity_threshold": 0.5
+      },
+      "selectedCellIds": [
+        "7905741_1"
+      ]
+    },
+    "status": "completed",
+    "progress": 100,
+    "result": null,
+    "error": null,
+    "created_at": "2026-05-10T02:02:01.895339",
+    "started_at": "2026-05-10T02:02:01.896033",
+    "completed_at": null
+  },
+  "1914ce65-d8e0-4289-b6dc-95638f65e3c3": {
+    "task_id": "1914ce65-d8e0-4289-b6dc-95638f65e3c3",
+    "task_type": "tac_planning",
+    "config": {
+      "networkType": "LTE",
+      "enableSingularityCheck": true,
+      "singularityConfig": {
+        "search_radius": 1500,
+        "azimuth_tolerance": 60,
+        "singularity_threshold": 0.5
+      },
+      "selectedCellIds": null
+    },
+    "status": "completed",
+    "progress": 100,
+    "result": null,
+    "error": null,
+    "created_at": "2026-05-10T09:53:53.208849",
+    "started_at": "2026-05-10T09:53:53.252763",
+    "completed_at": null
+  },
+  "64962f29-98bf-4f29-a519-a6558aae8e30": {
+    "task_id": "64962f29-98bf-4f29-a519-a6558aae8e30",
+    "task_type": "tac",
+    "config": {
+      "networkType": "LTE",
+      "enableSingularityCheck": true,
+      "singularityConfig": {
+        "searchRadius": 1500,
+        "singularityThreshold": 0.5
+      },
+      "selectedCellIds": null
+    },
+    "status": "completed",
+    "progress": 95,
+    "result": null,
+    "error": null,
+    "created_at": "2026-05-10T11:12:48.696171",
+    "started_at": "2026-05-10T11:12:48.711012",
+    "completed_at": null
   }
 }

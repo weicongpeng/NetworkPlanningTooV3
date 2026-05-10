@@ -1320,6 +1320,8 @@ class DataService:
         # 处理数据
         try:
             import json
+            import time as _time
+            _t_start = _time.time()
 
             safe_print(f"[DataService] 开始解析Excel文件...")
 
@@ -1330,6 +1332,7 @@ class DataService:
                 xls = pd.ExcelFile(file_path)
             except PermissionError as e:
                 safe_print(f"[DataService] 权限错误: {e}")
+            _t_excelopen = _time.time()
             safe_print(f"[DataService] 开始解析文件...")
 
             # 使用 file_path 作为当前文件路径
@@ -1476,6 +1479,8 @@ class DataService:
                             len(s.get("sectors", [])) for s in sites
                         )
                         safe_print(f"[DataService] 默认解析完成: {len(sites)} 个基站")
+
+                    _t_parsedone = _time.time()
 
                 finally:
                     # 确保关闭文件句柄
@@ -1668,19 +1673,17 @@ class DataService:
     def _parse_target_cells_sheet(
         self, excel_file, sheet_name: str, network_type: str
     ) -> List[Dict]:
-        """解析待规划小区Sheet (只有ID信息)"""
+        """解析待规划小区Sheet (只有ID信息) - 向量化优化版本"""
         import pandas as pd
 
         print(f"[DataService] 解析待规划小区Sheet: {sheet_name}")
 
         df = pd.read_excel(excel_file, sheet_name=sheet_name)
-        sites = {}
 
         # 确定ID列
         site_id_col = "eNodeBID" if network_type == "LTE" else "gNodeBID"
 
         if site_id_col not in df.columns:
-            # 尝试查找
             for col in df.columns:
                 if site_id_col.lower() in col.lower():
                     site_id_col = col
@@ -1691,52 +1694,60 @@ class DataService:
 
         print(f"[DataService] 使用 {site_id_col} 作为站点ID列")
 
-        for _, row in df.iterrows():
-            try:
-                if pd.isna(row[site_id_col]):
-                    continue
+        # === 向量化处理 ===
+        df = df.copy()
 
-                site_id = str(int(row[site_id_col]))
-                cell_id = (
-                    str(int(row["CellID"]))
-                    if "CellID" in row and pd.notna(row["CellID"])
-                    else "0"
-                )
+        # 站点ID：数值化 → int → str（去除小数点）
+        df['_site_id_num'] = pd.to_numeric(df[site_id_col], errors='coerce')
+        df = df.dropna(subset=['_site_id_num'])
+        if len(df) == 0:
+            return []
+        df['_site_id'] = df['_site_id_num'].astype(int).astype(str)
 
-                # 构建唯一扇区ID
-                unique_sector_id = f"{site_id}_{cell_id}"
+        # 小区ID：数值化 → int → str，失败则默认"0"
+        if "CellID" in df.columns:
+            df['_cell_num'] = pd.to_numeric(df["CellID"], errors='coerce').fillna(0).astype(int)
+        else:
+            df['_cell_num'] = 0
+        df['_cell_id'] = df['_cell_num'].astype(str)
 
-                if site_id not in sites:
-                    sites[site_id] = {
-                        "id": site_id,
-                        "name": f"Site_{site_id}",  # 自动生成名称
-                        "longitude": 0.0,  # 默认值
-                        "latitude": 0.0,  # 默认值
-                        "networkType": network_type,
-                        "sectors": [],
-                    }
+        # 唯一扇区ID
+        df['_sector_id'] = df['_site_id'] + '_' + df['_cell_id']
 
-                # 添加扇区
-                sector = {
-                    "id": unique_sector_id,
-                    "siteId": site_id,
-                    "name": f"Cell_{site_id}_{cell_id}",
-                    "longitude": 0.0,
-                    "latitude": 0.0,
-                    "azimuth": 0,
-                    "beamwidth": 65,
-                    "height": 30,
-                    "pci": 0,
-                    "earfcn": 0,
-                }
+        # 单次to_dict + dict分组
+        flat = df[['_site_id', '_sector_id', '_cell_id']].to_dict('records')
 
-                sites[site_id]["sectors"].append(sector)
+        from collections import defaultdict
+        site_groups = defaultdict(list)
+        for rec in flat:
+            site_groups[rec['_site_id']].append(rec)
 
-            except Exception as e:
-                print(f"[DataService] 解析行失败: {e}")
-                continue
+        # 构建结果
+        result = []
+        for site_id, recs in site_groups.items():
+            sectors = [{
+                "id": rec['_sector_id'],
+                "siteId": site_id,
+                "name": f"Cell_{site_id}_{rec['_cell_id']}",
+                "longitude": 0.0,
+                "latitude": 0.0,
+                "azimuth": 0,
+                "beamwidth": 65,
+                "height": 30,
+                "pci": 0,
+                "earfcn": 0,
+            } for rec in recs]
 
-        return list(sites.values())
+            result.append({
+                "id": site_id,
+                "name": f"Site_{site_id}",
+                "longitude": 0.0,
+                "latitude": 0.0,
+                "networkType": network_type,
+                "sectors": sectors,
+            })
+
+        return result
 
     def _parse_full_params_sheet(
         self, excel_file, sheet_name: str, network_type: str
@@ -1827,26 +1838,23 @@ class DataService:
     def _parse_full_params_dataframe(
         self, df: pd.DataFrame, network_type: str
     ) -> List[Dict]:
-        """解析全量工参DataFrame为站点数据
+        """解析全量工参DataFrame为站点数据 - 向量化版本
 
         使用唯一键进行小区去重:
         - LTE: eNodeB标识 + 小区标识
         - NR: 移动国家码 + 移动网络码 + gNodeB标识 + 小区标识
         """
-        sites = {}
+        import time as _time
+        _t0 = _time.perf_counter()
 
         print(f"[DataService] 解析全量工参DataFrame，网络类型: {network_type}")
 
         # 定义全量工参的列名映射（智能匹配）
         if network_type == "LTE":
-            # LTE工参需要的列名（中文）
             required_columns = {
                 "site_id": [
-                    "eNodeB标识",
-                    "eNodeBID",
-                    "eNodeB ID",
-                    "基站ID",
-                ],  # 移除了'管理网元ID'，避免混淆
+                    "eNodeB标识", "eNodeBID", "eNodeB ID", "基站ID",
+                ],
                 "site_name": ["基站名称"],
                 "longitude": ["基站经度", "经度", "小区经度"],
                 "latitude": ["基站纬度", "纬度", "小区纬度"],
@@ -1856,21 +1864,15 @@ class DataService:
                 "height": ["天线挂高", "挂高"],
                 "pci": ["物理小区识别码", "PCI"],
                 "earfcn": ["下行链路的中心载频", "EARFCN"],
-                # 可选字段
                 "tac": ["跟踪区码", "TAC"],
                 "cell_cover_type": ["小区覆盖类型"],
                 "is_shared": ["是否共享"],
                 "first_group": ["第一分组"],
             }
         else:  # NR
-            # NR工参需要的列名（中文）
             required_columns = {
                 "site_id": [
-                    "gNodeB标识",
-                    "gNodeBID",
-                    "gNodeB ID",
-                    "基站ID",
-                    "管理网元ID",
+                    "gNodeB标识", "gNodeBID", "gNodeB ID", "基站ID", "管理网元ID",
                 ],
                 "site_name": ["基站名称"],
                 "longitude": ["基站经度", "经度", "小区经度"],
@@ -1881,7 +1883,6 @@ class DataService:
                 "height": ["天线挂高", "挂高"],
                 "pci": ["物理小区识别码", "PCI"],
                 "ssb_frequency": ["填写SSB频点", "SSB频点", "SSB Frequency"],
-                # 可选字段
                 "tac": ["跟踪区码", "TAC"],
                 "cell_cover_type": ["小区覆盖类型"],
                 "is_shared": ["是否共享"],
@@ -1890,464 +1891,400 @@ class DataService:
                 "first_group": ["第一分组"],
             }
 
-        # 智能列名匹配函数
-        def find_column(clean_cols, possible_names, column_type=""):
-            """在清理后的列名列表中查找匹配的列，返回列索引"""
-            clean_cols_lower = [str(c).strip().lower() for c in clean_cols]
-            clean_cols_clean = [str(c).strip() for c in clean_cols]
-
-            print(
-                f"[DataService] {network_type}] 查找列: {possible_names}, 可用列: {clean_cols_clean}"
-            )
+        # 智能列名匹配函数（精简打印）
+        def find_column(col_names, possible_names, column_type=""):
+            """在清理后的列名列表中查找匹配的列，返回列名"""
+            col_lower = [str(c).strip().lower() for c in col_names]
+            col_clean = [str(c).strip() for c in col_names]
 
             for possible in possible_names:
-                possible_lower = possible.lower()
-                possible_clean = possible.strip()
-
-                print(
-                    f"[DataService] {network_type}] 尝试匹配: {possible_clean} -> {possible_lower}"
-                )
+                pl = possible.lower()
 
                 # 精确匹配
-                if possible_lower in clean_cols_lower:
-                    index = clean_cols_lower.index(possible_lower)
-                    print(
-                        f"[DataService] {network_type}] 精确匹配成功: {possible_clean} -> {clean_cols_clean[index]}, 索引: {index}"
-                    )
-                    return index
+                if pl in col_lower:
+                    return col_clean[col_lower.index(pl)]
 
                 # 包含匹配
-                for i, (col, col_lower) in enumerate(
-                    zip(clean_cols_clean, clean_cols_lower)
-                ):
-                    if possible_lower in col_lower or col_lower in possible_lower:
-                        print(
-                            f"[DataService] {network_type}] 包含匹配成功: {possible_clean} -> {col}, 索引: {i}"
-                        )
-                        return i
+                for i, cc in enumerate(col_clean):
+                    if pl in col_lower[i] or col_lower[i] in pl:
+                        return cc
 
-                # 对于管理网元ID，尝试更宽松的匹配
+                # 管理网元ID宽松匹配
                 if column_type == "managed_element":
-                    for i, (col, col_lower) in enumerate(
-                        zip(clean_cols_clean, clean_cols_lower)
-                    ):
-                        if (
-                            "网元" in col
-                            or "element" in col_lower
-                            or "managed" in col_lower
-                            or "管理" in col
-                        ):
-                            print(
-                                f"[DataService] {network_type}] 宽松匹配成功: {possible_clean} -> {col}, 索引: {i}"
-                            )
-                            return i
+                    for cc in col_clean:
+                        ccl = cc.lower()
+                        if "网元" in cc or "element" in ccl or "managed" in ccl or "管理" in cc:
+                            return cc
 
-            print(f"[DataService] {network_type}] 未找到匹配列: {possible_names}")
             return None
 
-        # 获取当前DataFrame的列名
         current_columns = list(df.columns)
 
         # 执行列名匹配
         mapped_columns = {}
-        print(f"[DataService] {network_type}] 开始列名匹配，可用列: {current_columns}")
+        print(f"[DataService] {network_type}] 开始列名匹配...")
         for key, possible_names in required_columns.items():
-            found_col_index = find_column(current_columns, possible_names)
-            if found_col_index is not None:
-                # 注意：这里返回的是列索引，而不是列名
-                found_col = current_columns[found_col_index]
+            found_col = find_column(current_columns, possible_names)
+            if found_col is not None:
                 mapped_columns[key] = found_col
-                # 特别关注小区覆盖类型和是否共享列的映射
-                if key in ["cell_cover_type", "is_shared"]:
-                    try:
-                        print(
-                            f"[DataService] {network_type}] 列名映射: {key} -> {found_col}"
-                        )
-                    except UnicodeEncodeError:
-                        safe_col = (
-                            str(found_col).encode("ascii", "replace").decode("ascii")
-                        )
-                        print(
-                            f"[DataService] {network_type}] 列名映射: {key} -> {safe_col}"
-                        )
             else:
-                if key == "cell_cover_type":
-                    print(
-                        f"[DataService] {network_type}] 警告: 未找到列 {key}，尝试匹配: {possible_names}"
-                    )
-                # 只对必需字段输出警告
                 if key in ["site_id", "longitude", "latitude", "sector_id"]:
-                    print(
-                        f"[DataService] 警告: 未找到列 {key}，尝试匹配: {possible_names}"
-                    )
+                    print(f"[DataService] 警告: 未找到列 {key}，可选匹配: {possible_names}")
 
-        # 额外匹配管理网元ID字段
-        # 注意：优先匹配"管理网元ID"和"ManagedElement ID"，避免误匹配到其他列
+        # 额外匹配管理网元ID
         managed_element_columns = [
-            "管理网元ID",
-            "ManagedElement ID",
-            "ManagedElementId",
-            "ManagedElement",
-            "Managed Element",
-            "MEID",
-            "网元ID",  # 放在最后，避免误匹配
+            "管理网元ID", "ManagedElement ID", "ManagedElementId",
+            "ManagedElement", "Managed Element", "MEID", "网元ID",
         ]
-        managed_element_col_index = find_column(
+        managed_element_col = find_column(
             current_columns, managed_element_columns, column_type="managed_element"
         )
-        if managed_element_col_index is not None:
-            managed_element_col = current_columns[managed_element_col_index]
+        if managed_element_col is not None:
             mapped_columns["managed_element_id"] = managed_element_col
-            print(
-                f"[DataService] {network_type}] 找到管理网元ID列: {managed_element_col}"
-            )
+            print(f"[DataService] {network_type}] 找到管理网元ID列: {managed_element_col}")
         else:
-            # 尝试在所有列中查找包含"网元"或"element"的列
-            print(f"[DataService] {network_type}] 尝试手动匹配管理网元ID列...")
-            for i, col in enumerate(current_columns):
-                if (
-                    "网元" in col
-                    or "element" in col.lower()
-                    or "managed" in col.lower()
-                    or "管理" in col
-                ):
+            for col in current_columns:
+                cl = col.lower()
+                if "网元" in col or "element" in cl or "managed" in cl or "管理" in col:
                     mapped_columns["managed_element_id"] = col
                     print(f"[DataService] {network_type}] 手动匹配管理网元ID列: {col}")
                     break
 
         print(f"[DataService] {network_type}] 最终映射结果: {mapped_columns}")
 
-        # 检查必需列是否存在
+        # 检查必需列
         required_keys = ["site_id", "longitude", "latitude", "sector_id"]
         missing_keys = [k for k in required_keys if k not in mapped_columns]
-
         if missing_keys:
             raise ValueError(
                 f"全量工参文件缺少必需的列: {missing_keys}。已找到的列: {list(df.columns)}"
             )
 
-        # 开始解析数据
+        # ========== 向量化处理 ==========
+
+        df = df.copy()
+
+        # 1) 数值字段向量化转换
+        df['_lon'] = pd.to_numeric(df[mapped_columns["longitude"]], errors='coerce').fillna(0.0)
+        df['_lat'] = pd.to_numeric(df[mapped_columns["latitude"]], errors='coerce').fillna(0.0)
+
+        if "azimuth" in mapped_columns:
+            df['_azimuth'] = pd.to_numeric(df[mapped_columns["azimuth"]], errors='coerce').fillna(0.0)
+        else:
+            df['_azimuth'] = 0.0
+
+        if "height" in mapped_columns:
+            df['_height'] = pd.to_numeric(df[mapped_columns["height"]], errors='coerce').fillna(30.0)
+        else:
+            df['_height'] = 30.0
+
+        if "pci" in mapped_columns:
+            df['_pci'] = pd.to_numeric(df[mapped_columns["pci"]], errors='coerce')
+
+        if network_type == "LTE" and "earfcn" in mapped_columns:
+            df['_earfcn'] = pd.to_numeric(df[mapped_columns["earfcn"]], errors='coerce')
+        elif network_type == "NR" and "ssb_frequency" in mapped_columns:
+            df['_ssb_frequency'] = pd.to_numeric(df[mapped_columns["ssb_frequency"]], errors='coerce')
+
+        _t_vecconv = _time.perf_counter()
+
+        # 2) 字符串字段清理
+        site_id_col = mapped_columns["site_id"]
+        df['_site_id_raw'] = df[site_id_col]
+        df['_site_id'] = df[site_id_col].astype(str).str.strip()
+
+        if "site_name" in mapped_columns:
+            df['_site_name'] = df[mapped_columns["site_name"]].astype(str).str.strip()
+        else:
+            df['_site_name'] = "Unknown"
+
+        # 3) 过滤无效行
+        invalid_mask = (
+            df['_site_id'].isin(['', 'nan', 'none', 'NaN', 'None'])
+            | df[site_id_col].isna()
+        )
+        invalid_count = int(invalid_mask.sum())
+        df = df[~invalid_mask].copy()
         parsed_count = 0
-        skipped_count = 0
 
-        for idx, row in df.iterrows():
+        if len(df) == 0:
+            print(f"[DataService] {network_type}] 过滤后无有效数据")
+            print(f"=====================================\n")
+            return []
+
+        # 4) 扇区ID转换（str(int(float(val))) 或 str(val).strip()）
+        def _convert_sector_id(val):
+            if pd.isna(val):
+                return None
             try:
-                # 提取基站ID
-                site_id_raw = row.get(mapped_columns["site_id"])
-                if pd.isna(site_id_raw):
-                    skipped_count += 1
-                    continue
+                return str(int(float(val)))
+            except (ValueError, TypeError):
+                return str(val).strip()
 
-                site_id = str(site_id_raw).strip()
-                if not site_id or site_id.lower() in ["nan", "none", ""]:
-                    skipped_count += 1
-                    continue
+        df['_sector_id'] = df[mapped_columns["sector_id"]].apply(_convert_sector_id)
+        _t_sectorid = _time.perf_counter()
 
-                # 提取基站名称
-                site_name = "Unknown"
-                if "site_name" in mapped_columns:
-                    name_raw = row.get(mapped_columns["site_name"])
-                    if pd.notna(name_raw):
-                        site_name = str(name_raw).strip()
+        # 标记缺失扇区ID的行（后续分配临时唯一ID，避免去重时被误删）
+        df['_sector_id_missing'] = df['_sector_id'].isna()
+        missing_mask = df['_sector_id_missing']
+        if missing_mask.any():
+            df.loc[missing_mask, '_sector_id'] = df[missing_mask].index.astype(str).map(lambda x: f'__MISSING_{x}__')
 
-                # 提取经纬度
-                longitude = 0.0
-                latitude = 0.0
-                lon_col = mapped_columns["longitude"]
-                lat_col = mapped_columns["latitude"]
+        # 5) 从列中提取有效的小区名称（仅当列存在且值有效时）
+        if "sector_name" in mapped_columns:
+            sname_col = mapped_columns["sector_name"]
+            valid_mask = (
+                df[sname_col].notna()
+                & ~df[sname_col].astype(str).str.strip().isin(['', '非必填', 'nan', 'None'])
+            )
+            df['_sector_name_col'] = df[sname_col].astype(str).str.strip().where(valid_mask)
+        else:
+            df['_sector_name_col'] = pd.NA
 
-                if pd.notna(row.get(lon_col)):
-                    try:
-                        longitude = float(row[lon_col])
-                    except:
-                        pass
+        # 6) 构建唯一键用于去重
+        if network_type == "LTE":
+            df['_unique_key'] = df['_site_id'] + '_' + df['_sector_id']
+        else:
+            if "mcc" in mapped_columns:
+                df['_mcc'] = df[mapped_columns["mcc"]].astype(str).str.strip()
+            else:
+                df['_mcc'] = ''
+            if "mnc" in mapped_columns:
+                df['_mnc'] = df[mapped_columns["mnc"]].astype(str).str.strip()
+            else:
+                df['_mnc'] = ''
+            df['_unique_key'] = df['_mcc'] + '_' + df['_mnc'] + '_' + df['_site_id'] + '_' + df['_sector_id']
 
-                if pd.notna(row.get(lat_col)):
-                    try:
-                        latitude = float(row[lat_col])
-                    except:
-                        pass
+        total_before_dedup = len(df)
+        df = df.drop_duplicates(subset='_unique_key', keep='last')
+        dup_count = total_before_dedup - len(df)
+        _t_dedup = _time.perf_counter()
 
-                # 移除经纬度为0的过滤条件 - 只使用唯一键去重统计小区数
+        # 7) 管理网元ID处理函数
+        def _extract_me_id(val):
+            """处理管理网元ID，将数值转换为整数"""
+            if pd.isna(val):
+                return None
+            val_str = str(val).strip()
+            if not val_str or val_str.lower() in ["nan", "none", ""]:
+                return None
+            try:
+                me_id_float = float(val_str)
+                if me_id_float.is_integer():
+                    return str(int(me_id_float))
+            except (ValueError, TypeError):
+                pass
+            return val_str
 
-                # 创建或获取站点（使用字典存储sectors，以唯一键为key实现去重）
-                if site_id not in sites:
-                    site_data = {
-                        "id": site_id,
-                        "name": site_name,
-                        "longitude": longitude,
-                        "latitude": latitude,
-                        "networkType": network_type,
-                        "sectors": {},  # 改为字典，key为唯一键，value为sector对象
-                    }
+        # ========== 向量化计算所有剩余扇区字段 + 单次to_dict ==========
 
-                    # 提取管理网元ID（所有网络类型）
-                    if "managed_element_id" in mapped_columns:
-                        me_col = mapped_columns["managed_element_id"]
-                        try:
-                            # 直接访问列值，因为row是pandas Series对象
-                            managed_element_id = row[me_col]
-                            if pd.notna(managed_element_id):
-                                managed_element_id_str = str(managed_element_id).strip()
-                                if (
-                                    managed_element_id_str
-                                    and managed_element_id_str.lower()
-                                    not in ["nan", "none", ""]
-                                ):
-                                    # 处理数值类型的管理网元ID，转换为整数
-                                    try:
-                                        # 尝试转换为float，再转为int，最后转为字符串
-                                        me_id_float = float(managed_element_id_str)
-                                        if me_id_float.is_integer():
-                                            managed_element_id_str = str(
-                                                int(me_id_float)
-                                            )
-                                    except (ValueError, TypeError):
-                                        # 如果转换失败，保持原字符串
-                                        pass
-                                    site_data["managedElementId"] = (
-                                        managed_element_id_str
-                                    )
-                                    print(
-                                        f"[DataService] {network_type}] 站点 {site_id} 的管理网元ID: {managed_element_id_str}"
-                                    )
-                                else:
-                                    print(
-                                        f"[DataService] {network_type}] 站点 {site_id} 的管理网元ID为空或无效: {managed_element_id}"
-                                    )
-                            else:
-                                print(
-                                    f"[DataService] {network_type}] 站点 {site_id} 的管理网元ID为NaN"
-                                )
-                        except KeyError:
-                            print(
-                                f"[DataService] {network_type}] 站点 {site_id} 找不到列: {me_col}"
-                            )
-                        except Exception as e:
-                            print(
-                                f"[DataService] {network_type}] 站点 {site_id} 提取管理网元ID失败: {e}"
-                            )
-                    else:
-                        print(
-                            f"[DataService] {network_type}] 站点 {site_id} 没有映射的管理网元ID列"
-                        )
+        # 8) 字符串类型字段向量化处理
+        df['_is_shared'] = None
+        if "is_shared" in mapped_columns:
+            col = mapped_columns["is_shared"]
+            valid = df[col].notna() & ~df[col].astype(str).str.strip().isin(['', 'nan', 'None'])
+            df.loc[valid, '_is_shared'] = df.loc[valid, col].astype(str).str.strip()
 
-                    sites[site_id] = site_data
+        df['_first_group'] = None
+        if "first_group" in mapped_columns:
+            col = mapped_columns["first_group"]
+            valid = df[col].notna() & ~df[col].astype(str).str.strip().isin(['', 'nan', 'None'])
+            df.loc[valid, '_first_group'] = df.loc[valid, col].astype(str).str.strip()
 
-                # 提取小区信息
-                sector_id_raw = row.get(mapped_columns["sector_id"])
-                if pd.notna(sector_id_raw):
-                    try:
-                        sector_id = str(int(float(sector_id_raw)))
-                    except:
-                        sector_id = str(sector_id_raw).strip()
-                else:
-                    # 获取当前sectors字典的大小作为默认ID
-                    sector_id = f"{site_id}_{len(sites[site_id]['sectors'])}"
+        # 9) TAC字段处理（数值转换）
+        df['_tac'] = None
+        if "tac" in mapped_columns:
+            tac_col = mapped_columns["tac"]
+            tac_num = pd.to_numeric(df[tac_col], errors='coerce')
+            numeric_mask = tac_num.notna()
+            df.loc[numeric_mask, '_tac'] = tac_num.loc[numeric_mask].astype(int)
+            non_num_non_null = df[tac_col].notna() & ~numeric_mask
+            df.loc[non_num_non_null, '_tac'] = df.loc[non_num_non_null, tac_col].astype(str).str.strip()
+
+        # 10) 小区覆盖类型
+        df['_cct'] = 1
+        if "cell_cover_type" in mapped_columns:
+            cct_col = mapped_columns["cell_cover_type"]
+            cct_num = pd.to_numeric(df[cct_col], errors='coerce')
+            cct_valid = cct_num.notna()
+            df.loc[cct_valid, '_cct'] = cct_num.loc[cct_valid].astype(int)
+
+        # 11) 管理网元ID原值
+        if "managed_element_id" in mapped_columns:
+            df['_me_id'] = df[mapped_columns["managed_element_id"]]
+
+        _t_extra = _time.perf_counter()
+
+        # 12) 单次to_dict + dict分组（完全消除iterrows的Series创建开销）
+        from collections import defaultdict
+
+        # 选取输出列
+        record_cols = [
+            '_site_id', '_site_name', '_sector_id', '_sector_id_missing',
+            '_sector_name_col', '_lon', '_lat', '_azimuth', '_height',
+            '_pci', '_is_shared', '_first_group', '_tac', '_cct',
+        ]
+        if network_type == "LTE":
+            df['_frequency'] = df['_earfcn'] if '_earfcn' in df.columns else None
+            record_cols.append('_frequency')
+        else:  # NR
+            df['_frequency'] = df['_ssb_frequency'] if '_ssb_frequency' in df.columns else None
+            record_cols.extend(['_mcc', '_mnc', '_frequency'])
+        if '_me_id' in df.columns:
+            record_cols.append('_me_id')
+
+        # 单次to_dict（完全消除iterrows)
+        flat_records = df[record_cols].to_dict('records')
+        _t_todict = _time.perf_counter()
+
+        # 按site_id分组（O(n)一遍扫描）
+        site_groups = defaultdict(list)
+        for rec in flat_records:
+            site_groups[rec['_site_id']].append(rec)
+
+        # 构建结果
+        result = []
+        for site_id, records in site_groups.items():
+            first = records[0]
+
+            # 站点级数据
+            site_data = {
+                "id": site_id,
+                "name": first['_site_name'] if first['_site_name'] not in ['', 'nan', 'none'] else "Unknown",
+                "longitude": float(first['_lon']),
+                "latitude": float(first['_lat']),
+                "networkType": network_type,
+                "sectors": [],
+            }
+
+            # 管理网元ID
+            me_val = first.get('_me_id')
+            if me_val is not None and pd.notna(me_val):
+                me_id = _extract_me_id(me_val)
+                if me_id is not None:
+                    site_data["managedElementId"] = me_id
+
+            # 扇区级数据
+            sectors = []
+            for n, rec in enumerate(records):
+                sector_id = rec['_sector_id']
+                if rec['_sector_id_missing']:
+                    sector_id = f"{site_id}_{n}"
 
                 # 小区名称
-                sector_name = f"{site_name}_{sector_id}"
-                if "sector_name" in mapped_columns:
-                    sname_raw = row.get(mapped_columns["sector_name"])
-                    if pd.notna(sname_raw):
-                        sname_str = str(sname_raw).strip()
-                        if sname_str and sname_str not in ["非必填", "nan", "None"]:
-                            sector_name = sname_str
+                col_name = rec.get('_sector_name_col')
+                sector_name = str(col_name).strip() if pd.notna(col_name) else f"{first['_site_name']}_{sector_id}"
 
-                # 方位角
-                azimuth = 0.0
-                if "azimuth" in mapped_columns:
-                    az_raw = row.get(mapped_columns["azimuth"])
-                    if pd.notna(az_raw):
-                        try:
-                            azimuth = float(az_raw)
-                        except:
-                            pass
-
-                # 天线高度
-                height = 30.0
-                if "height" in mapped_columns:
-                    h_raw = row.get(mapped_columns["height"])
-                    if pd.notna(h_raw):
-                        try:
-                            height = float(h_raw)
-                        except:
-                            pass
-
-                # 构建小区数据
                 sector = {
                     "id": sector_id,
                     "siteId": site_id,
                     "name": sector_name,
-                    "longitude": longitude,
-                    "latitude": latitude,
-                    "azimuth": azimuth,
+                    "longitude": float(rec['_lon']),
+                    "latitude": float(rec['_lat']),
+                    "azimuth": float(rec['_azimuth']),
                     "beamwidth": 65.0,
-                    "height": height,
+                    "height": float(rec['_height']),
                 }
 
-                # 可选字段：PCI
-                if "pci" in mapped_columns:
-                    pci_raw = row.get(mapped_columns["pci"])
-                    if pd.notna(pci_raw):
-                        try:
-                            pci_val = int(float(pci_raw))
-                            # PCI值范围是0-503，包括0
-                            sector["pci"] = pci_val
-                        except Exception as e:
-                            print(f"[DataService] 解析PCI失败: {pci_raw}, 错误: {e}")
-                            sector["pci"] = str(pci_raw).strip()
-                # 确保pci字段始终存在，即使值为None
-                if "pci" not in sector:
+                # PCI
+                pci_v = rec.get('_pci')
+                if pd.notna(pci_v):
+                    try:
+                        sector["pci"] = int(float(pci_v))
+                    except:
+                        sector["pci"] = str(pci_v)
+                else:
                     sector["pci"] = None
 
-                # 可选字段：是否共享
-                if "is_shared" in mapped_columns:
-                    is_shared_raw = row.get(mapped_columns["is_shared"])
-                    if pd.notna(is_shared_raw):
-                        sector["is_shared"] = str(is_shared_raw).strip()
-                # 确保is_shared字段始终存在，即使值为None
-                if "is_shared" not in sector:
+                # is_shared
+                isv = rec.get('_is_shared')
+                if isv is not None:
+                    sector["is_shared"] = str(isv).strip()
+                else:
                     sector["is_shared"] = None
 
-                # 可选字段：第一分组
-                if "first_group" in mapped_columns:
-                    first_group_raw = row.get(mapped_columns["first_group"])
-                    if pd.notna(first_group_raw):
-                        sector["first_group"] = str(first_group_raw).strip()
-                # 确保first_group字段始终存在，即使值为None
-                if "first_group" not in sector:
+                # first_group
+                fgv = rec.get('_first_group')
+                if fgv is not None:
+                    sector["first_group"] = str(fgv).strip()
+                else:
                     sector["first_group"] = None
 
-                # 可选字段：TAC（跟踪区码）
-                if "tac" in mapped_columns:
-                    tac_raw = row.get(mapped_columns["tac"])
-                    if pd.notna(tac_raw):
-                        try:
-                            # 尝试直接转换为整数
-                            if isinstance(tac_raw, (int, float)):
-                                tac_val = int(tac_raw)
-                            else:
-                                # 尝试从字符串转换
-                                tac_val = int(float(str(tac_raw).strip()))
-                            sector["tac"] = tac_val
-                        except Exception as e:
-                            # 记录错误并继续，使用原始值
-                            print(f"[DataService] 解析TAC失败: {tac_raw}, 错误: {e}")
-                            sector["tac"] = str(tac_raw).strip()
-                # 确保tac字段始终存在，即使值为None
-                if "tac" not in sector:
+                # TAC
+                tac_v = rec.get('_tac')
+                if tac_v is not None:
+                    if isinstance(tac_v, (int, float)):
+                        sector["tac"] = int(tac_v)
+                    else:
+                        sector["tac"] = str(tac_v).strip()
+                else:
                     sector["tac"] = None
 
-                # 可选字段：EARFCN（LTE）或SSB频点（NR），并添加统一的下行频点字段
-                if network_type == "LTE" and "earfcn" in mapped_columns:
-                    earfcn_raw = row.get(mapped_columns["earfcn"])
-                    if pd.notna(earfcn_raw):
-                        try:
-                            earfcn_val = float(earfcn_raw)
-                            sector["earfcn"] = earfcn_val
-                            sector["frequency"] = earfcn_val  # 添加统一的下行频点字段
-                        except Exception as e:
-                            print(
-                                f"[DataService] 解析LTE频点失败: {earfcn_raw}, 错误: {e}"
-                            )
-                            # 使用原始值
-                            sector["earfcn"] = str(earfcn_raw).strip()
-                            sector["frequency"] = str(earfcn_raw).strip()
-                elif network_type == "NR" and "ssb_frequency" in mapped_columns:
-                    ssb_raw = row.get(mapped_columns["ssb_frequency"])
-                    if pd.notna(ssb_raw):
-                        try:
-                            ssb_val = float(ssb_raw)
-                            sector["ssb_frequency"] = ssb_val
-                            sector["frequency"] = ssb_val  # 添加统一的下行频点字段
-                        except Exception as e:
-                            # 处理字符串格式的SSB频点，如"900-955"
-                            print(
-                                f"[DataService] 解析NR SSB频点失败: {ssb_raw}, 错误: {e}"
-                            )
-                            ssb_str = str(ssb_raw).strip()
-                            sector["ssb_frequency"] = ssb_str
-                            sector["frequency"] = ssb_str  # 添加统一的下行频点字段
-                # 确保frequency字段始终存在，即使值为None
-                if "frequency" not in sector:
+                # EARFCN / SSB频点
+                freq = rec.get('_frequency')
+                if pd.notna(freq):
+                    try:
+                        fv = float(freq)
+                        if network_type == "LTE":
+                            sector["earfcn"] = fv
+                        else:
+                            sector["ssb_frequency"] = fv
+                        sector["frequency"] = fv
+                    except:
+                        sv = str(freq).strip()
+                        if network_type == "LTE":
+                            sector["earfcn"] = sv
+                        else:
+                            sector["ssb_frequency"] = sv
+                        sector["frequency"] = sv
+                else:
                     sector["frequency"] = None
 
-                # 可选字段：小区覆盖类型
-                # 1=室外小区（扇形，半径60米，夹角40度，按方向角绘制）
-                # 4=室内小区（圆形，半径30米，不考虑方向角）
-                if "cell_cover_type" in mapped_columns:
-                    cover_type_raw = row.get(mapped_columns["cell_cover_type"])
-                    if pd.notna(cover_type_raw):
-                        try:
-                            cover_type_val = int(float(cover_type_raw))
-                            sector["cell_cover_type"] = cover_type_val
-                            # 调试日志：记录室内小区
-                            if cover_type_val == 4 and network_type == "NR":
-                                print(
-                                    f"[DataService] NR室内小区: {sector.get('sector_name')} cell_cover_type=4"
-                                )
-                        except:
-                            # 默认为室外小区
-                            sector["cell_cover_type"] = 1
-                    else:
-                        sector["cell_cover_type"] = 1  # 默认室外
-                else:
-                    sector["cell_cover_type"] = 1  # 默认室外
-                    if network_type == "NR":
-                        print(
-                            f"[DataService] NR未找到小区覆盖类型列，使用默认值1: {sector.get('sector_name')}"
-                        )
+                # 小区覆盖类型
+                cct = rec.get('_cct', 1)
+                sector["cell_cover_type"] = int(cct)
+                if cct == 4 and network_type == "NR":
+                    print(f"[DataService] NR室内小区: {sector.get('name')} cell_cover_type=4")
+                if "cell_cover_type" not in mapped_columns and network_type == "NR":
+                    print(f"[DataService] NR未找到小区覆盖类型列，使用默认值1: {sector.get('name')}")
 
-                # 生成小区唯一键用于去重
-                # LTE: site_id + sector_id
-                # NR: mcc + mnc + site_id + sector_id
-                if network_type == "LTE":
-                    sector_unique_key = f"{site_id}_{sector_id}"
-                else:  # NR
-                    # 尝试获取MCC和MNC
-                    mcc = ""
-                    mnc = ""
-                    if "mcc" in mapped_columns:
-                        mcc_raw = row.get(mapped_columns["mcc"])
-                        if pd.notna(mcc_raw):
-                            mcc = str(mcc_raw).strip()
-                            sector["mcc"] = mcc  # 添加到sector对象
-                    if "mnc" in mapped_columns:
-                        mnc_raw = row.get(mapped_columns["mnc"])
-                        if pd.notna(mnc_raw):
-                            mnc = str(mnc_raw).strip()
-                            sector["mnc"] = mnc  # 添加到sector对象
-                    sector_unique_key = f"{mcc}_{mnc}_{site_id}_{sector_id}"
+                # NR MCC/MNC
+                if network_type == "NR":
+                    if pd.notna(rec.get('_mcc')) and str(rec.get('_mcc', '')).strip():
+                        sector["mcc"] = str(rec['_mcc']).strip()
+                    if pd.notna(rec.get('_mnc')) and str(rec.get('_mnc', '')).strip():
+                        sector["mnc"] = str(rec['_mnc']).strip()
 
-                # 使用唯一键存储sector，自动去重（后面的数据覆盖前面的）
-                sites[site_id]["sectors"][sector_unique_key] = sector
+                sectors.append(sector)
                 parsed_count += 1
 
-            except Exception as e:
-                print(f"[DataService] 解析第{idx}行数据失败: {e}")
-                skipped_count += 1
-                continue
-
-        # 将sectors字典转换为列表，保持向后兼容
-        result = []
-        unique_sector_count = 0
-        for site_data in sites.values():
-            # 将sectors从字典转换为列表
-            site_data["sectors"] = list(site_data["sectors"].values())
+            site_data["sectors"] = sectors
             result.append(site_data)
-            unique_sector_count += len(site_data["sectors"])
+
+        _t_groupby = _time.perf_counter()
 
         print(f"\n[DataService] ===== 全量工参解析完成 =====")
         print(f"  共解析: {len(result)} 个基站")
-        print(f"  唯一小区数: {unique_sector_count} 个 (去重后)")
-        print(f"  处理总行数: {parsed_count} 行")
-        print(f"  跳过无效行: {skipped_count} 行")
+        print(f"  唯一小区数: {parsed_count} 个")
+        print(f"  处理总行数: {total_before_dedup} 行")
+        print(f"  去重重叠: {dup_count} 行")
+        if invalid_count > 0:
+            print(f"  过滤无效行: {invalid_count} 行")
         for site in result[:5]:
             print(f"  站点 {site['id']}: {len(site['sectors'])} 个小区")
         if len(result) > 5:
             print(f"  ... (还有 {len(result) - 5} 个站点)")
         print(f"=====================================\n")
+
+        # 打印DF解析各阶段耗时
+        print(f"[DATA_TIMING] DataFrame解析阶段耗时 ({network_type}):")
+        print(f"  向量化转换:    {_t_vecconv - _t0:.3f}s")
+        print(f"  SectorID转换:  {_t_sectorid - _t_vecconv:.3f}s")
+        print(f"  去重+构建:     {_t_dedup - _t_sectorid:.3f}s")
+        print(f"  额外字段计算:  {_t_extra - _t_dedup:.3f}s")
+        print(f"  to_dict+分组:  {_t_todict - _t_extra:.3f}s")
+        print(f"  后处理+构建:   {_t_groupby - _t_todict:.3f}s")
+        print(f"  合计:          {_time.perf_counter() - _t0:.3f}s")
 
         return result
 

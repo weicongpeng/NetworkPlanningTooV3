@@ -45,6 +45,7 @@ export interface NaviStateSnapshot {
   heading: number | null;  // 设备朝向角度
   prevStepEndIndex: number;  // flatPolyline 中当前步结束点索引
   remainingDistance: number;
+  remainingDuration: number;  // 基于实时速度和剩余距离计算的预计剩余时间（秒）
   elapsedSec: number;
   destLat: number;
   destLng: number;
@@ -80,6 +81,14 @@ let _autoHideTimer: ReturnType<typeof setTimeout> | null = null;
 let _cachedPosition: { lat: number; lng: number; timestamp: number } | null = null;
 const POSITION_CACHE_TTL = 5 * 60 * 1000; // 5分钟
 
+/** AMap 定位回调（由 UI 层通过 MapViewRef 注册） */
+let _amapPositionGetter: (() => Promise<{ lat: number; lng: number; accuracy: number; source: string } | null>) | null = null;
+
+/** 注册 AMap 定位回调 */
+export function setAmapPositionGetter(getter: typeof _amapPositionGetter): void {
+  _amapPositionGetter = getter;
+}
+
 // 已说过的靠近提醒（防止重复）
 let _approachingSpoken: Set<number> = new Set();
 
@@ -88,6 +97,22 @@ let _lastDeviateCheckTime = 0;
 let _deviateAlertGiven = false;
 let _routeStartIdx = 0;
 let _isRerouting = false;
+
+// 实时速度计算状态（用于估算剩余时间）
+interface PositionRecord {
+  lat: number;
+  lng: number;
+  timestamp: number;
+}
+let _positionHistory: PositionRecord[] = [];  // 最近的位置记录
+let _lastSpeedCalcTime = 0;
+let _currentSpeed = 0;  // 当前估算速度（米/秒）
+let _remainingDuration = 0;  // 预计剩余时间（秒）
+const SPEED_CALC_INTERVAL = 5000;  // 5秒计算一次速度
+const SPEED_HISTORY_MAX_AGE = 30000;  // 只使用30秒内的位置记录
+const MIN_SPEED_WALK = 1.0;   // 步行最低速度（m/s）
+const MIN_SPEED_BICYCLE = 3.0;  // 骑行最低速度（m/s）
+const MIN_SPEED_DRIVE = 5.0;  // 驾车最低速度（m/s）
 
 // 路线缓存（避免重复规划）
 const _routeCache = new Map<string, { data: RouteData; timestamp: number }>();
@@ -126,6 +151,9 @@ export function resetNavUiAutoHide(): void {
 }
 
 function notify() {
+  // 更新速度和剩余时间
+  updateSpeedAndRemainingTime();
+
   const snapshot: NaviStateSnapshot = {
     isNavigating: _isNavigating,
     currentStepIndex: _currentStepIndex,
@@ -135,6 +163,7 @@ function notify() {
       ? _routeData.steps.slice(0, _currentStepIndex + 1).reduce((sum, s) => sum + s.polyline.length, 0) - 1
       : 0,
     remainingDistance: calcRemainingDistance(),
+    remainingDuration: _remainingDuration,
     elapsedSec: _elapsedSec,
     destLat: _destLat,
     destLng: _destLng,
@@ -167,20 +196,18 @@ function getCurrentPositionWithTimeout(
 }
 
 /**
- * 获取当前位置（WGS84），多级快速定位策略
+ * 获取当前位置（GCJ-02），多级快速定位策略
  * 
- * 定位策略（Android）：
+ * 定位策略（中国大陆）：
  * 1. 5分钟内缓存（最快）
- * 2. 系统最后已知位置（读取缓存，支持WiFi/基站/GPS）
- * 3. 启用网络定位服务（WiFi/基站定位，适合室内）
- * 4. Lowest精度实时定位（≤10秒）
- * 5. Balanced精度实时定位（≤15秒）
- * 6. High精度实时定位（≤20秒，GPS）
- * 7. 过期缓存兜底（1分钟内）
+ * 2. AMap 高德定位（WiFi/基站/GPS，适合中国大陆，返回 GCJ-02）
+ * 3. 系统最后已知位置（读取缓存）
+ * 4. 启用网络定位服务 + 实时定位（expo-location 备用）
+ * 5. 过期缓存兜底（1分钟内）
  * 
- * 定位策略（iOS）：
- * iOS 不区分精度等级，系统总是使用最佳可用位置源
- * 室内主要依赖 WiFi 定位和网络位置缓存
+ * 注意：在中国大陆，Google Play Services 不可用，
+ * expo-location 的网络定位会失败。AMap 定位使用高德服务器，
+ * 通过 WiFi/基站三角测量，是最佳方案。
  */
 export async function getCurrentPosition(): Promise<{ lat: number; lng: number } | null> {
   console.log('[NaviService] getCurrentPosition: 开始获取位置');
@@ -207,32 +234,49 @@ export async function getCurrentPosition(): Promise<{ lat: number; lng: number }
       console.log('[NaviService] getCurrentPosition: 网络定位服务已启用');
     } catch (e: any) {
       console.log('[NaviService] getCurrentPosition: 网络定位服务启用失败:', e.message);
-      // 继续尝试定位，不阻断流程
     }
   }
 
-  // 4. 首先尝试 getLastKnownPosition（最快，读取系统缓存，支持WiFi/基站/GPS）
+  // 4. 优先尝试 AMap 高德定位（中国大陆最佳方案）
+  if (_amapPositionGetter) {
+    try {
+      console.log('[NaviService] getCurrentPosition: 尝试 AMap 高德定位...');
+      const amapPos = await _amapPositionGetter();
+      if (amapPos) {
+        _cachedPosition = { lat: amapPos.lat, lng: amapPos.lng, timestamp: Date.now() };
+        console.log(`[NaviService] getCurrentPosition: AMap定位成功 [${amapPos.lat.toFixed(6)}, ${amapPos.lng.toFixed(6)}], 精度=${Math.round(amapPos.accuracy)}m, 来源=${amapPos.source}`);
+        return { lat: amapPos.lat, lng: amapPos.lng };
+      }
+      console.log('[NaviService] getCurrentPosition: AMap定位返回空结果');
+    } catch (e: any) {
+      console.log('[NaviService] getCurrentPosition: AMap定位失败:', e.message);
+      // 继续尝试备用方案
+    }
+  } else {
+    console.log('[NaviService] getCurrentPosition: AMap定位回调未注册，跳过');
+  }
+
+  // 5. 备用：尝试 getLastKnownPosition（系统缓存）
   try {
-    console.log('[NaviService] getCurrentPosition: 尝试获取最后已知位置...');
+    console.log('[NaviService] getCurrentPosition: 尝试获取系统最后已知位置...');
     const lastPos = await Location.getLastKnownPositionAsync({});
     if (lastPos && lastPos.coords) {
       const age = Date.now() - lastPos.timestamp;
       if (age < 5 * 60 * 1000) {
         const result = { lat: lastPos.coords.latitude, lng: lastPos.coords.longitude };
         _cachedPosition = { ...result, timestamp: Date.now() };
-        console.log(`[NaviService] getCurrentPosition: 使用最后已知位置(缓存${Math.round(age / 1000)}秒)`);
+        console.log(`[NaviService] getCurrentPosition: 使用系统缓存位置(${Math.round(age / 1000)}秒前)`);
         return result;
       }
-      console.log(`[NaviService] getCurrentPosition: 最后已知位置已过时(${Math.round(age / 1000)}秒)`);
+      console.log(`[NaviService] getCurrentPosition: 系统缓存已过时(${Math.round(age / 1000)}秒)`);
     } else {
-      console.log('[NaviService] getCurrentPosition: 无最后已知位置');
+      console.log('[NaviService] getCurrentPosition: 无系统缓存位置');
     }
   } catch (e: any) {
     console.log('[NaviService] getCurrentPosition: getLastKnownPosition不可用:', e.message);
   }
 
-  // 5. 尝试获取实时定位，逐步提高精度和超时时间
-  // 注意：室内定位可能需要更长时间获取 WiFi/基站信号
+  // 6. 备用：尝试实时定位（expo-location）
   const strategies = [
     { accuracy: Location.Accuracy.Lowest, timeout: 10000, label: 'Lowest(WiFi/基站)' },
     { accuracy: Location.Accuracy.Balanced, timeout: 15000, label: 'Balanced(混合)' },
@@ -241,25 +285,42 @@ export async function getCurrentPosition(): Promise<{ lat: number; lng: number }
 
   for (const strategy of strategies) {
     try {
-      console.log(`[NaviService] getCurrentPosition: 尝试${strategy.label}定位(${strategy.timeout / 1000}秒超时)...`);
+      console.log(`[NaviService] getCurrentPosition: 尝试${strategy.label}(${strategy.timeout / 1000}秒超时)...`);
       const pos = await getCurrentPositionWithTimeout(
         { accuracy: strategy.accuracy },
         strategy.timeout,
       );
       const result = { lat: pos.coords.latitude, lng: pos.coords.longitude };
       _cachedPosition = { ...result, timestamp: Date.now() };
-      console.log(`[NaviService] getCurrentPosition: ${strategy.label}定位成功`);
+      console.log(`[NaviService] getCurrentPosition: ${strategy.label}成功`);
       return result;
     } catch (e: any) {
-      console.log(`[NaviService] getCurrentPosition: ${strategy.label}定位失败:`, e.message);
-      // 继续尝试下一个策略
+      console.log(`[NaviService] getCurrentPosition: ${strategy.label}失败:`, e.message);
     }
   }
 
-  // 6. 兜底：返回过期缓存（1分钟内）
+  // 7. 兜底：过期缓存（1分钟内）
   if (_cachedPosition && Date.now() - _cachedPosition.timestamp < 60000) {
-    console.log('[NaviService] getCurrentPosition: 使用过期缓存兜底(1分钟内)');
+    console.log('[NaviService] getCurrentPosition: 使用过期缓存兜底');
     return { lat: _cachedPosition.lat, lng: _cachedPosition.lng };
+  }
+
+  // 8. 最终兜底：高德 IP 定位（无 GPS/无网络定位时的城市级定位）
+  try {
+    console.log('[NaviService] getCurrentPosition: 尝试 IP 定位（城市级精度）...');
+    const currentApiUrl = await getEffectiveApiUrl();
+    const res = await axios.get(`${currentApiUrl}/map/ip-location`, { timeout: 10000 });
+    const ipResult = res.data;
+    if (ipResult && ipResult.success && ipResult.data) {
+      const { lat, lng, source, city } = ipResult.data;
+      const ipPos = { lat, lng };
+      _cachedPosition = { ...ipPos, timestamp: Date.now() };
+      console.log(`[NaviService] getCurrentPosition: IP定位成功 [${lat}, ${lng}], 来源=${source}, 城市=${city}`);
+      return ipPos;
+    }
+    console.log('[NaviService] getCurrentPosition: IP定位失败 -', ipResult?.error || '未知');
+  } catch (e: any) {
+    console.log('[NaviService] getCurrentPosition: IP定位异常 -', e.message);
   }
 
   console.error('[NaviService] getCurrentPosition: 所有定位方式均失败');
@@ -412,6 +473,7 @@ export async function startNavigation(
   }
 
   _currentPosition = [origin.lat, origin.lng];
+  _currentPositionGcj = wgs84ToGcj02(origin.lat, origin.lng);
   _destLat = destWgs.lat;
   _destLng = destWgs.lng;
   _destName = name;
@@ -485,6 +547,11 @@ export function stopNavigation(): void {
   _currentStepIndex = 0;
   _currentPosition = null;
   _currentPositionGcj = null;
+  // 重置速度计算状态
+  _positionHistory = [];
+  _lastSpeedCalcTime = 0;
+  _currentSpeed = 0;
+  _remainingDuration = 0;
   Speech.stop();
   notify();
 }
@@ -578,6 +645,101 @@ function calcRemainingDistance(): number {
     remaining += haversine(flat[i][1], flat[i][0], flat[i + 1][1], flat[i + 1][0]);
   }
   return remaining;
+}
+
+/** 计算当前速度（米/秒），基于最近的位置记录 */
+function calculateCurrentSpeed(): number {
+  const now = Date.now();
+
+  // 清理过期的位置记录
+  _positionHistory = _positionHistory.filter(
+    (p) => now - p.timestamp <= SPEED_HISTORY_MAX_AGE
+  );
+
+  if (_positionHistory.length < 2) {
+    return 0;
+  }
+
+  // 计算总位移和时间
+  let totalDistance = 0;
+  let totalTime = 0;
+
+  for (let i = 1; i < _positionHistory.length; i++) {
+    const prev = _positionHistory[i - 1];
+    const curr = _positionHistory[i];
+    const dist = haversine(prev.lat, prev.lng, curr.lat, curr.lng);
+    const time = (curr.timestamp - prev.timestamp) / 1000;
+    if (time > 0) {
+      totalDistance += dist;
+      totalTime += time;
+    }
+  }
+
+  if (totalTime <= 0) return 0;
+
+  // 计算平均速度
+  const avgSpeed = totalDistance / totalTime;
+
+  // 根据导航模式设置最低速度（避免静止时剩余时间无限大）
+  const minSpeed = _mode === 'walk' ? MIN_SPEED_WALK
+    : _mode === 'bicycling' ? MIN_SPEED_BICYCLE
+      : MIN_SPEED_DRIVE;
+
+  // 如果速度低于最低速度，使用最低速度（表示用户可能在等待或慢行）
+  return Math.max(avgSpeed, minSpeed * 0.3);
+}
+
+/** 更新速度和剩余时间估算（每5秒调用一次） */
+function updateSpeedAndRemainingTime() {
+  const now = Date.now();
+
+  // 记录当前位置（避免重复记录相同位置）
+  if (_currentPosition) {
+    const lastRecord = _positionHistory[_positionHistory.length - 1];
+    if (!lastRecord ||
+        lastRecord.lat !== _currentPosition[0] ||
+        lastRecord.lng !== _currentPosition[1]) {
+      _positionHistory.push({
+        lat: _currentPosition[0],
+        lng: _currentPosition[1],
+        timestamp: now,
+      });
+    }
+  }
+
+  // 每5秒计算一次速度
+  if (now - _lastSpeedCalcTime < SPEED_CALC_INTERVAL) {
+    return;
+  }
+  _lastSpeedCalcTime = now;
+
+  // 清理过期的位置记录
+  _positionHistory = _positionHistory.filter(
+    (p) => now - p.timestamp <= SPEED_HISTORY_MAX_AGE
+  );
+
+  // 计算当前速度
+  _currentSpeed = calculateCurrentSpeed();
+
+  // 计算剩余距离
+  const remainingDist = calcRemainingDistance();
+
+  // 计算预计剩余时间
+  if (_currentSpeed > 0 && remainingDist > 0) {
+    _remainingDuration = Math.round(remainingDist / _currentSpeed);
+  } else if (remainingDist > 0) {
+    // 无法计算速度时，使用原始路线的平均速度估算
+    if (_routeData && _routeData.totalDuration > 0 && _routeData.totalDistance > 0) {
+      const avgRouteSpeed = _routeData.totalDistance / _routeData.totalDuration;
+      _remainingDuration = Math.round(remainingDist / avgRouteSpeed);
+    } else {
+      _remainingDuration = 0;
+    }
+  } else {
+    _remainingDuration = 0;
+  }
+
+  console.log(`[NaviService] 速度更新: ${_currentSpeed.toFixed(2)}m/s, 剩余距离: ${Math.round(remainingDist)}m, 预计剩余: ${_remainingDuration}s`);
 }
 
 function findNearestPointOnPolyline(lat: number, lng: number, polyline: [number, number][]): number {
@@ -808,6 +970,7 @@ export function getNaviState(): NaviStateSnapshot {
       ? _routeData.steps.slice(0, _currentStepIndex + 1).reduce((sum, s) => sum + s.polyline.length, 0) - 1
       : 0,
     remainingDistance: calcRemainingDistance(),
+    remainingDuration: _remainingDuration,
     elapsedSec: _elapsedSec,
     destLat: _destLat,
     destLng: _destLng,

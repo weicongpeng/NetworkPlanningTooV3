@@ -317,12 +317,71 @@ async def update_offline_path(config: OfflineMapConfig) -> Dict[str, Any]:
 # ---------- 导航路线规划代理 ----------
 
 AMAP_DIRECTION_API = "https://restapi.amap.com/v3/direction"
+AMAP_IP_LOCATION_API = "https://restapi.amap.com/v3/ip"
 
 MODE_MAP = {
     "drive": "driving",
     "walk": "walking",
     "bicycling": "bicycling",
 }
+
+
+@router.get("/ip-location", response_model=Dict[str, Any])
+async def get_ip_location():
+    """通过高德 IP 定位获取当前位置（兜底方案，适合室内/无 GPS 环境）
+    
+    注意：IP 定位精度较低（城市级），仅作为无法获取精确位置时的兜底。
+    精度说明：
+    - WiFi 环境：约 100m-1km
+    - 移动网络：约 1km-5km
+    - 宽带/企业网络：可能不准
+    """
+    params = {
+        "key": settings.AMAP_API_KEY,
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(AMAP_IP_LOCATION_API, params=params)
+            data = resp.json()
+
+        if data.get("status") != "1":
+            info = data.get("info", "未知错误")
+            return {"success": False, "error": f"IP定位失败: {info}"}
+
+        # 解析返回数据
+        # 返回格式: {rectangle:"minlng,minlat,maxlng,maxlat", location:"lng,lat", ...}
+        location = data.get("location", "")
+        if not location:
+            return {"success": False, "error": "IP定位未返回坐标"}
+
+        lng, lat = location.split(",")
+        rectangle = data.get("rectangle", "")
+        accuracy = "unknown"
+        
+        if rectangle:
+            # 根据边界框估算精度
+            parts = rectangle.split(",")
+            if len(parts) == 4:
+                min_lng, min_lat, max_lng, max_lat = map(float, parts)
+                # 粗略估算精度（米）
+                accuracy = f"{int(max(abs(max_lng - min_lng) * 111000, int(abs(max_lat - min_lat) * 111000)))}m"
+
+        return {
+            "success": True,
+            "data": {
+                "lat": float(lat),
+                "lng": float(lng),
+                "accuracy": accuracy,
+                "source": "ip",
+                "city": data.get("city", ""),
+                "province": data.get("province", ""),
+            }
+        }
+    except httpx.TimeoutException:
+        return {"success": False, "error": "IP定位请求超时"}
+    except Exception as e:
+        return {"success": False, "error": f"IP定位失败: {str(e)}"}
 
 
 @router.get("/direction", response_model=Dict[str, Any])
@@ -353,15 +412,28 @@ async def get_direction(
             resp = await client.get(url, params=params)
             data = resp.json()
 
-        if data.get("status") != "1":
-            info = data.get("info", "未知错误")
-            infocode = data.get("infocode", "")
+        # 高德API v3 (驾车/步行): status="1" 表示成功
+        # 高德API v4 (骑行): errcode=0 表示成功
+        is_v3_success = data.get("status") == "1"
+        is_v4_success = data.get("errcode") == 0
+
+        if not is_v3_success and not is_v4_success:
+            # 优先使用v3错误格式，否则使用v4错误格式
+            info = data.get("info", data.get("errmsg", "未知错误"))
+            infocode = data.get("infocode", data.get("errcode", ""))
             detail = f"方向规划失败: {info}"
             if infocode:
                 detail += f" (code: {infocode})"
             return {"success": False, "error": detail}
 
-        return {"success": True, "data": data.get("route", {})}
+        # v3 API: 数据在 data.route 下
+        # v4 API: 数据在 data.data 下
+        if is_v4_success:
+            route_data = data.get("data", {})
+        else:
+            route_data = data.get("route", {})
+
+        return {"success": True, "data": route_data}
     except httpx.TimeoutException:
         return {"success": False, "error": "请求高德API超时"}
     except Exception as e:

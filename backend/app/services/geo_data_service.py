@@ -211,17 +211,7 @@ class GeoDataService:
     def _extract_data(
         self, df: pd.DataFrame, fields: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
-        """
-        提取并转换坐标数据
-
-        Args:
-            df: 数据框
-            fields: 检测到的字段映射
-
-        Returns:
-            解析后的数据列表
-        """
-        result = []
+        """提取并转换坐标数据（to_dict 优化版本）"""
         lon_col = fields["longitude"]
         lat_col = fields["latitude"]
         azi_col = fields.get("azimuth")
@@ -229,17 +219,18 @@ class GeoDataService:
         cover_col = fields.get("cell_cover_type")
         name_col = fields.get("name")
 
-        for idx, row in df.iterrows():
+        records = df.to_dict("records")
+        result = []
+
+        for idx, rec in enumerate(records):
             try:
-                # 提取并转换坐标
-                lon = float(row[lon_col])
-                lat = float(row[lat_col])
+                lon = float(rec[lon_col])
+                lat = float(rec[lat_col])
 
                 # WGS84 -> GCJ02 坐标转换
                 gcj_lat, gcj_lon = CoordinateTransformer.wgs84_to_gcj02(lat, lon)
 
-                # 基础坐标数据（作为元数据放在根部）
-                point = {
+                point: Dict[str, Any] = {
                     "longitude": lon,
                     "latitude": lat,
                     "displayLng": gcj_lon,
@@ -247,62 +238,55 @@ class GeoDataService:
                     "properties": {},
                 }
 
-                # 提取名称（如果存在，则作为快捷访问放在根部，但保留原始列在 properties 中）
-                if name_col and pd.notna(row[name_col]):
-                    point["name"] = str(row[name_col])
+                # 名称
+                name_val = rec.get(name_col) if name_col else None
+                if name_val is not None and not (isinstance(name_val, float) and math.isnan(name_val)):
+                    point["name"] = str(name_val)
                 else:
-                    point["name"] = f"点_{idx + 1}"
+                    point["name"] = "点_" + str(idx + 1)
 
-                # 提取方位角（如果存在，作为快捷访问放在根部）
-                # 注意：输入数据中的方位角是角度单位（0-360度）
-                if azi_col and pd.notna(row[azi_col]):
-                    try:
-                        azimuth = float(row[azi_col])
-                        point["azimuth"] = azimuth % 360
-                    except (ValueError, TypeError):
-                        pass
+                # 方位角
+                if azi_col:
+                    azi_val = rec.get(azi_col)
+                    if azi_val is not None and not (isinstance(azi_val, float) and math.isnan(azi_val)):
+                        try:
+                            point["azimuth"] = float(azi_val) % 360
+                        except (ValueError, TypeError):
+                            pass
 
-                # 提取波束宽度
-                if beam_col and pd.notna(row[beam_col]):
-                    try:
-                        beam_val = float(row[beam_col])
-                        point["beamwidth"] = max(5, min(120, beam_val))
-                    except (ValueError, TypeError):
-                        point["beamwidth"] = 65
+                # 波束宽度
+                if beam_col:
+                    beam_val = rec.get(beam_col)
+                    if beam_val is not None and not (isinstance(beam_val, float) and math.isnan(beam_val)):
+                        try:
+                            point["beamwidth"] = max(5, min(120, float(beam_val)))
+                        except (ValueError, TypeError):
+                            point["beamwidth"] = 65
 
-                # 提取覆盖类型
-                if cover_col and pd.notna(row[cover_col]):
-                    try:
-                        cover_val = str(row[cover_col]).lower()
-                        if (
-                            "indoor" in cover_val
-                            or "室内" in cover_val
-                            or cover_val == "4"
-                        ):
-                            point["cell_cover_type"] = 4
-                        elif (
-                            "outdoor" in cover_val
-                            or "室外" in cover_val
-                            or cover_val == "1"
-                        ):
+                # 覆盖类型
+                if cover_col:
+                    cover_val = rec.get(cover_col)
+                    if cover_val is not None and not (isinstance(cover_val, float) and math.isnan(cover_val)):
+                        try:
+                            cover_str = str(cover_val).lower()
+                            if "indoor" in cover_str or cover_str == "4":
+                                point["cell_cover_type"] = 4
+                            elif "outdoor" in cover_str or cover_str == "1":
+                                point["cell_cover_type"] = 1
+                            else:
+                                point["cell_cover_type"] = int(float(cover_str))
+                        except (ValueError, TypeError):
                             point["cell_cover_type"] = 1
-                        else:
-                            point["cell_cover_type"] = int(float(row[cover_col]))
-                    except (ValueError, TypeError):
-                        point["cell_cover_type"] = 1
 
-                # 保存「所有」原始字段到 properties，不再排除已检测字段
-                # 这样做是为了保证标签设置下拉框能看到原始列名（如“小区名称”、“小区方位角”）
-                for col in df.columns:
-                    val = row[col]
-                    if pd.notna(val):
-                        # 排除掉转换后的内部字段名，防止混淆
-                        if col not in ["displayLng", "displayLat"]:
-                            point["properties"][col] = val
+                # 保存所有原始字段到 properties（dict O(1) 访问）
+                for k, v in rec.items():
+                    if isinstance(v, float) and math.isnan(v):
+                        continue
+                    if k not in ("displayLng", "displayLat"):
+                        point["properties"][k] = v
 
                 result.append(point)
             except (ValueError, TypeError):
-                # 跳过无效数据行
                 continue
 
         return result
@@ -365,7 +349,7 @@ class GeoDataService:
         self, df: pd.DataFrame, fields: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
         """
-        提取多边形数据
+        提取多边形数据（to_dict 优化版本）
 
         Returns:
             [{
@@ -375,64 +359,55 @@ class GeoDataService:
             }]
         """
         print(f"[_extract_polygon_data] 开始提取，共 {len(df)} 行数据")
-        result = []
         polygon_col = fields.get("polygon")
         name_col = fields.get("name")
         print(f"[_extract_polygon_data] POLYGON列: {polygon_col}, 名称列: {name_col}")
 
-        for idx, row in df.iterrows():
+        records = df.to_dict("records")
+        result = []
+
+        for idx, rec in enumerate(records):
             try:
-                polygon_val = row[polygon_col] if polygon_col else None
-                if not polygon_val or pd.isna(polygon_val):
+                polygon_val = rec.get(polygon_col) if polygon_col else None
+                if polygon_val is None or (isinstance(polygon_val, float) and math.isnan(polygon_val)):
                     print(f"[_extract_polygon_data] 第{idx + 1}行: POLYGON值为空，跳过")
                     continue
 
-                print(
-                    f"[_extract_polygon_data] 第{idx + 1}行 POLYGON: {str(polygon_val)[:80]}..."
-                )
+                print(f"[_extract_polygon_data] 第{idx + 1}行 POLYGON: {str(polygon_val)[:80]}...")
 
-                # 解析POLYGON（现已返回已转换的 [[lat, lng], ...]）
                 success, error_msg, path = self._parse_polygon(str(polygon_val))
                 if not success:
-                    print(
-                        f"[_extract_polygon_data] 第{idx + 1}行POLYGON解析失败: {error_msg}"
-                    )
+                    print(f"[_extract_polygon_data] 第{idx + 1}行POLYGON解析失败: {error_msg}")
                     continue
 
-                print(
-                    f"[_extract_polygon_data] 第{idx + 1}行解析成功，坐标数: {len(path)}"
-                )
+                print(f"[_extract_polygon_data] 第{idx + 1}行解析成功，坐标数: {len(path)}")
 
-                # 提取名称
+                # 名称
+                name_val = rec.get(name_col) if name_col else None
                 name = (
-                    str(row[name_col])
-                    if name_col and pd.notna(row[name_col])
+                    str(name_val)
+                    if name_val is not None and not (isinstance(name_val, float) and math.isnan(name_val))
                     else f"多边形_{idx + 1}"
                 )
 
-                polygon = {
+                polygon: Dict[str, Any] = {
                     "name": name,
-                    "path": path,  # 已转换的坐标，直接用于Leaflet positions
+                    "path": path,
                     "properties": {},
                 }
 
-                # 提取所有原始字段到properties
-                for col in df.columns:
-                    val = row[col]
-                    if pd.notna(val):
-                        if col not in [
-                            "path",
-                            "coordinates",
-                            "displayLng",
-                            "displayLat",
-                            polygon_col,
-                        ]:
-                            polygon["properties"][col] = val
+                # 所有原始字段到properties（dict O(1) 访问）
+                exclude_keys = {"path", "coordinates", "displayLng", "displayLat"}
+                if polygon_col:
+                    exclude_keys.add(polygon_col)
+                for k, v in rec.items():
+                    if isinstance(v, float) and math.isnan(v):
+                        continue
+                    if k not in exclude_keys:
+                        polygon["properties"][k] = v
 
                 result.append(polygon)
-                print(
-                    f"[_extract_polygon_data] 已添加第{idx + 1}个多边形，当前总数: {len(result)}"
-                )
+                print(f"[_extract_polygon_data] 已添加第{idx + 1}个多边形，当前总数: {len(result)}")
             except Exception as e:
                 print(f"[_extract_polygon_data] 第{idx + 1}行处理失败: {e}")
                 continue

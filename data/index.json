@@ -1,38 +1,37 @@
 {
-  "bbb0b288-3311-4ad7-828e-232b0c2db868": {
-    "id": "bbb0b288-3311-4ad7-828e-232b0c2db868",
-    "name": "中兴工参-2026-4-21.xlsx",
-    "type": "excel",
-    "fileType": "geo_data",
-    "geometryType": "sector",
-    "sourceType": "excel",
-    "size": 9594374,
-    "uploadDate": "2026-05-06T00:47:04.728204",
+  "33dcdc92-f609-4c1c-a8c7-1374de62cd6d": {
+    "id": "33dcdc92-f609-4c1c-a8c7-1374de62cd6d",
+    "name": "BaselineLab_172.16.34.163_1777518578_2210747.zip",
+    "type": "map",
+    "subType": "offline",
+    "size": 3928404,
+    "originalPath": null,
+    "uploadDate": "2026-05-09T23:53:25.007797",
     "status": "ready",
     "metadata": {
-      "pointCount": 8008
+      "fileCount": 10
     }
   },
-  "d2abd0d2-41b2-43f4-9b86-edfc8c9798d6": {
-    "id": "d2abd0d2-41b2-43f4-9b86-edfc8c9798d6",
+  "6b104f7f-9883-467a-9aad-5ac47657a310": {
+    "id": "6b104f7f-9883-467a-9aad-5ac47657a310",
     "name": "4G_TAC.zip",
     "type": "map",
     "subType": "mapinfo",
     "size": 30113,
     "originalPath": null,
-    "uploadDate": "2026-05-06T08:41:56.096803",
+    "uploadDate": "2026-05-09T23:53:48.673130",
     "status": "ready",
     "metadata": {
       "fileCount": 6,
       "layerCount": 1,
       "layers": [
         {
-          "id": "a030cd7d-739f-496c-9957-339bf238aaee",
+          "id": "8cfaf535-4113-40d3-a573-66f21e87bccc",
           "name": "4G_TAC",
           "type": "polygon",
           "feature_count": 23,
           "metadata": {
-            "source_file": "D:\\mycode\\NetworkPlanningTooV3\\data\\d2abd0d2-41b2-43f4-9b86-edfc8c9798d6\\4G_TAC.TAB",
+            "source_file": "D:\\mycode\\NetworkPlanningTooV3\\data\\6b104f7f-9883-467a-9aad-5ac47657a310\\4G_TAC.TAB",
             "feature_count": 23,
             "name": "4G_TAC",
             "coord_sys": "unknown",
@@ -52,26 +51,26 @@
       ]
     }
   },
-  "7bef3f57-9cd6-4a7b-b646-d9de5fea72cb": {
-    "id": "7bef3f57-9cd6-4a7b-b646-d9de5fea72cb",
+  "1f2dfd4d-238b-4902-9283-aac3374cc5c2": {
+    "id": "1f2dfd4d-238b-4902-9283-aac3374cc5c2",
     "name": "5G TAC.zip",
     "type": "map",
     "subType": "mapinfo",
     "size": 9188,
     "originalPath": null,
-    "uploadDate": "2026-05-06T08:41:56.505780",
+    "uploadDate": "2026-05-09T23:53:49.515498",
     "status": "ready",
     "metadata": {
       "fileCount": 5,
       "layerCount": 1,
       "layers": [
         {
-          "id": "0a3f2c9f-25f0-46d5-a184-8a3589aaa6e2",
+          "id": "704cec4e-75b1-47ce-973b-ce7a70b70749",
           "name": "河源5G-TAC",
           "type": "polygon",
           "feature_count": 51,
           "metadata": {
-            "source_file": "D:\\mycode\\NetworkPlanningTooV3\\data\\7bef3f57-9cd6-4a7b-b646-d9de5fea72cb\\河源5G-TAC.TAB",
+            "source_file": "D:\\mycode\\NetworkPlanningTooV3\\data\\1f2dfd4d-238b-4902-9283-aac3374cc5c2\\河源5G-TAC.TAB",
             "feature_count": 51,
             "name": "河源5G-TAC",
             "coord_sys": "unknown",
@@ -89,43 +88,14 @@
       ]
     }
   },
-  "672cdae9-0f8d-407a-abed-cd7b7edd8953": {
-    "id": "672cdae9-0f8d-407a-abed-cd7b7edd8953",
-    "name": "cell-tree-export.xlsx",
-    "type": "excel",
-    "fileType": "target_cells",
-    "size": 14827,
-    "originalPath": null,
-    "uploadDate": "2026-05-09T08:53:01.715610",
-    "status": "ready",
-    "metadata": {
-      "LTESiteCount": 56,
-      "LTESectorCount": 201,
-      "NRSiteCount": 0,
-      "NRSectorCount": 0
-    }
-  },
-  "72e908e6-91eb-4532-9157-1aa73e378678": {
-    "id": "72e908e6-91eb-4532-9157-1aa73e378678",
-    "name": "BaselineLab_172.16.34.163_1778290813_6891959.zip",
-    "type": "map",
-    "subType": "offline",
-    "size": 3974361,
-    "originalPath": null,
-    "uploadDate": "2026-05-09T09:51:14.427767",
-    "status": "ready",
-    "metadata": {
-      "fileCount": 10
-    }
-  },
-  "44e0e035-21ac-4e01-957c-81e7b7f68a55": {
-    "id": "44e0e035-21ac-4e01-957c-81e7b7f68a55",
+  "dacd1e48-11c6-4aa8-b37c-542a6f788112": {
+    "id": "dacd1e48-11c6-4aa8-b37c-542a6f788112",
     "name": "ProjectParameter_mongoose河源电联20260509095124.xlsx",
     "type": "excel",
     "fileType": "full_params",
-    "size": 5127964,
+    "size": 5127931,
     "originalPath": null,
-    "uploadDate": "2026-05-09T15:16:47.493787",
+    "uploadDate": "2026-05-10T11:10:18.463352",
     "status": "ready",
     "metadata": {
       "LTESiteCount": 4065,
@@ -134,41 +104,34 @@
       "NRSectorCount": 15499
     }
   },
-  "041c8639-f5aa-4c94-b2c9-48bcb811dec8": {
-    "id": "041c8639-f5aa-4c94-b2c9-48bcb811dec8",
-    "name": "赣深高铁线路.zip",
-    "type": "map",
-    "subType": "mapinfo",
-    "size": 2663,
+  "e8f82531-9ed0-44ff-b45d-6d2fbf7a8e8e": {
+    "id": "e8f82531-9ed0-44ff-b45d-6d2fbf7a8e8e",
+    "name": "cell-tree-export.xlsx",
+    "type": "excel",
+    "fileType": "target_cells",
+    "size": 14827,
     "originalPath": null,
-    "uploadDate": "2026-05-09T16:28:14.739928",
+    "uploadDate": "2026-05-10T11:10:29.994500",
     "status": "ready",
     "metadata": {
-      "fileCount": 5,
-      "layerCount": 1,
-      "layers": [
-        {
-          "id": "f52b8a72-24d4-4dba-96c0-4e99e60d3754",
-          "name": "赣深高铁路线图",
-          "type": "point",
-          "feature_count": 3,
-          "metadata": {
-            "source_file": "D:\\mycode\\NetworkPlanningTooV3\\data\\041c8639-f5aa-4c94-b2c9-48bcb811dec8\\赣深高铁路线图.TAB",
-            "feature_count": 3,
-            "name": "赣深高铁路线图",
-            "coord_sys": "unknown",
-            "fields": [
-              "WindowsSimpChinese",
-              "\\IsReadOnly",
-              "FALSE",
-              "\\MapInfo",
-              "\\MapInfo\\TableID",
-              "1aa45dc1-becd-480f-8692-f91f54a8075b"
-            ],
-            "description": ""
-          }
-        }
-      ]
+      "LTESiteCount": 56,
+      "LTESectorCount": 201,
+      "NRSiteCount": 0,
+      "NRSectorCount": 0
+    }
+  },
+  "b106b809-d688-4b34-b50b-23dff6b84334": {
+    "id": "b106b809-d688-4b34-b50b-23dff6b84334",
+    "name": "中兴工参-2026-4-21.xlsx",
+    "type": "excel",
+    "fileType": "geo_data",
+    "geometryType": "sector",
+    "sourceType": "excel",
+    "size": 9594374,
+    "uploadDate": "2026-05-10T11:12:16.157814",
+    "status": "ready",
+    "metadata": {
+      "pointCount": 8008
     }
   }
 }

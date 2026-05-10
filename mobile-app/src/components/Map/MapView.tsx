@@ -3,6 +3,7 @@ import { View, StyleSheet, Text, ActivityIndicator } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { useMapStore } from '../../store/mapStore';
 import { resetNavUiAutoHide } from '../../services/navigationService';
+import { wgs84ToGcj02 } from '../../utils/coordinate';
 
 export interface MapViewRef {
   moveCamera: (lat: number, lng: number, zoom?: number) => void;
@@ -12,11 +13,15 @@ export interface MapViewRef {
   hideDestinationMarker: () => void;
   updateUserLocation: (lat: number, lng: number, heading?: number) => void;
   clearUserLocation: () => void;
-  fitRouteBounds: (polyline: [number, number][]) => void;
+  fitRouteBounds: (polyline: [number, number][], totalDistance?: number) => void;
   locateMe: (lat: number, lng: number, zoom?: number) => void;
   startAutoFit: () => void;
   stopAutoFit: () => void;
   injectJavaScript: (script: string) => void;
+  /** 通过高德定位获取当前位置（GCJ-02），适合中国大陆室内定位 */
+  amapGetPosition: () => Promise<{ lat: number; lng: number; accuracy: number; source: string } | null>;
+  /** 更新导航剩余距离，供 auto-fit 动态 zoom 使用 */
+  setNavRemainingDistance: (dist: number) => void;
 }
 
 interface Props {
@@ -29,6 +34,7 @@ interface Props {
   onMeasureClear?: () => void;
   onSectorOverlap?: (sectors: any[], lat: number, lng: number) => void;
   onMapInteraction?: () => void;
+  onMapReady?: () => void;
 }
 
 const AMAP_KEY = '9fa8b08372c3c764fd14d0bc74862ad1';
@@ -104,7 +110,7 @@ const HTML_TEMPLATE = `
     .amap-copyright { display: none !important; }
   </style>
   <script id="amap-script"
-    src="https://webapi.amap.com/maps?v=2.0&key=${AMAP_KEY}&callback=onAMapLoaded"
+    src="https://webapi.amap.com/maps?v=2.0&key=${AMAP_KEY}&callback=onAMapLoaded&plugin=AMap.Geolocation"
     onload="window._amapScriptLoaded=true;"
     onerror="window._amapScriptError=true;">
   </script>
@@ -114,6 +120,7 @@ const HTML_TEMPLATE = `
   <script>
     (function() {
       var map = null;
+      var geolocationPlugin = null;
       var sectorOverlayGroup = null;
       var markerOverlayGroup = null;
       var measureOverlayGroup = null;
@@ -135,11 +142,12 @@ const HTML_TEMPLATE = `
       var lastTapTime = 0;
       var touchHandled = false;
 
-      // Auto-fit variables: 5秒无操作自动恢复实时定位导航视图
+      // Auto-fit variables: 3秒无操作自动恢复实时定位导航视图
       var _autoFitTimer = null;
       var _autoFitEnabled = false;
       var _currentUserPos = null;         // [lat, lng] from updateUserLocation
       var _programmaticMove = false;      // 防止程序移动触发 auto-fit 循环
+      var _navDefaultZoom = 18;           // 导航中默认zoom值
 
       function log(msg) {
         if (window.ReactNativeWebView) {
@@ -275,6 +283,9 @@ const HTML_TEMPLATE = `
           window.map = map;
           log('Map initialized');
 
+          // AMap Geolocation 插件延迟初始化（在 doGetPosition 中按需初始化）
+          // 避免在地图初始化时占用资源，同时确保插件可用性
+
           map.on('complete', function() {
             log('Map tiles loaded');
           });
@@ -342,6 +353,20 @@ const HTML_TEMPLATE = `
             if (_programmaticMove) { _programmaticMove = false; return; }
             startAutoFitTimer();
           });
+
+          // 导航视窗动态调整：根据剩余距离计算最佳 zoom，让用户看清近端路线
+          window.getNavZoom = function(remainingDistance) {
+            if (!remainingDistance || remainingDistance <= 0) return 17;
+            // 剩余距离越短，zoom 越大（地图越放大），便于看清近端路线细节
+            if (remainingDistance < 50) return 19;
+            if (remainingDistance < 120) return 18;
+            if (remainingDistance < 250) return 17;
+            if (remainingDistance < 500) return 16;
+            if (remainingDistance < 1000) return 15;
+            if (remainingDistance < 2000) return 14;
+            if (remainingDistance < 5000) return 13;
+            return 12;
+          };
 
           // ---- RELIABLE TAP DETECTION ----
           // On mobile WebView, AMap overlay click events are unreliable because the
@@ -973,20 +998,41 @@ const HTML_TEMPLATE = `
         });
         routeOverlayGroup.addOverlay(routeLine);
 
-        // 添加方向箭头标记，每隔约300米一个
+        // 添加方向箭头标记，根据地图缩放动态调整间隔
         if (polyline.length >= 2) {
-          var arrowInterval = 300; // 米
+          // 根据当前地图缩放级别计算箭头间隔
+          // 缩放级别越高（地图越放大），间隔越小（箭头更密集）
+          // 缩放级别越低（地图越缩小），间隔越大（箭头更稀疏）
+          var zoom = map.getZoom() || 15;
+          // 动态间隔: zoom 10 -> 1000m, zoom 15 -> 200m, zoom 17 -> 80m, zoom 18 -> 50m
+          var arrowInterval = Math.max(50, Math.min(1000, Math.round(1000000 / Math.pow(2.5, zoom))));
           var accumulatedDist = 0;
           var nextArrowDist = arrowInterval;
+          var totalRouteDist = 0;
 
+          // 先计算总距离
           for (var i = 0; i < polyline.length - 1; i++) {
+            totalRouteDist += getHaversineDistance(polyline[i][1], polyline[i][0], polyline[i + 1][1], polyline[i + 1][0]);
+          }
+
+          // 如果路线太短，不添加箭头或只添加少量
+          if (totalRouteDist < arrowInterval * 0.5) {
+            arrowInterval = totalRouteDist / 2;
+            nextArrowDist = arrowInterval;
+          }
+
+          // 限制最大箭头数量，避免过于密集
+          var maxArrows = Math.min(30, Math.max(3, Math.floor(totalRouteDist / arrowInterval)));
+          var arrowCount = 0;
+
+          for (var i = 0; i < polyline.length - 1 && arrowCount < maxArrows; i++) {
             var p1 = polyline[i];
             var p2 = polyline[i + 1];
             var segDist = getHaversineDistance(p1[1], p1[0], p2[1], p2[0]);
             var bearing = getRouteBearing(p1, p2);
 
             // 检查这段路是否包含下一个箭头位置
-            while (accumulatedDist + segDist >= nextArrowDist && nextArrowDist < accumulatedDist + segDist + 1) {
+            while (accumulatedDist + segDist >= nextArrowDist && nextArrowDist < accumulatedDist + segDist + 1 && arrowCount < maxArrows) {
               // 计算箭头在这段路上的位置比例
               var ratio = (nextArrowDist - accumulatedDist) / segDist;
               var arrowLng = p1[0] + (p2[0] - p1[0]) * ratio;
@@ -1005,6 +1051,7 @@ const HTML_TEMPLATE = `
               });
               map.add(arrowMarker);
               _routeArrowMarkers.push(arrowMarker);
+              arrowCount++;
 
               nextArrowDist += arrowInterval;
             }
@@ -1123,7 +1170,174 @@ const HTML_TEMPLATE = `
         _currentUserPos = null;
       };
 
-      // Auto-fit: 用户拖拽/缩放后5秒无操作 → 恢复实时定位导航视图
+      // === 定位：混合策略 ===
+      // 1. 优先使用 HTML5 Geolocation API（Android WebView + 定位权限即可用）
+      // 2. 降级使用 AMap Geolocation 插件
+      // 3. 最终降级：IP 定位（通过 RN 调用后端 API）
+      var _positioning = false;
+      var _geolocationPluginReady = false;
+
+      // 初始化 AMap Geolocation 插件（延迟到地图加载完成后）
+      function initGeolocationPlugin() {
+        try {
+          if (typeof AMap === 'undefined' || !AMap.Geolocation) {
+            log('initGeolocationPlugin: AMap.Geolocation not available');
+            return false;
+          }
+          geolocationPlugin = new AMap.Geolocation({
+            timeout: 15000,
+            maximumAge: 60000,
+            convert: true,
+            showButton: false,
+            buttonPosition: 'LB',
+            showMarker: false,
+            showCircle: false,
+            useNative: false,
+            noGeoLocate: false,
+            GeoLocationFirst: false,
+            panToLocation: false,
+          });
+          _geolocationPluginReady = true;
+          log('initGeolocationPlugin: AMap Geolocation plugin initialized');
+          return true;
+        } catch (e) {
+          log('initGeolocationPlugin error: ' + (e.message || e));
+          return false;
+        }
+      }
+
+      // 核心定位函数：返回 GCJ-02 坐标
+      function doGetPosition(callback) {
+        if (_positioning) {
+          log('getPosition: already positioning, skip');
+          callback('error', 'Already positioning');
+          return;
+        }
+        _positioning = true;
+
+        // 确保插件已初始化
+        if (!_geolocationPluginReady && !initGeolocationPlugin()) {
+          log('getPosition: AMap plugin not available, will try HTML5 only');
+        }
+
+        var html5Timeout = null;
+        var amapTimeout = null;
+        var completed = false;
+
+        function done(status, data) {
+          if (completed) return;
+          completed = true;
+          if (html5Timeout) { clearTimeout(html5Timeout); html5Timeout = null; }
+          if (amapTimeout) { clearTimeout(amapTimeout); amapTimeout = null; }
+          _positioning = false;
+          callback(status, data);
+        }
+
+        // 方法1：HTML5 Geolocation（Android WebView 中可用）
+        if (navigator && navigator.geolocation) {
+          log('getPosition: 尝试 HTML5 Geolocation...');
+
+          // HTML5 定位超时处理
+          html5Timeout = setTimeout(function() {
+            if (!completed) {
+              log('getPosition: HTML5 timeout (10s), trying AMap...');
+              tryAmapPlugin();
+            }
+          }, 10000);
+
+          navigator.geolocation.getCurrentPosition(
+            function(pos) {
+              if (completed) return;
+              var lat = pos.coords.latitude;
+              var lng = pos.coords.longitude;
+              var accuracy = pos.coords.accuracy || 0;
+              log('getPosition: HTML5 success [' + lat.toFixed(6) + ', ' + lng.toFixed(6) + '], accuracy=' + Math.round(accuracy) + 'm');
+              done('success_wgs84', { lat: lat, lng: lng, accuracy: accuracy, source: 'html5' });
+            },
+            function(err) {
+              if (completed) return;
+              log('getPosition: HTML5 failed - ' + (err.message || err) + ' (code=' + (err.code || 'unknown') + ')');
+              // HTML5 失败，尝试 AMap
+              tryAmapPlugin();
+            },
+            {
+              enableHighAccuracy: false,
+              timeout: 12000,
+              maximumAge: 60000,
+            }
+          );
+        } else {
+          log('getPosition: HTML5 Geolocation not available');
+          tryAmapPlugin();
+        }
+
+        // 方法2：AMap Geolocation 插件
+        function tryAmapPlugin() {
+          if (completed) return;
+          if (!geolocationPlugin) {
+            log('getPosition: AMap plugin not available');
+            done('error', 'No geolocation available');
+            return;
+          }
+
+          log('getPosition: 尝试 AMap Geolocation 插件...');
+          amapTimeout = setTimeout(function() {
+            if (!completed) {
+              log('getPosition: AMap timeout (15s)');
+              done('error', 'AMap positioning timeout');
+            }
+          }, 15000);
+
+          geolocationPlugin.getCurrentPosition(function(status, result) {
+            if (completed) return;
+            if (status === 'complete' && result && result.position) {
+              var gcjLat = result.position.lat;
+              var gcjLng = result.position.lng;
+              var acc = result.accuracy || 0;
+              var src = result.location_type || 'amap';
+              log('getPosition: AMap plugin success [' + gcjLat.toFixed(6) + ', ' + gcjLng.toFixed(6) + '], accuracy=' + Math.round(acc) + 'm, type=' + src);
+              done('success_gcj02', { lat: gcjLat, lng: gcjLng, accuracy: acc, source: src });
+            } else {
+              var errMsg = (result && result.message) || 'AMap plugin failed';
+              log('getPosition: AMap plugin failed - ' + errMsg);
+              done('error', errMsg);
+            }
+          });
+        }
+      }
+
+      // 暴露给 RN 调用的接口
+      window.amapGetPosition = function() {
+        log('amapGetPosition: 开始定位（混合策略）');
+        doGetPosition(function(status, data) {
+          if (status === 'success_wgs84') {
+            log('amapGetPosition: 返回 WGS84 坐标');
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'locationSuccess',
+              lat: data.lat,
+              lng: data.lng,
+              accuracy: data.accuracy,
+              source: data.source,
+              coordinateSystem: 'WGS84'
+            }));
+          } else if (status === 'success_gcj02') {
+            log('amapGetPosition: 返回 GCJ-02 坐标');
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'locationSuccess',
+              lat: data.lat,
+              lng: data.lng,
+              accuracy: data.accuracy,
+              source: data.source,
+              coordinateSystem: 'GCJ02'
+            }));
+          } else {
+            log('amapGetPosition: 失败 - ' + data);
+            window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'locationError', error: data }));
+          }
+        });
+      };
+
+      // Auto-fit
       function clearAutoFitTimer() {
         if (_autoFitTimer) {
           clearTimeout(_autoFitTimer);
@@ -1136,10 +1350,11 @@ const HTML_TEMPLATE = `
         _autoFitTimer = setTimeout(function() {
           if (_autoFitEnabled && _currentUserPos && map) {
             _programmaticMove = true;
-            map.setZoomAndCenter(15, [_currentUserPos[1], _currentUserPos[0]]);
+            // 导航模式下固定使用 zoom=18，让用户看清近端路线细节
+            map.setZoomAndCenter(_navDefaultZoom, [_currentUserPos[1], _currentUserPos[0]]);
           }
           _autoFitTimer = null;
-        }, 5000);
+        }, 3000);
       }
 
       window.enableAutoFit = function() { _autoFitEnabled = true; };
@@ -1147,16 +1362,33 @@ const HTML_TEMPLATE = `
         _autoFitEnabled = false;
         clearAutoFitTimer();
       };
+      // 更新导航剩余距离（供 auto-fit 动态 zoom 使用）
+      window.setNavRemainingDistance = function(dist) {
+        window._navRemainingDistance = dist;
+      };
 
-      // fitRouteBounds：展示路线全局视野，标记为程序移动避免触发 auto-fit 循环
-      window.fitRouteBounds = function(polyline) {
+      // fitRouteBounds：展示路线全局视野，根据路线距离动态调整缩放
+      window.fitRouteBounds = function(polyline, totalDistance) {
         if (!map || !polyline || polyline.length === 0) return;
         _programmaticMove = true;
         var bounds = new AMap.Bounds();
         for (var i = 0; i < polyline.length; i++) {
           bounds.extend(new AMap.LngLat(polyline[i][0], polyline[i][1]));
         }
-        map.setBounds(bounds, null, false, [80, 80, 80, 80]);
+        // 根据路线距离动态调整缩放级别
+        // 短距离路线放大到 zoom 17-19，长距离路线缩小到 zoom 12-13
+        var targetZoom = 16; // 默认
+        if (totalDistance) {
+          if (totalDistance < 100) targetZoom = 19;
+          else if (totalDistance < 200) targetZoom = 18;
+          else if (totalDistance < 400) targetZoom = 17;
+          else if (totalDistance < 800) targetZoom = 16;
+          else if (totalDistance < 1500) targetZoom = 15;
+          else if (totalDistance < 3000) targetZoom = 14;
+          else if (totalDistance < 6000) targetZoom = 13;
+          else targetZoom = 12;
+        }
+        map.setBounds(bounds, targetZoom, false, [80, 80, 80, 80]);
       };
 
       // ==================== TAB 图层渲染 ====================
@@ -1530,6 +1762,9 @@ export default forwardRef<MapViewRef, Props>(function MapView(props, ref) {
   const webViewRef = useRef<WebView>(null);
   const [mapReady, setMapReady] = useState(false);
   const prevCenterRef = useRef<string | null>(null);
+  // AMap 定位结果回调
+  const _amapPositionResolve = useRef<((pos: { lat: number; lng: number; accuracy: number; source: string } | null) => void) | null>(null);
+  const _amapPositionReject = useRef<((err: string) => void) | null>(null);
 
   const {
     lteSectors,
@@ -1546,7 +1781,7 @@ export default forwardRef<MapViewRef, Props>(function MapView(props, ref) {
     focusLocation,
     setFocusLocation,
   } = useMapStore();
-  const { onMapPress, onLongPress, onMarkerClick, onMeasureFinish, onMeasureClear, onSectorOverlap, onMapInteraction } = props;
+  const { onMapPress, onLongPress, onMarkerClick, onMeasureFinish, onMeasureClear, onSectorOverlap, onMapInteraction, onMapReady } = props;
   const showSatellite = props.showSatellite;
 
   const injectJS = useCallback((code: string) => {
@@ -1648,6 +1883,7 @@ export default forwardRef<MapViewRef, Props>(function MapView(props, ref) {
         case 'mapReady':
           setMapReady(true);
           syncAllData();
+          onMapReady?.();
           break;
         case 'mapClick':
           console.log('[MapView] mapClick:', data.lat, data.lng);
@@ -1693,6 +1929,31 @@ export default forwardRef<MapViewRef, Props>(function MapView(props, ref) {
           onMapInteraction?.();
           resetNavUiAutoHide();
           break;
+        case 'locationSuccess':
+          console.log('[MapView] locationSuccess:', data.lat, data.lng, 'accuracy:', data.accuracy, 'source:', data.source, 'coordSys:', data.coordinateSystem);
+          if (_amapPositionResolve.current) {
+            let gcjLat = data.lat;
+            let gcjLng = data.lng;
+            // 如果是 WGS84 坐标，转换为 GCJ-02
+            if (data.coordinateSystem === 'WGS84') {
+              const [convertedLat, convertedLng] = wgs84ToGcj02(data.lat, data.lng);
+              gcjLat = convertedLat;
+              gcjLng = convertedLng;
+              console.log('[MapView] WGS84→GCJ02:', data.lat.toFixed(6), data.lng.toFixed(6), '→', gcjLat.toFixed(6), gcjLng.toFixed(6));
+            }
+            _amapPositionResolve.current({ lat: gcjLat, lng: gcjLng, accuracy: data.accuracy, source: data.source });
+            _amapPositionResolve.current = null;
+            _amapPositionReject.current = null;
+          }
+          break;
+        case 'locationError':
+          console.error('[MapView] AMap locationError:', data.error);
+          if (_amapPositionReject.current) {
+            _amapPositionReject.current(data.error);
+            _amapPositionResolve.current = null;
+            _amapPositionReject.current = null;
+          }
+          break;
       }
     } catch (err) {
       console.error('[MapView] message error:', err);
@@ -1721,8 +1982,8 @@ export default forwardRef<MapViewRef, Props>(function MapView(props, ref) {
     clearUserLocation: () => {
       injectJS('window.clearUserLocation();');
     },
-    fitRouteBounds: (polyline: [number, number][]) => {
-      injectJS(`window.fitRouteBounds(${JSON.stringify(polyline)});`);
+    fitRouteBounds: (polyline: [number, number][], totalDistance?: number) => {
+      injectJS(`window.fitRouteBounds(${JSON.stringify(polyline)}, ${totalDistance || 0});`);
     },
     locateMe: (lat: number, lng: number, zoom?: number) => {
       injectJS(`window.moveCamera(${lat}, ${lng}, ${zoom || 16});`);
@@ -1734,8 +1995,27 @@ export default forwardRef<MapViewRef, Props>(function MapView(props, ref) {
     stopAutoFit: () => {
       injectJS('window.disableAutoFit();');
     },
+    setNavRemainingDistance: (dist: number) => {
+      injectJS(`window.setNavRemainingDistance(${dist});`);
+    },
     injectJavaScript: (script: string) => {
       injectJS(script);
+    },
+    amapGetPosition: (): Promise<{ lat: number; lng: number; accuracy: number; source: string } | null> => {
+      console.log('[MapView] amapGetPosition: 请求高德定位...');
+      return new Promise((resolve, reject) => {
+        _amapPositionResolve.current = resolve;
+        _amapPositionReject.current = reject;
+        // 设置超时（15秒）
+        setTimeout(() => {
+          if (_amapPositionReject.current) {
+            _amapPositionReject.current('高德定位超时');
+            _amapPositionResolve.current = null;
+            _amapPositionReject.current = null;
+          }
+        }, 15000);
+        injectJS('window.amapGetPosition();');
+      });
     },
   }));
 
@@ -1748,6 +2028,7 @@ export default forwardRef<MapViewRef, Props>(function MapView(props, ref) {
         onMessage={handleMessage}
         javaScriptEnabled={true}
         domStorageEnabled={true}
+        geolocationEnabled={true}
         startInLoadingState={true}
         allowFileAccess={true}
         mixedContentMode="compatibility"
